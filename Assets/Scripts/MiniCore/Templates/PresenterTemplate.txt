@@ -1,0 +1,9 @@
+using MiniCore.Model;
+
+public class {PRESENTER_CLASS} : APresenter<{VIEW_CLASS}>
+{
+    protected override void OnBind()
+    {
+        // TODO: 初始化 Presenter 逻辑
+    }
+}

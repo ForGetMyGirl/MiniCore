@@ -1,0 +1,117 @@
+{
+    "FileVersion": "2025.9.30",
+    "EnableAddressable": true,
+    "SupportExtensionless": true,
+    "LocationToLower": false,
+    "IncludeAssetGUID": false,
+    "ReplaceAssetPathWithAddress": false,
+    "OutputNameStyle": 0,
+    "BuildBundleType": 2,
+    "BuildPipeline": "ScriptableBuildPipeline",
+    "PackageName": "DefaultPackage",
+    "PackageVersion": "2026-01-12-1337",
+    "PackageNote": "2026/1/12 22:17:19",
+    "AssetList": [
+        {
+            "Address": "KcpTestWindow",
+            "AssetPath": "Assets/AssetRes/Prefabs/UI/KcpTestWindow.prefab",
+            "AssetGUID": "",
+            "AssetTags": [],
+            "BundleID": 0,
+            "DependBundleIDs": [
+                2,
+                3,
+                4,
+                5
+            ]
+        },
+        {
+            "Address": "MainScene",
+            "AssetPath": "Assets/Scenes/HotScene/MainScene.unity",
+            "AssetGUID": "",
+            "AssetTags": [],
+            "BundleID": 1,
+            "DependBundleIDs": [
+                3,
+                4,
+                5
+            ]
+        }
+    ],
+    "BundleList": [
+        {
+            "BundleName": "assets_assetres_prefabs_ui.bundle",
+            "UnityCRC": 3197977049,
+            "FileHash": "a10e150eec26b949c69cad8934113ed9",
+            "FileCRC": 3334207653,
+            "FileSize": 23037,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": [
+                2,
+                3,
+                4,
+                5
+            ]
+        },
+        {
+            "BundleName": "assets_scenes_hotscene.bundle",
+            "UnityCRC": 3311976458,
+            "FileHash": "153097e75046cb55ea2522049a35fe90",
+            "FileCRC": 4023835818,
+            "FileSize": 114697,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": [
+                3,
+                4,
+                5
+            ]
+        },
+        {
+            "BundleName": "share_assets_assetres_fonts_tmp.bundle",
+            "UnityCRC": 3360457955,
+            "FileHash": "1e2ae605eb2e2d8c23a77abd735d9701",
+            "FileCRC": 4287147162,
+            "FileSize": 14495220,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": [
+                5
+            ]
+        },
+        {
+            "BundleName": "share_assets_textmesh_pro_fonts.bundle",
+            "UnityCRC": 3371153973,
+            "FileHash": "e07a8fc63c9cb87a89257529f90617d0",
+            "FileCRC": 3331489098,
+            "FileSize": 227375,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": []
+        },
+        {
+            "BundleName": "share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+            "UnityCRC": 1187865144,
+            "FileHash": "323867051b5d99ec06c9bc035eb3d1ba",
+            "FileCRC": 1258995294,
+            "FileSize": 373522,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": [
+                3,
+                5
+            ]
+        },
+        {
+            "BundleName": "unityshaders.bundle",
+            "UnityCRC": 2042217175,
+            "FileHash": "d91b0655eb6dc07648b9adba26d69b0f",
+            "FileCRC": 2649290675,
+            "FileSize": 26770,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundleIDs": []
+        }
+    ]
+}

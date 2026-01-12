@@ -1,0 +1,274 @@
+{
+    "Summary": {
+        "YooVersion": "2.3.18",
+        "UnityVersion": "2021.3.45f2c1",
+        "BuildDate": "2026/1/12 22:17:32",
+        "BuildSeconds": 12,
+        "BuildTarget": 19,
+        "BuildPipeline": "ScriptableBuildPipeline",
+        "BuildBundleType": 2,
+        "BuildPackageName": "DefaultPackage",
+        "BuildPackageVersion": "2026-01-12-1337",
+        "BuildPackageNote": "2026/1/12 22:17:19",
+        "UniqueBundleName": false,
+        "EnableAddressable": true,
+        "SupportExtensionless": true,
+        "LocationToLower": false,
+        "IncludeAssetGUID": false,
+        "AutoCollectShaders": true,
+        "IgnoreRuleName": "YooAsset.Editor.NormalIgnoreRule",
+        "ClearBuildCacheFiles": true,
+        "UseAssetDependencyDB": true,
+        "EnableSharePackRule": true,
+        "SingleReferencedPackAlone": true,
+        "EncryptionServicesClassName": "YooAsset.Editor.EncryptionNone",
+        "ManifestProcessServicesClassName": "YooAsset.Editor.ManifestProcessNone",
+        "ManifestRestoreServicesClassName": "YooAsset.Editor.ManifestRestoreNone",
+        "FileNameStyle": 0,
+        "CompressOption": 2,
+        "DisableWriteTypeTree": false,
+        "IgnoreTypeTreeChanges": true,
+        "ReplaceAssetPathWithAddress": false,
+        "WriteLinkXML": true,
+        "CacheServerHost": "",
+        "CacheServerPort": 0,
+        "BuiltinShadersBundleName": "unityshaders.bundle",
+        "MonoScriptsBundleName": "",
+        "AssetFileTotalCount": 10,
+        "MainAssetTotalCount": 2,
+        "AllBundleTotalCount": 6,
+        "AllBundleTotalSize": 15260621,
+        "EncryptedBundleTotalCount": 0,
+        "EncryptedBundleTotalSize": 0
+    },
+    "AssetInfos": [
+        {
+            "Address": "KcpTestWindow",
+            "AssetPath": "Assets/AssetRes/Prefabs/UI/KcpTestWindow.prefab",
+            "AssetGUID": "7deeba7047d7dec40b8e317337e3b810",
+            "AssetTags": [],
+            "MainBundleName": "assets_assetres_prefabs_ui.bundle",
+            "MainBundleSize": 23037,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/AssetRes/Fonts/TMP/AlimamaDongFangDaKai-Regular SDF.asset",
+                    "AssetGUID": "37701b3db94d35141991390dfca23d27"
+                },
+                {
+                    "AssetPath": "Assets/AssetRes/Fonts/TMP/AlimamaDongFangDaKai-Regular.ttf",
+                    "AssetGUID": "6f80bc56777173d4dbfd33d8ff8e0884"
+                },
+                {
+                    "AssetPath": "Assets/AssetRes/Fonts/TMP/AlimamaDongFangDaKai-Regular_SpecularChar.asset",
+                    "AssetGUID": "7121ccd2240182340a61b0fcb5aaf47c"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF.shader",
+                    "AssetGUID": "68e6db2ebdc24f95958faec2be5558d6"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "share_assets_assetres_fonts_tmp.bundle",
+                "share_assets_textmesh_pro_fonts.bundle",
+                "share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "unityshaders.bundle"
+            ]
+        },
+        {
+            "Address": "MainScene",
+            "AssetPath": "Assets/Scenes/HotScene/MainScene.unity",
+            "AssetGUID": "2593e0aacebbbed479385413d63d85c7",
+            "AssetTags": [],
+            "MainBundleName": "assets_scenes_hotscene.bundle",
+            "MainBundleSize": 114697,
+            "DependAssets": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ],
+            "DependBundles": [
+                "share_assets_textmesh_pro_fonts.bundle",
+                "share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "unityshaders.bundle"
+            ]
+        }
+    ],
+    "BundleInfos": [
+        {
+            "BundleName": "assets_assetres_prefabs_ui.bundle",
+            "FileName": "a10e150eec26b949c69cad8934113ed9.bundle",
+            "FileHash": "a10e150eec26b949c69cad8934113ed9",
+            "FileCRC": 3334207653,
+            "FileSize": 23037,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "share_assets_assetres_fonts_tmp.bundle",
+                "share_assets_textmesh_pro_fonts.bundle",
+                "share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/AssetRes/Prefabs/UI/KcpTestWindow.prefab",
+                    "AssetGUID": "7deeba7047d7dec40b8e317337e3b810"
+                }
+            ]
+        },
+        {
+            "BundleName": "assets_scenes_hotscene.bundle",
+            "FileName": "153097e75046cb55ea2522049a35fe90.bundle",
+            "FileHash": "153097e75046cb55ea2522049a35fe90",
+            "FileCRC": 4023835818,
+            "FileSize": 114697,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "share_assets_textmesh_pro_fonts.bundle",
+                "share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+                "unityshaders.bundle"
+            ],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Scenes/HotScene/MainScene.unity",
+                    "AssetGUID": "2593e0aacebbbed479385413d63d85c7"
+                }
+            ]
+        },
+        {
+            "BundleName": "share_assets_assetres_fonts_tmp.bundle",
+            "FileName": "1e2ae605eb2e2d8c23a77abd735d9701.bundle",
+            "FileHash": "1e2ae605eb2e2d8c23a77abd735d9701",
+            "FileCRC": 4287147162,
+            "FileSize": 14495220,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "assets_assetres_prefabs_ui.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/AssetRes/Fonts/TMP/AlimamaDongFangDaKai-Regular SDF.asset",
+                    "AssetGUID": "37701b3db94d35141991390dfca23d27"
+                },
+                {
+                    "AssetPath": "Assets/AssetRes/Fonts/TMP/AlimamaDongFangDaKai-Regular.ttf",
+                    "AssetGUID": "6f80bc56777173d4dbfd33d8ff8e0884"
+                },
+                {
+                    "AssetPath": "Assets/AssetRes/Fonts/TMP/AlimamaDongFangDaKai-Regular_SpecularChar.asset",
+                    "AssetGUID": "7121ccd2240182340a61b0fcb5aaf47c"
+                }
+            ]
+        },
+        {
+            "BundleName": "share_assets_textmesh_pro_fonts.bundle",
+            "FileName": "e07a8fc63c9cb87a89257529f90617d0.bundle",
+            "FileHash": "e07a8fc63c9cb87a89257529f90617d0",
+            "FileCRC": 3331489098,
+            "FileSize": 227375,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "assets_assetres_prefabs_ui.bundle",
+                "assets_scenes_hotscene.bundle",
+                "share_assets_textmesh_pro_resources_fonts_&_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
+                    "AssetGUID": "e3265ab4bf004d28a9537516768c1c75"
+                }
+            ]
+        },
+        {
+            "BundleName": "share_assets_textmesh_pro_resources_fonts_&_materials.bundle",
+            "FileName": "323867051b5d99ec06c9bc035eb3d1ba.bundle",
+            "FileHash": "323867051b5d99ec06c9bc035eb3d1ba",
+            "FileCRC": 1258995294,
+            "FileSize": 373522,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [
+                "share_assets_textmesh_pro_fonts.bundle",
+                "unityshaders.bundle"
+            ],
+            "ReferenceBundles": [
+                "assets_assetres_prefabs_ui.bundle",
+                "assets_scenes_hotscene.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+                    "AssetGUID": "2e498d1c8094910479dc3e1b768306a4"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+                    "AssetGUID": "8f586378b4e144a9851e7b34d9b748ee"
+                }
+            ]
+        },
+        {
+            "BundleName": "unityshaders.bundle",
+            "FileName": "d91b0655eb6dc07648b9adba26d69b0f.bundle",
+            "FileHash": "d91b0655eb6dc07648b9adba26d69b0f",
+            "FileCRC": 2649290675,
+            "FileSize": 26770,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [
+                "assets_assetres_prefabs_ui.bundle",
+                "assets_scenes_hotscene.bundle",
+                "share_assets_assetres_fonts_tmp.bundle",
+                "share_assets_textmesh_pro_resources_fonts_&_materials.bundle"
+            ],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF.shader",
+                    "AssetGUID": "68e6db2ebdc24f95958faec2be5558d6"
+                },
+                {
+                    "AssetPath": "Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader",
+                    "AssetGUID": "fe393ace9b354375a9cb14cdbbc28be4"
+                }
+            ]
+        }
+    ],
+    "IndependAssets": []
+}

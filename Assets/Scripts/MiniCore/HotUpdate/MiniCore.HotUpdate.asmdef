@@ -1,0 +1,20 @@
+{
+    "name": "MiniCore.HotUpdate",
+    "rootNamespace": "",
+    "references": [
+        "GUID:26aad5a806fd9f94bb9d2fc72472b0a0",
+        "GUID:016897c86617a974691af1908707de1f",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:e34a5702dd353724aa315fb8011f08c3",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

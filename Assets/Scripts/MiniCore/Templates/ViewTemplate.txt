@@ -1,0 +1,17 @@
+using Cysharp.Threading.Tasks;
+using MiniCore.Model;
+using UnityEngine;
+
+[UIWindow(typeof({PRESENTER_CLASS}))]
+public class {VIEW_CLASS} : AUIBase
+{
+    public override UniTask OpenAsync()
+    {
+        return UniTask.CompletedTask;
+    }
+
+    public override UniTask CloseAsync()
+    {
+        return UniTask.CompletedTask;
+    }
+}
