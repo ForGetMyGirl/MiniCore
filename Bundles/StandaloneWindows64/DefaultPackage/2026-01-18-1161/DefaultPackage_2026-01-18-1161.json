@@ -9,8 +9,8 @@
     "BuildBundleType": 2,
     "BuildPipeline": "ScriptableBuildPipeline",
     "PackageName": "DefaultPackage",
-    "PackageVersion": "2026-01-12-1337",
-    "PackageNote": "2026/1/12 22:17:19",
+    "PackageVersion": "2026-01-18-1161",
+    "PackageNote": "2026/1/18 19:21:13",
     "AssetList": [
         {
             "Address": "KcpTestWindow",
@@ -56,10 +56,10 @@
         },
         {
             "BundleName": "assets_scenes_hotscene.bundle",
-            "UnityCRC": 3311976458,
-            "FileHash": "153097e75046cb55ea2522049a35fe90",
-            "FileCRC": 4023835818,
-            "FileSize": 114697,
+            "UnityCRC": 4274951490,
+            "FileHash": "f9a915c213429bad6aa5316e2858b871",
+            "FileCRC": 645555966,
+            "FileSize": 114625,
             "Encrypted": false,
             "Tags": [],
             "DependBundleIDs": [

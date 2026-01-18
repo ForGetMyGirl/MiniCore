@@ -1,5 +1,7 @@
 using System;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
+using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
 
@@ -16,16 +18,18 @@ namespace MiniCore.HotUpdate
         private bool clientConnected;
         private bool serverRunning;
         private bool serverHandlersBound;
+        private bool localJoined;
         private NetworkSessionComponent sessionComponent;
+        private Action clientDisconnectedHandler;
 
         protected override void OnBind()
         {
             sessionComponent = Global.Com.Get<NetworkSessionComponent>();
             EventCenter.AddListener<string>(HotEvent.KcpTestMessage, OnKcpTestMessage);
             View.OnStartServerClicked += StartServer;
-            View.OnStopServerClicked += StopServer;
+            View.OnStopServerClicked += () => StopServerAsync().Forget();
             View.OnConnectClientClicked += ConnectClient;
-            View.OnDisconnectClientClicked += DisconnectClient;
+            View.OnDisconnectClientClicked += () => DisconnectClientAsync().Forget();
             View.OnSendRpcClicked += SendRpc;
             View.OnSendNormalClicked += SendNormal;
         }
@@ -96,11 +100,35 @@ namespace MiniCore.HotUpdate
             session?.Transport?.Disconnect();
             sessionComponent.RemoveSession(ClientSessionId);
             clientConnected = false;
+            localJoined = false;
             View.UpdatePrompt("客户端已主动断开连接。");
         }
 
         private async UniTaskVoid ConnectClientAsync()
         {
+            if (clientConnected)
+            {
+                var session = sessionComponent.GetSession(ClientSessionId);
+                if (session != null && session.IsConnected)
+                {
+                    var net = Global.Com.Get<NetworkMessageComponent>();
+                    bool alive = await net.ProbeSessionAsync(ClientSessionId, TimeSpan.FromMilliseconds(500));
+                    if (alive)
+                    {
+                        View.UpdatePrompt("客户端已连接。");
+                        return;
+                    }
+                }
+                sessionComponent.DisconnectSession(ClientSessionId);
+                clientConnected = false;
+            }
+
+            var existingSession = sessionComponent.GetSession(ClientSessionId);
+            if (clientConnected && (existingSession == null || !existingSession.IsConnected))
+            {
+                clientConnected = false;
+            }
+
             if (clientConnected)
             {
                 View.UpdatePrompt("客户端已连接。");
@@ -125,8 +153,37 @@ namespace MiniCore.HotUpdate
                 View.UpdatePrompt($"连接参数 host:{host} port:{connectPort} conv:{conv}");
 
                 var net = Global.Com.Get<NetworkMessageComponent>();
-                await net.InitializeKcpSessionAsync(ClientSessionId, host, connectPort, conv);
+                bool ok = await net.ConnectKcpSessionAsync(ClientSessionId, host, connectPort, conv);
+                if (!ok)
+                {
+                    clientConnected = false;
+                    View.UpdatePrompt("客户端连接失败（心跳探测超时）。");
+                    return;
+                }
                 clientConnected = true;
+                var session = sessionComponent.GetSession(ClientSessionId);
+                if (session?.Transport != null)
+                {
+                    if (clientDisconnectedHandler != null)
+                    {
+                        session.Transport.OnDisconnected -= clientDisconnectedHandler;
+                    }
+                    clientDisconnectedHandler = () =>
+                    {
+                        UniTask.Void(async () =>
+                        {
+                            await UniTask.SwitchToMainThread();
+                            if (!clientConnected)
+                            {
+                                return;
+                            }
+                            clientConnected = false;
+                            localJoined = false;
+                            View.UpdatePrompt("服务端已停止，客户端连接已断开。");
+                        });
+                    };
+                    session.Transport.OnDisconnected += clientDisconnectedHandler;
+                }
                 View.UpdatePrompt($"客户端已连接 {host}:{connectPort} conv:{conv}");
             }
             catch (Exception ex)
@@ -134,6 +191,69 @@ namespace MiniCore.HotUpdate
                 View.UpdatePrompt($"客户端连接失败：{ex.Message}");
                 EventCenter.Broadcast(GameEvent.LogError, ex);
             }
+        }
+
+        private async UniTaskVoid DisconnectClientAsync()
+        {
+            if (!clientConnected)
+            {
+                View.UpdatePrompt("客户端未连接，无法断开。");
+                return;
+            }
+
+            try
+            {
+                var net = Global.Com.Get<NetworkMessageComponent>();
+                await net.SendAsync(ClientSessionId, new DisconnectNotice
+                {
+                    IsServerShutdown = false,
+                    Reason = "ClientDisconnect"
+                });
+            }
+            catch (Exception ex)
+            {
+                EventCenter.Broadcast(GameEvent.LogWarning, $"客户端断开通知发送失败: {ex.Message}");
+            }
+            finally
+            {
+                sessionComponent.DisconnectSession(ClientSessionId);
+                clientConnected = false;
+                localJoined = false;
+                View.UpdatePrompt("客户端已主动断开连接。");
+            }
+        }
+
+        private async UniTaskVoid StopServerAsync()
+        {
+            if (!serverRunning)
+            {
+                View.UpdatePrompt("服务端未运行。");
+                return;
+            }
+
+            try
+            {
+                var net = Global.Com.Get<NetworkMessageComponent>();
+                var serverSessions = sessionComponent.GetServerSessionsSnapshot();
+                for (int i = 0; i < serverSessions.Count; i++)
+                {
+                    var session = serverSessions[i];
+                    await net.SendAsync(session.SessionId, new DisconnectNotice
+                    {
+                        IsServerShutdown = true,
+                        Reason = "ServerStopping"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                EventCenter.Broadcast(GameEvent.LogWarning, $"服务端关闭通知发送失败: {ex.Message}");
+            }
+
+            await UniTask.Delay(200);
+            sessionComponent.StopKcpServer();
+            serverRunning = false;
+            View.UpdatePrompt("服务端已停止。");
         }
 
         private void SendNormal()
@@ -148,6 +268,23 @@ namespace MiniCore.HotUpdate
 
         private async UniTaskVoid SendNormalAsync()
         {
+            var currentSession = sessionComponent.GetSession(ClientSessionId);
+            if (clientConnected && (currentSession == null || !currentSession.IsConnected))
+            {
+                clientConnected = false;
+            }
+
+            if (clientConnected)
+            {
+                var session = sessionComponent.GetSession(ClientSessionId);
+                if (session == null || !session.IsConnected)
+                {
+                    clientConnected = false;
+                    View.UpdatePrompt("客户端会话已断开，请重新连接。");
+                    return;
+                }
+            }
+
             if (!clientConnected)
             {
                 View.UpdatePrompt("客户端未连接。");
@@ -170,6 +307,17 @@ namespace MiniCore.HotUpdate
 
         private async UniTaskVoid SendRpcAsync()
         {
+            if (clientConnected)
+            {
+                var session = sessionComponent.GetSession(ClientSessionId);
+                if (session == null || !session.IsConnected)
+                {
+                    clientConnected = false;
+                    View.UpdatePrompt("客户端会话已断开，请重新连接。");
+                    return;
+                }
+            }
+
             if (!clientConnected)
             {
                 View.UpdatePrompt("客户端未连接。");
@@ -191,6 +339,7 @@ namespace MiniCore.HotUpdate
                 EventCenter.Broadcast(GameEvent.LogError, ex);
             }
         }
+
 
         private void HandleServerSessionCreated(NetworkSession session)
         {

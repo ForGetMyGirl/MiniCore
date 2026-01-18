@@ -1091,8 +1091,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 192c47f2d60e6f045a75fb8acc3859f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  kcpTestWindowAssetPath: KcpTestWindow
   packageName: DefaultPackage
-  kcpTestWindowPath: KcpTestWindow
 --- !u!4 &1059927275
 Transform:
   m_ObjectHideFlags: 0

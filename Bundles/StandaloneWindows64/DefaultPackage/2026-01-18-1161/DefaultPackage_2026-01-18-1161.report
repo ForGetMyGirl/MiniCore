@@ -2,14 +2,14 @@
     "Summary": {
         "YooVersion": "2.3.18",
         "UnityVersion": "2021.3.45f2c1",
-        "BuildDate": "2026/1/12 22:17:32",
-        "BuildSeconds": 12,
+        "BuildDate": "2026/1/18 19:21:24",
+        "BuildSeconds": 10,
         "BuildTarget": 19,
         "BuildPipeline": "ScriptableBuildPipeline",
         "BuildBundleType": 2,
         "BuildPackageName": "DefaultPackage",
-        "BuildPackageVersion": "2026-01-12-1337",
-        "BuildPackageNote": "2026/1/12 22:17:19",
+        "BuildPackageVersion": "2026-01-18-1161",
+        "BuildPackageNote": "2026/1/18 19:21:13",
         "UniqueBundleName": false,
         "EnableAddressable": true,
         "SupportExtensionless": true,
@@ -37,7 +37,7 @@
         "AssetFileTotalCount": 10,
         "MainAssetTotalCount": 2,
         "AllBundleTotalCount": 6,
-        "AllBundleTotalSize": 15260621,
+        "AllBundleTotalSize": 15260549,
         "EncryptedBundleTotalCount": 0,
         "EncryptedBundleTotalSize": 0
     },
@@ -96,7 +96,7 @@
             "AssetGUID": "2593e0aacebbbed479385413d63d85c7",
             "AssetTags": [],
             "MainBundleName": "assets_scenes_hotscene.bundle",
-            "MainBundleSize": 114697,
+            "MainBundleSize": 114625,
             "DependAssets": [
                 {
                     "AssetPath": "Assets/TextMesh Pro/Fonts/LiberationSans.ttf",
@@ -147,10 +147,10 @@
         },
         {
             "BundleName": "assets_scenes_hotscene.bundle",
-            "FileName": "153097e75046cb55ea2522049a35fe90.bundle",
-            "FileHash": "153097e75046cb55ea2522049a35fe90",
-            "FileCRC": 4023835818,
-            "FileSize": 114697,
+            "FileName": "f9a915c213429bad6aa5316e2858b871.bundle",
+            "FileHash": "f9a915c213429bad6aa5316e2858b871",
+            "FileCRC": 645555966,
+            "FileSize": 114625,
             "Encrypted": false,
             "Tags": [],
             "DependBundles": [

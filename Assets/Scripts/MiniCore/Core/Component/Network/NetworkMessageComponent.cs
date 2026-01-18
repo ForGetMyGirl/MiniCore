@@ -1,8 +1,10 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using MiniCore.Model;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using UnityEngine;
 
@@ -22,6 +24,8 @@ namespace MiniCore.Core
         private readonly Dictionary<uint, RpcHandlerInfo> rpcHandlers = new Dictionary<uint, RpcHandlerInfo>();
         private readonly Dictionary<string, HeartbeatState> heartbeatStates = new Dictionary<string, HeartbeatState>();
         private readonly Dictionary<Type, uint> opcodeCache = new Dictionary<Type, uint>();
+        private readonly ConcurrentQueue<IncomingPacket> incomingPackets = new ConcurrentQueue<IncomingPacket>();
+        private int processingQueue;
 
         private class PendingRpc
         {
@@ -56,11 +60,20 @@ namespace MiniCore.Core
             public HeartbeatMode Mode;
         }
 
+        private struct IncomingPacket
+        {
+            public NetworkSession Session;
+            public byte[] Buffer;
+            public int Length;
+        }
+
         public string DefaultSessionId { get; set; } = "default";
         public uint PingOpcode { get; set; } = 1;
         public uint PongOpcode { get; set; } = 2;
         public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);
         public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(15);
+        private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2);
+        
 
         public override void Awake()
         {
@@ -79,10 +92,40 @@ namespace MiniCore.Core
         {
             await InitializeSessionAsync(DefaultSessionId, host, port, token);
         }
-
+/*
         public async UniTask InitializeDefaultKcpSessionAsync(string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
         {
             await InitializeKcpSessionAsync(DefaultSessionId, host, port, conv, config, token);
+        }*/
+
+        public UniTask<bool> ConnectDefaultKcpSessionAsync(string host, int port, uint conv, TimeSpan probeTimeout = default, KcpTransportConfig config = null, CancellationToken token = default)
+        {
+            return ConnectKcpSessionAsync(DefaultSessionId, host, port, conv, probeTimeout, config, token);
+        }
+
+        public async UniTask<bool> ConnectKcpSessionAsync(string sessionId, string host, int port, uint conv, TimeSpan probeTimeout = default, KcpTransportConfig config = null, CancellationToken token = default)
+        {
+            try
+            {
+                await InitializeKcpSessionAsync(sessionId, host, port, conv, config, token);
+            }
+            catch (Exception ex)
+            {
+                LogSwitch.Warning($"Kcp session init failed: {ex.Message}");
+                return false;
+            }
+
+            if (probeTimeout <= TimeSpan.Zero)
+            {
+                probeTimeout = DefaultProbeTimeout;
+            }
+
+            bool ok = await ProbeSessionAsync(sessionId, probeTimeout, token);
+            if (!ok)
+            {
+                sessionComponent?.RemoveSession(sessionId);
+            }
+            return ok;
         }
 
         public async UniTask InitializeSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
@@ -107,6 +150,58 @@ namespace MiniCore.Core
             BindSessionReceiverInternal(sessionId, HeartbeatMode.Server);
         }
 
+        protected override void Update()
+        {
+            if (incomingPackets.IsEmpty)
+            {
+                return;
+            }
+
+            if (Interlocked.CompareExchange(ref processingQueue, 1, 0) != 0)
+            {
+                return;
+            }
+
+            ProcessQueueAsync().Forget();
+        }
+
+        public async UniTask<bool> ProbeSessionAsync(string sessionId, TimeSpan timeout, CancellationToken token = default)
+        {
+            if (!heartbeatStates.TryGetValue(sessionId, out var state))
+            {
+                return false;
+            }
+
+            if (!TryGetSession(sessionId, out var session))
+            {
+                return false;
+            }
+            long lastPong = state.LastPongTicks;
+            var start = DateTimeOffset.UtcNow;
+            var nextPing = start;
+            while (!token.IsCancellationRequested && DateTimeOffset.UtcNow - start < timeout)
+            {
+                if (DateTimeOffset.UtcNow >= nextPing)
+                {
+                    try
+                    {
+                        await SendPingAsync(session, token);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                    nextPing = DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(200);
+                }
+                if (heartbeatStates.TryGetValue(sessionId, out var updated) && updated.LastPongTicks != lastPong)
+                {
+                    return true;
+                }
+                await UniTask.Delay(50, cancellationToken: token);
+            }
+            return false;
+        }
+
         public UniTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request, CancellationToken token = default)
             where TRequest : IRequest
             where TResponse : IResponse
@@ -118,7 +213,10 @@ namespace MiniCore.Core
             where TRequest : IRequest
             where TResponse : IResponse
         {
-            var session = GetSessionOrThrow(sessionId);
+            if (!TryGetSession(sessionId, out var session))
+            {
+                return CreateLocalErrorResponse<TResponse>($"Session {sessionId} not found.");
+            }
 
             long rpcId = rpcIdGenerator++;
             request.RpcId = rpcId;
@@ -127,8 +225,14 @@ namespace MiniCore.Core
             pendingRpcs[rpcId] = new PendingRpc { ResponseType = typeof(TResponse), Tcs = tcs };
 
             uint opcode = ResolveOpcode(request.GetType(), request.Opcode);
-            EventCenter.Broadcast(GameEvent.LogInfo, $"[{GetLogSide(session.SessionId)}] 发送RPC opcode:{opcode} rpcId:{rpcId} type:{request.GetType().FullName}");
+            string sendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            LogSwitch.Info($"[{sendTime}] [{GetLogSide(session.SessionId)}] 发送RPC opcode:{opcode} rpcId:{rpcId} type:{request.GetType().FullName}");
             byte[] payload = GetSerializer().Serialize(request);
+            if (LogSwitch.EnablePayloadLog)
+            {
+                string payloadText = Encoding.UTF8.GetString(payload);
+                LogSwitch.Info($"[{sendTime}] 发送RPC内容: {payloadText}");
+            }
             byte[] body = BuildPacket(opcode, rpcId, payload);
             await session.SendAsync(new ArraySegment<byte>(body), token);
 
@@ -143,10 +247,20 @@ namespace MiniCore.Core
 
         public async UniTask SendAsync<TMessage>(string sessionId, TMessage message, CancellationToken token = default) where TMessage : IProtocol
         {
-            var session = GetSessionOrThrow(sessionId);
+            if (!TryGetSession(sessionId, out var session))
+            {
+                LogSwitch.Warning($"Session {sessionId} not found, send skipped.");
+                return;
+            }
             uint opcode = ResolveOpcode(message.GetType(), message.Opcode);
-            EventCenter.Broadcast(GameEvent.LogInfo, $"[{GetLogSide(session.SessionId)}] 发送普通消息 opcode:{opcode} rpcId:0 type:{message.GetType().FullName}");
+            string sendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            LogSwitch.Info($"[{sendTime}] [{GetLogSide(session.SessionId)}] 发送普通消息 opcode:{opcode} rpcId:0 type:{message.GetType().FullName}");
             byte[] payload = GetSerializer().Serialize(message);
+            if (LogSwitch.EnablePayloadLog)
+            {
+                string payloadText = Encoding.UTF8.GetString(payload);
+                LogSwitch.Info($"[{sendTime}] 发送普通消息内容: {payloadText}");
+            }
             byte[] body = BuildPacket(opcode, 0, payload);
             await session.SendAsync(new ArraySegment<byte>(body), token);
         }
@@ -160,7 +274,7 @@ namespace MiniCore.Core
             var asm = Array.Find(assemblies, a => a.FullName.Contains(assemblyName));
             if (asm == null)
             {
-                EventCenter.Broadcast(GameEvent.LogWarning, $"未找到包含 {assemblyName} 的程序集，跳过自动注册。");
+                LogSwitch.Warning($"未找到包含 {assemblyName} 的程序集，跳过自动注册。");
                 return;
             }
 
@@ -179,7 +293,7 @@ namespace MiniCore.Core
 
                 if (!OpcodeRegistry.TryGetHandlerInfo(opcode, out _, out string requestTypeName, out string responseTypeName, out bool isRpc))
                 {
-                    EventCenter.Broadcast(GameEvent.LogWarning, $"Opcode 注册信息缺失: {type.FullName} (opcode:{opcode})，请重新生成映射。");
+                    LogSwitch.Warning($"Opcode 注册信息缺失: {type.FullName} (opcode:{opcode})，请重新生成映射。");
                     continue;
                 }
 
@@ -187,12 +301,12 @@ namespace MiniCore.Core
                 Type responseType = string.IsNullOrEmpty(responseTypeName) ? null : ResolveType(assemblies, responseTypeName);
                 if (requestType == null)
                 {
-                    EventCenter.Broadcast(GameEvent.LogWarning, $"未找到请求类型 {requestTypeName}，handler: {type.FullName}");
+                    LogSwitch.Warning($"未找到请求类型 {requestTypeName}，handler: {type.FullName}");
                     continue;
                 }
                 if (isRpc && responseType == null)
                 {
-                    EventCenter.Broadcast(GameEvent.LogWarning, $"未找到响应类型 {responseTypeName}，RPC handler: {type.FullName}");
+                    LogSwitch.Warning($"未找到响应类型 {responseTypeName}，RPC handler: {type.FullName}");
                     continue;
                 }
 
@@ -200,7 +314,7 @@ namespace MiniCore.Core
                 var handleMethod = type.GetMethod("HandleAsync", BindingFlags.Instance | BindingFlags.Public);
                 if (handleMethod == null)
                 {
-                    EventCenter.Broadcast(GameEvent.LogWarning, $"未找到 HandleAsync 方法: {type.FullName}");
+                    LogSwitch.Warning($"未找到 HandleAsync 方法: {type.FullName}");
                     continue;
                 }
 
@@ -208,7 +322,7 @@ namespace MiniCore.Core
                 {
                     if (rpcHandlers.ContainsKey(opcode))
                     {
-                        EventCenter.Broadcast(GameEvent.LogError, $"RPC opcode 冲突:{opcode}，已跳过 {type.FullName}");
+                        LogSwitch.Error($"RPC opcode 冲突:{opcode}，已跳过 {type.FullName}");
                         continue;
                     }
 
@@ -224,7 +338,7 @@ namespace MiniCore.Core
                 {
                     if (handlers.ContainsKey(opcode))
                     {
-                        EventCenter.Broadcast(GameEvent.LogError, $"普通消息 opcode 冲突:{opcode}，{type.FullName} 与 {handlers[opcode].MessageType.FullName} 冲突，已跳过");
+                        LogSwitch.Error($"普通消息 opcode 冲突:{opcode}，{type.FullName} 与 {handlers[opcode].MessageType.FullName} 冲突，已跳过");
                         continue;
                     }
 
@@ -237,7 +351,7 @@ namespace MiniCore.Core
                 }
             }
 
-            EventCenter.Broadcast(GameEvent.LogInfo, $"自动注册完成: 普通消息 {normalCount} 个，RPC {rpcCount} 个，程序集: {asm.FullName}");
+            LogSwitch.Info($"自动注册完成: 普通消息 {normalCount} 个，RPC {rpcCount} 个，程序集: {asm.FullName}");
         }
 
         private Type ResolveType(Assembly[] assemblies, string fullName)
@@ -273,7 +387,7 @@ namespace MiniCore.Core
         {
             if (data.Length < 12)
             {
-                EventCenter.Broadcast(GameEvent.LogWarning, "包长度无效，头部不足。");
+                LogSwitch.Warning("包长度无效，头部不足。");
                 return;
             }
 
@@ -283,7 +397,8 @@ namespace MiniCore.Core
             int payloadLength = data.Length - 12;
             ReadOnlyMemory<byte> payload = payloadLength > 0 ? data.Slice(12, payloadLength) : ReadOnlyMemory<byte>.Empty;
 
-            EventCenter.Broadcast(GameEvent.LogInfo, $"[{GetLogSide(session.SessionId)}] 收到消息 opcode:{opcode} rpcId:{rpcId} len:{payloadLength}");
+            string recvTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            LogSwitch.Info($"[{recvTime}] [{GetLogSide(session.SessionId)}] 收到消息 opcode:{opcode} rpcId:{rpcId} len:{payloadLength}");
 
             // Heartbeat handling
             if (opcode == PingOpcode)
@@ -314,7 +429,7 @@ namespace MiniCore.Core
                 }
                 catch (Exception ex)
                 {
-                    EventCenter.Broadcast(GameEvent.LogError, $"反序列化响应失败 opcode:{opcode} rpcId:{rpcId} err:{ex.Message}");
+                    LogSwitch.Error($"反序列化响应失败 opcode:{opcode} rpcId:{rpcId} err:{ex.Message}");
                     pending.Tcs.TrySetException(ex);
                 }
                 return;
@@ -325,7 +440,7 @@ namespace MiniCore.Core
                 object req = GetSerializer().Deserialize(rpcInfo.RequestType, payload);
                 if (!(Activator.CreateInstance(rpcInfo.ResponseType) is IResponse response))
                 {
-                    EventCenter.Broadcast(GameEvent.LogError, $"RPC响应实例创建失败，类型:{rpcInfo.ResponseType?.FullName}");
+                    LogSwitch.Error($"RPC响应实例创建失败，类型:{rpcInfo.ResponseType?.FullName}");
                     return;
                 }
 
@@ -336,21 +451,27 @@ namespace MiniCore.Core
                 }
                 catch (Exception ex)
                 {
-                    EventCenter.Broadcast(GameEvent.LogError, $"RPC处理器执行异常，opcode:{opcode} 会话:{session.SessionId} 错误:{ex}");
+                    LogSwitch.Error($"RPC处理器执行异常，opcode:{opcode} 会话:{session.SessionId} 错误:{ex}");
                     return;
                 }
 
                 uint respOpcode = ResolveOpcode(response.GetType(), response.Opcode);
-                EventCenter.Broadcast(GameEvent.LogInfo, $"[{GetLogSide(session.SessionId)}] 发送RPC响应 opcode:{respOpcode} rpcId:{rpcId} type:{response.GetType().FullName}");
+                string sendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                LogSwitch.Info($"[{sendTime}] [{GetLogSide(session.SessionId)}] 发送RPC响应 opcode:{respOpcode} rpcId:{rpcId} type:{response.GetType().FullName}");
                 try
                 {
                     byte[] respPayload = GetSerializer().Serialize(response);
+                    if (LogSwitch.EnablePayloadLog)
+                    {
+                        string payloadText = Encoding.UTF8.GetString(respPayload);
+                        LogSwitch.Info($"[{sendTime}] 发送RPC响应内容: {payloadText}");
+                    }
                     byte[] packet = BuildPacket(respOpcode, rpcId, respPayload);
                     await session.SendAsync(new ArraySegment<byte>(packet));
                 }
                 catch (Exception ex)
                 {
-                    EventCenter.Broadcast(GameEvent.LogError, $"RPC响应发送异常，opcode:{respOpcode} 会话:{session.SessionId} 错误:{ex}");
+                    LogSwitch.Error($"RPC响应发送异常，opcode:{respOpcode} 会话:{session.SessionId} 错误:{ex}");
                 }
                 return;
             }
@@ -362,7 +483,7 @@ namespace MiniCore.Core
             }
             else
             {
-                EventCenter.Broadcast(GameEvent.LogWarning, $"未找到 opcode:{opcode} 的处理器");
+                LogSwitch.Warning($"未找到 opcode:{opcode} 的处理器");
             }
         }
 
@@ -408,7 +529,7 @@ namespace MiniCore.Core
                     {
                         string side = GetLogSide(session.SessionId);
                         string text = $"{side}心跳超时，主动断开，会话:{session.SessionId}";
-                        EventCenter.Broadcast(GameEvent.LogWarning, text);
+                        LogSwitch.Warning(text);
                         session.Transport?.Disconnect();
                         break;
                     }
@@ -417,7 +538,7 @@ namespace MiniCore.Core
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                EventCenter.Broadcast(GameEvent.LogWarning, $"心跳循环异常: {ex.Message}");
+                LogSwitch.Warning($"心跳循环异常: {ex.Message}");
             }
         }
 
@@ -432,7 +553,7 @@ namespace MiniCore.Core
                     {
                         string side = GetLogSide(session.SessionId);
                         string text = $"{side}心跳超时，踢出连接，会话:{session.SessionId}";
-                        EventCenter.Broadcast(GameEvent.LogWarning, text);
+                        LogSwitch.Warning(text);
                         session.Transport?.Disconnect();
                         break;
                     }
@@ -441,7 +562,7 @@ namespace MiniCore.Core
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                EventCenter.Broadcast(GameEvent.LogWarning, $"服务端心跳循环异常: {ex.Message}");
+                LogSwitch.Warning($"服务端心跳循环异常: {ex.Message}");
             }
         }
 
@@ -543,14 +664,28 @@ namespace MiniCore.Core
             return ReadInt64BE(buffer.Span, offset);
         }
 
-        private NetworkSession GetSessionOrThrow(string sessionId)
+        private bool TryGetSession(string sessionId, out NetworkSession session)
         {
-            var session = sessionComponent.GetSession(sessionId);
-            if (session == null)
+            session = sessionComponent?.GetSession(sessionId);
+            if (session != null)
             {
-                throw new InvalidOperationException($"Session {sessionId} not found.");
+                return true;
             }
-            return session;
+
+            LogSwitch.Warning($"Session {sessionId} not found.");
+            return false;
+        }
+
+        private TResponse CreateLocalErrorResponse<TResponse>(string message) where TResponse : IResponse
+        {
+            if (Activator.CreateInstance(typeof(TResponse)) is TResponse response)
+            {
+                response.ErrorCode = -1;
+                response.Message = message;
+                return response;
+            }
+
+            throw new InvalidOperationException($"Response type {typeof(TResponse).FullName} cannot be created.");
         }
 
         private INetworkSerializer GetSerializer()
@@ -616,15 +751,57 @@ namespace MiniCore.Core
                 throw new InvalidOperationException($"Session {sessionId} not found or not connected.");
             }
 
-            session.Transport.OnDataReceived += data => HandleIncoming(session, data);
+            session.Transport.OnDataReceived += data => EnqueueIncoming(session, data);
             session.Transport.OnDisconnected += () =>
             {
                 StopHeartbeat(session.SessionId);
                 string side = GetLogSide(session.SessionId);
                 string text = $"{side}连接已断开，会话:{session.SessionId}";
-                EventCenter.Broadcast(GameEvent.LogWarning, text);
+                LogSwitch.Warning(text);
             };
             StartHeartbeat(session, mode);
+        }
+
+        private UniTask EnqueueIncoming(NetworkSession session, ReadOnlyMemory<byte> data)
+        {
+            if (data.IsEmpty)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            int length = data.Length;
+            byte[] buffer = ByteBufferPool.Shared.Rent(length);
+            data.Span.CopyTo(buffer);
+            incomingPackets.Enqueue(new IncomingPacket
+            {
+                Session = session,
+                Buffer = buffer,
+                Length = length
+            });
+            return UniTask.CompletedTask;
+        }
+
+        private async UniTaskVoid ProcessQueueAsync()
+        {
+            try
+            {
+                while (incomingPackets.TryDequeue(out var packet))
+                {
+                    try
+                    {
+                        await UniTask.SwitchToMainThread();
+                        await HandleIncoming(packet.Session, new ReadOnlyMemory<byte>(packet.Buffer, 0, packet.Length));
+                    }
+                    finally
+                    {
+                        ByteBufferPool.Shared.Return(packet.Buffer);
+                    }
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref processingQueue, 0);
+            }
         }
 
         private string GetLogSide(string sessionId)

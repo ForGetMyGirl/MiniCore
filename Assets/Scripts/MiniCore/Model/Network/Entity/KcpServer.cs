@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace MiniCore.Model
 {
@@ -104,18 +105,40 @@ namespace MiniCore.Model
             }
         }
 
+        public void CloseSession(string sessionId)
+        {
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                return;
+            }
+
+            KcpServerSession session;
+            lock (sessionLock)
+            {
+                if (!sessions.TryGetValue(sessionId, out session))
+                {
+                    return;
+                }
+                sessions.Remove(sessionId);
+            }
+
+            session.Close();
+            OnSessionClosed?.Invoke(session);
+        }
+
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
             try
             {
+                await UniTask.SwitchToThreadPool();
                 EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                 while (!token.IsCancellationRequested && running)
                 {
                     SocketReceiveFromResult result = await socket.ReceiveFromAsync(
                         new ArraySegment<byte>(buffer),
                         SocketFlags.None,
-                        remote);
+                        remote).ConfigureAwait(false);
 
                     int received = result.ReceivedBytes;
                     if (received <= 0)
@@ -169,6 +192,7 @@ namespace MiniCore.Model
         {
             try
             {
+                await UniTask.SwitchToThreadPool();
                 while (!token.IsCancellationRequested && running)
                 {
                     uint now = CurrentMS();
@@ -187,7 +211,7 @@ namespace MiniCore.Model
                         }
                     }
 
-                    await UniTask.Delay(config.Interval, cancellationToken: token);
+                    await Task.Delay(config.Interval, token).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)

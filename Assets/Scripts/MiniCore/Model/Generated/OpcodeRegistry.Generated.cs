@@ -6,22 +6,26 @@ namespace MiniCore.Model
     public static partial class OpcodeRegistry
     {
         public const uint DemoNormalMessage = 100001u;
-        public const uint TestNetworkData = 100002u;
-        public const uint DemoRpcRequest = 100003u;
-        public const uint DemoRpcResponse = 100003u;
+        public const uint DisconnectNotice = 100002u;
+        public const uint TestNetworkData = 100003u;
+        public const uint DemoRpcRequest = 200001u;
+        public const uint DemoRpcResponse = 200002u;
 
         static partial void RegisterGenerated(Dictionary<string, uint> handlerToOpcode, Dictionary<uint, HandlerInfo> opcodeToHandler, Dictionary<string, uint> messageToOpcode)
         {
             handlerToOpcode["MiniCore.HotUpdate.DemoNormalHandler"] = 100001;
-            handlerToOpcode["MiniCore.HotUpdate.TestHandler"] = 100002;
-            handlerToOpcode["MiniCore.HotUpdate.DemoRpcHandler"] = 100003;
+            handlerToOpcode["MiniCore.HotUpdate.DisconnectNoticeHandler"] = 100002;
+            handlerToOpcode["MiniCore.HotUpdate.TestHandler"] = 100003;
+            handlerToOpcode["MiniCore.HotUpdate.DemoRpcHandler"] = 200001;
             opcodeToHandler[100001] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DemoNormalHandler", RequestType = "MiniCore.HotUpdate.DemoNormalMessage", ResponseType = "", IsRpc = false };
-            opcodeToHandler[100002] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.TestHandler", RequestType = "MiniCore.HotUpdate.TestNetworkData", ResponseType = "", IsRpc = false };
-            opcodeToHandler[100003] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DemoRpcHandler", RequestType = "MiniCore.HotUpdate.DemoRpcRequest", ResponseType = "MiniCore.HotUpdate.DemoRpcResponse", IsRpc = true };
+            opcodeToHandler[100002] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DisconnectNoticeHandler", RequestType = "MiniCore.HotUpdate.DisconnectNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100003] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.TestHandler", RequestType = "MiniCore.HotUpdate.TestNetworkData", ResponseType = "", IsRpc = false };
+            opcodeToHandler[200001] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DemoRpcHandler", RequestType = "MiniCore.HotUpdate.DemoRpcRequest", ResponseType = "MiniCore.HotUpdate.DemoRpcResponse", IsRpc = true };
             messageToOpcode["MiniCore.HotUpdate.DemoNormalMessage"] = 100001;
-            messageToOpcode["MiniCore.HotUpdate.TestNetworkData"] = 100002;
-            messageToOpcode["MiniCore.HotUpdate.DemoRpcRequest"] = 100003;
-            messageToOpcode["MiniCore.HotUpdate.DemoRpcResponse"] = 100003;
+            messageToOpcode["MiniCore.HotUpdate.DisconnectNotice"] = 100002;
+            messageToOpcode["MiniCore.HotUpdate.TestNetworkData"] = 100003;
+            messageToOpcode["MiniCore.HotUpdate.DemoRpcRequest"] = 200001;
+            messageToOpcode["MiniCore.HotUpdate.DemoRpcResponse"] = 200002;
         }
     }
 }

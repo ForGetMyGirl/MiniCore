@@ -113,12 +113,15 @@ namespace MiniCore.Model
             //{
             //    component.Dispose();
             //}
-            foreach (var type in components.Keys)
+            if (components != null)
             {
-                components[type].Dispose();
-                components[type] = null;
+                foreach (var type in components.Keys)
+                {
+                    components[type].Dispose();
+                    components[type] = null;
+                }
+                components.Clear();
             }
-            components.Clear();
             IsActive = false;
         }
 

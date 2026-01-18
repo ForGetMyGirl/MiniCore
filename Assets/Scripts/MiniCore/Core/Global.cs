@@ -8,6 +8,8 @@ namespace MiniCore.Core
 
     public class Global : MonoBehaviour
     {
+        private bool disposed;
+        private bool isQuitting;
         //public MiniCoreComponent Com { get; private set; }
         //protected override void Init()
         //{
@@ -49,6 +51,17 @@ namespace MiniCore.Core
                 com = this;
                 Init();
             }
+        }
+
+        private void OnApplicationQuit()
+        {
+            isQuitting = true;
+            Shutdown();
+        }
+
+        private void OnDestroy()
+        {
+            Shutdown();
         }
 
         #endregion
@@ -140,9 +153,12 @@ namespace MiniCore.Core
 
         void Update()
         {
-            foreach (var component in components.Values)
+            if (components != null)
             {
-                component.MonoUpdate();
+                foreach (var component in components.Values)
+                {
+                    component.MonoUpdate();
+                }
             }
         }
 
@@ -159,7 +175,24 @@ namespace MiniCore.Core
             {
                 component.Dispose();
             }
-            Destroy(gameObject);
+            if (!isQuitting)
+            {
+                Destroy(gameObject);
+            }
+        }
+
+        private void Shutdown()
+        {
+            if (disposed)
+            {
+                return;
+            }
+            disposed = true;
+            if (components == null)
+            {
+                return;
+            }
+            Dispose();
         }
     }
 

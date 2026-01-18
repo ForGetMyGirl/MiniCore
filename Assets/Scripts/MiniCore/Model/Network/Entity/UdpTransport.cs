@@ -1,7 +1,8 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using System;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace MiniCore.Model
 {
@@ -43,12 +44,13 @@ namespace MiniCore.Model
         {
             try
             {
+                await UniTask.SwitchToThreadPool();
                 while (!token.IsCancellationRequested && IsConnected)
                 {
                     byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
                     try
                     {
-                        int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None, token);
+                        int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None, token).ConfigureAwait(false);
                         if (received <= 0)
                         {
                             break;

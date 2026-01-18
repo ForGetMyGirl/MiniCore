@@ -140,19 +140,19 @@ namespace MiniCore.EditorTools
             uint rpcOpcode = Math.Max(nextOpcode, (uint)rpcStart);
             foreach (var item in rpcHandlers)
             {
-                uint opcode = AllocateOpcode(item.RequestType, ref rpcOpcode, messageOpcodes, constNameMap);
-                BindMessageToOpcode(item.ResponseType, opcode, messageOpcodes, constNameMap);
+                uint requestOpcode = AllocateOpcode(item.RequestType, ref rpcOpcode, messageOpcodes, constNameMap);
+                uint responseOpcode = AllocateOpcode(item.ResponseType, ref rpcOpcode, messageOpcodes, constNameMap);
 
                 bindings.Add(new HandlerBinding
                 {
                     HandlerType = item.HandlerType,
                     RequestType = item.RequestType,
                     ResponseType = item.ResponseType,
-                    Opcode = opcode,
+                    Opcode = requestOpcode,
                     IsRpc = true
                 });
 
-                logBuilder.AppendLine($"RPC: {opcode} -> {item.HandlerType.FullName} ({item.RequestType.FullName} / {item.ResponseType.FullName})");
+                logBuilder.AppendLine($"RPC: {requestOpcode}/{responseOpcode} -> {item.HandlerType.FullName} ({item.RequestType.FullName} / {item.ResponseType.FullName})");
             }
 
             // Bind remaining IProtocol implementations so outgoing messages without handlers still get opcodes.
@@ -203,23 +203,6 @@ namespace MiniCore.EditorTools
             constNameMap[constName] = messageType;
             map[messageType] = cursor;
             return cursor++;
-        }
-
-        private void BindMessageToOpcode(Type messageType, uint opcode, Dictionary<Type, uint> map, Dictionary<string, Type> constNameMap)
-        {
-            if (map.TryGetValue(messageType, out uint existing) && existing != opcode)
-            {
-                throw new InvalidOperationException($"Message type {messageType.FullName} already bound to opcode {existing}, cannot bind to {opcode}.");
-            }
-
-            string constName = BuildConstName(messageType);
-            if (constNameMap.TryGetValue(constName, out var other) && other != messageType)
-            {
-                throw new InvalidOperationException($"Const name collision: {messageType.FullName} and {other.FullName} both map to {constName}.");
-            }
-
-            constNameMap[constName] = messageType;
-            map[messageType] = opcode;
         }
 
         private string BuildGeneratedContent(

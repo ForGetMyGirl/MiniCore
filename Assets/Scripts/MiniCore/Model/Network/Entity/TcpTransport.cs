@@ -2,11 +2,12 @@ using Cysharp.Threading.Tasks;
 using System;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace MiniCore.Model
 {
     /// <summary>
-    /// TCP ä¼ è¾“å®ç°ï¼Œä½¿ç”¨ Socket + é•¿åº¦å‰ç¼€ï¼ˆ4 å­—èŠ‚ï¼Œå¤§ç«¯ï¼‰å¤„ç†ç²˜åŒ…/åŠåŒ…ã€‚
+    /// TCP ???¨¨?¡°?????¡ã???????¡±?Socket + ¨¦???o|?¡ë???€??? ?-¡ª¨¨??????¡è¡ì??¡¥??¡ë?¡è?????2???¡­/?????¡­?€?
     /// </summary>
     public class TcpTransport : INetworkTransport
     {
@@ -31,7 +32,7 @@ namespace MiniCore.Model
         {
             if (!IsConnected)
             {
-                throw new InvalidOperationException("TCP æœªè¿æ¥ï¼Œæ— æ³•å‘é€æ•°æ®ã€‚");
+                throw new InvalidOperationException("TCP ??a¨¨????£¤????¡ª??3???¡®¨¦€???¡ã????€?");
             }
 
             int length = data.Count;
@@ -52,6 +53,7 @@ namespace MiniCore.Model
         {
             try
             {
+                await UniTask.SwitchToThreadPool();
                 while (!token.IsCancellationRequested && IsConnected)
                 {
                     byte[] lengthBuf = ByteBufferPool.Shared.Rent(4);
@@ -106,7 +108,7 @@ namespace MiniCore.Model
             int read = 0;
             while (read < size)
             {
-                int n = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, read, size - read), SocketFlags.None, token);
+                int n = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, read, size - read), SocketFlags.None, token).ConfigureAwait(false);
                 if (n == 0)
                 {
                     return false;

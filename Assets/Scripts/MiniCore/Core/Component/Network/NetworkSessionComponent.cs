@@ -14,9 +14,16 @@ namespace MiniCore.Core
         private readonly Dictionary<string, NetworkSession> sessions = new Dictionary<string, NetworkSession>();
         private readonly Dictionary<string, KcpServerTransport> serverTransports = new Dictionary<string, KcpServerTransport>();
         private KcpServer kcpServer;
+        private SynchronizationContext unityContext;
 
         public event Action<NetworkSession> OnServerSessionCreated;
         public event Action<string> OnServerSessionClosed;
+
+        public override void Awake()
+        {
+            base.Awake();
+            unityContext = SynchronizationContext.Current;
+        }
 
         public override void Dispose()
         {
@@ -98,6 +105,35 @@ namespace MiniCore.Core
             return session;
         }
 
+        public List<NetworkSession> GetServerSessionsSnapshot()
+        {
+            var result = new List<NetworkSession>();
+            foreach (var sessionId in serverTransports.Keys)
+            {
+                if (sessions.TryGetValue(sessionId, out var session))
+                {
+                    result.Add(session);
+                }
+            }
+            return result;
+        }
+
+        public void DisconnectSession(string sessionId)
+        {
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                return;
+            }
+
+            if (serverTransports.ContainsKey(sessionId) && kcpServer != null)
+            {
+                kcpServer.CloseSession(sessionId);
+                return;
+            }
+
+            RemoveSession(sessionId);
+        }
+
         public void RemoveSession(string sessionId)
         {
             if (sessions.TryGetValue(sessionId, out var session))
@@ -123,7 +159,7 @@ namespace MiniCore.Core
             var session = new NetworkSession(serverSession.SessionId, transport);
             sessions.Add(serverSession.SessionId, session);
             serverTransports.Add(serverSession.SessionId, transport);
-            OnServerSessionCreated?.Invoke(session);
+            DispatchToMainThread(() => OnServerSessionCreated?.Invoke(session));
         }
 
         private void HandleServerSessionClosed(KcpServerSession serverSession)
@@ -134,7 +170,7 @@ namespace MiniCore.Core
             }
 
             RemoveSession(serverSession.SessionId);
-            OnServerSessionClosed?.Invoke(serverSession.SessionId);
+            DispatchToMainThread(() => OnServerSessionClosed?.Invoke(serverSession.SessionId));
         }
 
         private UniTask HandleServerDataReceived(KcpServerSession serverSession, ReadOnlyMemory<byte> data)
@@ -150,6 +186,22 @@ namespace MiniCore.Core
             }
 
             return UniTask.CompletedTask;
+        }
+
+        private void DispatchToMainThread(Action action)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            if (unityContext != null)
+            {
+                unityContext.Post(_ => action(), null);
+                return;
+            }
+
+            action();
         }
     }
 }

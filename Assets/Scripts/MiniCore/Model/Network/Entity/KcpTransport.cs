@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace MiniCore.Model
 {
@@ -96,9 +97,10 @@ namespace MiniCore.Model
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
             try
             {
+                await UniTask.SwitchToThreadPool();
                 while (!token.IsCancellationRequested && IsConnected)
                 {
-                    int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None, token);
+                    int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None, token).ConfigureAwait(false);
                     if (received <= 0)
                     {
                         break;
@@ -158,6 +160,7 @@ namespace MiniCore.Model
         {
             try
             {
+                await UniTask.SwitchToThreadPool();
                 while (!token.IsCancellationRequested && IsConnected)
                 {
                     uint current = CurrentMS();
@@ -171,7 +174,7 @@ namespace MiniCore.Model
                     int delay = TimeDiff(next, current);
                     if (delay < 1) delay = 1;
                     if (delay > config.Interval) delay = config.Interval;
-                    await UniTask.Delay(delay, cancellationToken: token);
+                    await Task.Delay(delay, token).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
