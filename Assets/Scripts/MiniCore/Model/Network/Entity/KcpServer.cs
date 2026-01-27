@@ -135,10 +135,28 @@ namespace MiniCore.Model
                 EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                 while (!token.IsCancellationRequested && running)
                 {
-                    SocketReceiveFromResult result = await socket.ReceiveFromAsync(
-                        new ArraySegment<byte>(buffer),
-                        SocketFlags.None,
-                        remote).ConfigureAwait(false);
+                    SocketReceiveFromResult result;
+                    try
+                    {
+                        result = await socket.ReceiveFromAsync(
+                            new ArraySegment<byte>(buffer),
+                            SocketFlags.None,
+                            remote).ConfigureAwait(false);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        break;
+                    }
+                    catch (SocketException ex)
+                    {
+                        EventCenter.Broadcast(GameEvent.LogWarning, $"KcpServer receive socket error: {ex.SocketErrorCode}");
+                        continue;
+                    }
+                    catch (Exception ex)
+                    {
+                        EventCenter.Broadcast(GameEvent.LogWarning, $"KcpServer receive error: {ex.Message}");
+                        continue;
+                    }
 
                     int received = result.ReceivedBytes;
                     if (received <= 0)
@@ -181,10 +199,6 @@ namespace MiniCore.Model
             finally
             {
                 ByteBufferPool.Shared.Return(buffer);
-                if (running)
-                {
-                    Stop();
-                }
             }
         }
 
