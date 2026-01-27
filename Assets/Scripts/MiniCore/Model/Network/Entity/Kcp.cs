@@ -95,6 +95,11 @@ namespace MiniCore.Model
             return core.PeekSize();
         }
 
+        public int GetSmoothedRttMs()
+        {
+            return core.GetSmoothedRttMs();
+        }
+
         public int Input(byte[] data, int offset, int size)
         {
             if (data == null)
@@ -209,6 +214,11 @@ namespace MiniCore.Model
             public void SetStreamMode(bool enable)
             {
                 stream = enable ? 1 : 0;
+            }
+
+            public int GetSmoothedRttMs()
+            {
+                return (int)rx_srtt;
             }
         }
     }

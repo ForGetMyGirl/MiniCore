@@ -92,6 +92,20 @@ namespace MiniCore.Model
             return UniTask.CompletedTask;
         }
 
+        public bool TryGetSmoothedRttMs(out int rttMs)
+        {
+            rttMs = 0;
+            lock (kcpLock)
+            {
+                if (kcp == null)
+                {
+                    return false;
+                }
+                rttMs = kcp.GetSmoothedRttMs();
+            }
+            return rttMs > 0;
+        }
+
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);

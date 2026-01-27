@@ -27,6 +27,8 @@ namespace MiniCore.Core
         private readonly ConcurrentQueue<IncomingPacket> incomingPackets = new ConcurrentQueue<IncomingPacket>();
         private int processingQueue;
 
+
+        private bool clientSendEnabled = true;
         private class PendingRpc
         {
             public Type ResponseType;
@@ -57,6 +59,10 @@ namespace MiniCore.Core
             public CancellationTokenSource Cts;
             public long LastPongTicks;
             public long LastPingTicks;
+            public long LastPingSentTicks;
+            public int LastRttMs;
+            public int MinRttMs;
+            public long MinRttWindowStartTicks;
             public HeartbeatMode Mode;
         }
 
@@ -73,7 +79,7 @@ namespace MiniCore.Core
         public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);
         public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2);
-        
+
 
         public override void Awake()
         {
@@ -92,11 +98,11 @@ namespace MiniCore.Core
         {
             await InitializeSessionAsync(DefaultSessionId, host, port, token);
         }
-/*
-        public async UniTask InitializeDefaultKcpSessionAsync(string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
-        {
-            await InitializeKcpSessionAsync(DefaultSessionId, host, port, conv, config, token);
-        }*/
+        /*
+                public async UniTask InitializeDefaultKcpSessionAsync(string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
+                {
+                    await InitializeKcpSessionAsync(DefaultSessionId, host, port, conv, config, token);
+                }*/
 
         public UniTask<bool> ConnectDefaultKcpSessionAsync(string host, int port, uint conv, TimeSpan probeTimeout = default, KcpTransportConfig config = null, CancellationToken token = default)
         {
@@ -213,6 +219,10 @@ namespace MiniCore.Core
             where TRequest : IRequest
             where TResponse : IResponse
         {
+            if (!clientSendEnabled)
+            {
+                return CreateLocalErrorResponse<TResponse>("Client disconnected.");
+            }
             if (!TryGetSession(sessionId, out var session))
             {
                 return CreateLocalErrorResponse<TResponse>($"Session {sessionId} not found.");
@@ -247,9 +257,19 @@ namespace MiniCore.Core
 
         public async UniTask SendAsync<TMessage>(string sessionId, TMessage message, CancellationToken token = default) where TMessage : IProtocol
         {
+            if (!clientSendEnabled)
+            {
+                LogSwitch.Warning("Client disconnected, send skipped.");
+                return;
+            }
             if (!TryGetSession(sessionId, out var session))
             {
                 LogSwitch.Warning($"Session {sessionId} not found, send skipped.");
+                return;
+            }
+            if (!session.IsConnected)
+            {
+                LogSwitch.Warning($"Session {sessionId} not connected, send skipped.");
                 return;
             }
             uint opcode = ResolveOpcode(message.GetType(), message.Opcode);
@@ -568,6 +588,10 @@ namespace MiniCore.Core
 
         private async UniTask SendPingAsync(NetworkSession session, CancellationToken token)
         {
+            if (heartbeatStates.TryGetValue(session.SessionId, out var state))
+            {
+                state.LastPingSentTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            }
             byte[] body = BuildPacket(PingOpcode, 0, null);
             await session.SendAsync(new ArraySegment<byte>(body), token);
         }
@@ -582,7 +606,27 @@ namespace MiniCore.Core
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
             {
-                state.LastPongTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                state.LastPongTicks = now;
+                if (state.LastPingSentTicks > 0)
+                {
+                    int rtt = (int)Math.Max(0, now - state.LastPingSentTicks);
+                    state.LastRttMs = rtt;
+                    if (state.MinRttWindowStartTicks == 0)
+                    {
+                        state.MinRttWindowStartTicks = now;
+                        state.MinRttMs = rtt;
+                    }
+                    else if (now - state.MinRttWindowStartTicks > 10000)
+                    {
+                        state.MinRttWindowStartTicks = now;
+                        state.MinRttMs = rtt;
+                    }
+                    else if (state.MinRttMs == 0 || rtt < state.MinRttMs)
+                    {
+                        state.MinRttMs = rtt;
+                    }
+                }
             }
         }
 
@@ -592,6 +636,45 @@ namespace MiniCore.Core
             {
                 state.LastPingTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
+        }
+
+        public bool TryGetLastPingMs(string sessionId, out int pingMs)
+        {
+            pingMs = 0;
+            if (!heartbeatStates.TryGetValue(sessionId, out var state))
+            {
+                return false;
+            }
+            pingMs = state.LastRttMs;
+            return pingMs > 0;
+        }
+
+        public bool TryGetMinPingMs(string sessionId, out int pingMs)
+        {
+            pingMs = 0;
+            if (!heartbeatStates.TryGetValue(sessionId, out var state))
+            {
+                return false;
+            }
+            pingMs = state.MinRttMs;
+            return pingMs > 0;
+        }
+
+        public bool TryGetTransportRttMs(string sessionId, out int rttMs)
+        {
+            rttMs = 0;
+            if (sessionComponent == null)
+            {
+                return false;
+            }
+
+            var session = sessionComponent.GetSession(sessionId);
+            if (session?.Transport is KcpTransport kcpTransport)
+            {
+                return kcpTransport.TryGetSmoothedRttMs(out rttMs);
+            }
+
+            return false;
         }
 
         private bool IsHeartbeatTimeout(string sessionId)
@@ -755,6 +838,10 @@ namespace MiniCore.Core
             session.Transport.OnDisconnected += () =>
             {
                 StopHeartbeat(session.SessionId);
+                if (mode == HeartbeatMode.Client)
+                {
+                    clientSendEnabled = false;
+                }
                 string side = GetLogSide(session.SessionId);
                 string text = $"{side}连接已断开，会话:{session.SessionId}";
                 LogSwitch.Warning(text);
