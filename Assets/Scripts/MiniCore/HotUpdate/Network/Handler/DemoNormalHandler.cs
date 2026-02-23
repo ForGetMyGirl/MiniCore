@@ -8,7 +8,7 @@ namespace MiniCore.HotUpdate
         public override async UniTask HandleAsync(NetworkSession session, DemoNormalMessage message)
         {
             string text = $"收到普通消息，会话:{session.SessionId} 内容:{message.Content}";
-            EventCenter.Broadcast(GameEvent.LogInfo, text);
+            LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
         }
     }

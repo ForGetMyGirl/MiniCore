@@ -20,7 +20,7 @@ public class TestBall : MonoBehaviour, IPoolObject
 
     void IPoolObject.Init()
     {
-        EventCenter.Broadcast(GameEvent.LogInfo, $"鐢熸垚浜嗕竴涓猅estBall瀵硅薄锛屽綋鍓嶅璞″悕绉帮細{name}锛屽綋鍓嶄綅缃細{transform.position}");
+        LogSwitch.Info($"鐢熸垚浜嗕竴涓猅estBall瀵硅薄锛屽綋鍓嶅璞″悕绉帮細{name}锛屽綋鍓嶄綅缃細{transform.position}");
         gameObject.SetActive(true);
     }
 }

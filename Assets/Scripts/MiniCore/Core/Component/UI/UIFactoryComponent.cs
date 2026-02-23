@@ -104,7 +104,7 @@ namespace MiniCore.Core
                 }
                 else
                 {
-                    EventCenter.Broadcast(GameEvent.LogError, $"UIBase:{curType.FullName} 缺少 UIWindowAttribute 属性，请确认。");
+                    LogSwitch.Error($"UIBase:{curType.FullName} 缺少 UIWindowAttribute 属性，请确认。");
                 }
             }
         }

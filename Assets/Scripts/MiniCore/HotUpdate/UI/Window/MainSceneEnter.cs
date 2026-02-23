@@ -1,5 +1,4 @@
 using Cysharp.Threading.Tasks;
-using System.Collections.Generic;
 using UnityEngine;
 using MiniCore;
 using MiniCore.Core;
@@ -20,10 +19,13 @@ namespace MiniCore.HotUpdate
             var yooAssetResourceComponent = Global.Com.Add<YooAssetResourceComponent>(new object[] { packageName });
             assetsComponent = Global.Com.Add<AssetsComponent>();
             assetsComponent.RegisterResourcesComponent(yooAssetResourceComponent);
-            var uiFactoryComponent = Global.Com.Add<UIFactoryComponent>();
-            var sessionComponent = Global.Com.Add<NetworkSessionComponent>();
+            Global.Com.Add<UIFactoryComponent>();
+            Global.Com.Add<NetworkSessionComponent>();
             var netMsg = Global.Com.Add<NetworkMessageComponent>();
-            netMsg.SetSerializer(new UnityJsonSerializer());
+            netMsg.SetSerializer(new NewtonsoftJsonSerializer());
+            netMsg.RpcTimeout = TimeSpan.FromSeconds(8);
+            netMsg.HeartbeatInterval = TimeSpan.FromSeconds(3);
+            netMsg.HeartbeatTimeout = TimeSpan.FromSeconds(12);
             Global.Com.Add<TimerComponent>();
         }
 

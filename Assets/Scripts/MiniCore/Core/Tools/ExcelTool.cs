@@ -153,7 +153,7 @@ namespace MiniCore.Core
             }
             catch (Exception e)
             {
-                EventCenter.Broadcast(GameEvent.LogInfo, $"Csv数据解析异常：\n{e}");
+                LogSwitch.Info($"Csv数据解析异常：\n{e}");
             }
 
             return csvTable;

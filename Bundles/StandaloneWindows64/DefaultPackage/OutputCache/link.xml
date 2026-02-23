@@ -2,6 +2,7 @@
   <assembly fullname="MiniCore.HotUpdate, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
     <type fullname="MiniCore.HotUpdate.KcpTestWindowView" preserve="all" />
     <type fullname="MiniCore.HotUpdate.MainSceneEnter" preserve="all" />
+    <type fullname="MiniCore.HotUpdate.MultiProtocolSceneEnter" preserve="all" />
   </assembly>
   <assembly fullname="Unity.RenderPipelines.Universal.Runtime, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
     <type fullname="UnityEngine.Rendering.Universal.UniversalAdditionalCameraData" preserve="all" />

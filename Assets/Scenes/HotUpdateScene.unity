@@ -300,7 +300,7 @@ MonoBehaviour:
   fallbackServerURL: 
   downloadMaxNum: 10
   failedTryAgain: 3
-  mainSceneName: MainScene
+  mainSceneName: MultiProtocolScene
 --- !u!114 &467674385
 MonoBehaviour:
   m_ObjectHideFlags: 0

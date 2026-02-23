@@ -13,7 +13,7 @@ namespace MiniCore.HotUpdate
     {
         public override async UniTask HandleAsync(NetworkSession session, TestNetworkData message)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, $"[TestHandler] 收到消息 -> Id:{message.Id}, Content:{message.Content}");
+            LogSwitch.Info($"[TestHandler] 收到消息 -> Id:{message.Id}, Content:{message.Content}");
             await UniTask.CompletedTask;
         }
     }

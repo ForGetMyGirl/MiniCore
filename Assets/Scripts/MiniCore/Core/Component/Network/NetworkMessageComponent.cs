@@ -18,6 +18,8 @@ namespace MiniCore.Core
         private NetworkSessionComponent sessionComponent;
         private INetworkSerializer serializer;
         private long rpcIdGenerator = 1;
+        private readonly object pendingRpcLock = new object();
+        private readonly HashSet<string> boundSessionReceivers = new HashSet<string>();
 
         private readonly Dictionary<long, PendingRpc> pendingRpcs = new Dictionary<long, PendingRpc>();
         private readonly Dictionary<uint, HandlerInfo> handlers = new Dictionary<uint, HandlerInfo>();
@@ -28,9 +30,9 @@ namespace MiniCore.Core
         private int processingQueue;
 
 
-        private bool clientSendEnabled = true;
         private class PendingRpc
         {
+            public string SessionId;
             public Type ResponseType;
             public UniTaskCompletionSource<object> Tcs;
         }
@@ -78,15 +80,50 @@ namespace MiniCore.Core
         public uint PongOpcode { get; set; } = 2;
         public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);
         public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(15);
+        public TimeSpan RpcTimeout { get; set; } = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2);
+
+        public event Action<NetworkSession> OnServerSessionCreated;
+        public event Action<string> OnServerSessionClosed;
 
 
         public override void Awake()
         {
             base.Awake();
             sessionComponent = Global.Com.Get<NetworkSessionComponent>();
+            if (sessionComponent != null)
+            {
+                sessionComponent.OnServerSessionCreated += HandleServerSessionCreated;
+                sessionComponent.OnServerSessionClosed += HandleServerSessionClosed;
+            }
             serializer = null;
             AutoRegisterHandlersFromAssembly("HotUpdate");
+        }
+
+        public override void Dispose()
+        {
+            base.Dispose();
+            if (sessionComponent != null)
+            {
+                sessionComponent.OnServerSessionCreated -= HandleServerSessionCreated;
+                sessionComponent.OnServerSessionClosed -= HandleServerSessionClosed;
+            }
+
+            lock (pendingRpcLock)
+            {
+                foreach (var kv in pendingRpcs)
+                {
+                    kv.Value.Tcs.TrySetException(new ObjectDisposedException(nameof(NetworkMessageComponent)));
+                }
+                pendingRpcs.Clear();
+            }
+
+            foreach (var sessionId in new List<string>(heartbeatStates.Keys))
+            {
+                StopHeartbeat(sessionId);
+            }
+
+            boundSessionReceivers.Clear();
         }
 
         public void SetSerializer(INetworkSerializer customSerializer)
@@ -109,8 +146,48 @@ namespace MiniCore.Core
             return ConnectKcpSessionAsync(DefaultSessionId, host, port, conv, probeTimeout, config, token);
         }
 
+        public UniTask<bool> ConnectDefaultTcpSessionAsync(string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
+        {
+            return ConnectTcpSessionAsync(DefaultSessionId, host, port, probeTimeout, token);
+        }
+
+        public UniTask<bool> ConnectDefaultUdpSessionAsync(string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
+        {
+            return ConnectUdpSessionAsync(DefaultSessionId, host, port, probeTimeout, token);
+        }
+
+        public async UniTask<bool> ConnectTcpSessionAsync(string sessionId, string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
+        {
+            PrepareSessionForReconnect(sessionId);
+
+            try
+            {
+                await InitializeSessionAsync(sessionId, host, port, token);
+            }
+            catch (Exception ex)
+            {
+                LogSwitch.Warning($"Tcp session init failed: {ex.Message}");
+                return false;
+            }
+
+            if (probeTimeout <= TimeSpan.Zero)
+            {
+                probeTimeout = DefaultProbeTimeout;
+            }
+
+            bool ok = await ProbeSessionAsync(sessionId, probeTimeout, token);
+            if (!ok)
+            {
+                sessionComponent?.RemoveSession(sessionId);
+            }
+
+            return ok;
+        }
+
         public async UniTask<bool> ConnectKcpSessionAsync(string sessionId, string host, int port, uint conv, TimeSpan probeTimeout = default, KcpTransportConfig config = null, CancellationToken token = default)
         {
+            PrepareSessionForReconnect(sessionId);
+
             try
             {
                 await InitializeKcpSessionAsync(sessionId, host, port, conv, config, token);
@@ -134,6 +211,34 @@ namespace MiniCore.Core
             return ok;
         }
 
+        public async UniTask<bool> ConnectUdpSessionAsync(string sessionId, string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
+        {
+            PrepareSessionForReconnect(sessionId);
+
+            try
+            {
+                await InitializeUdpSessionAsync(sessionId, host, port, token);
+            }
+            catch (Exception ex)
+            {
+                LogSwitch.Warning($"Udp session init failed: {ex.Message}");
+                return false;
+            }
+
+            if (probeTimeout <= TimeSpan.Zero)
+            {
+                probeTimeout = DefaultProbeTimeout;
+            }
+
+            bool ok = await ProbeSessionAsync(sessionId, probeTimeout, token);
+            if (!ok)
+            {
+                sessionComponent?.RemoveSession(sessionId);
+            }
+
+            return ok;
+        }
+
         public async UniTask InitializeSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
         {
             await sessionComponent.CreateTcpSessionAsync(sessionId, host, port, token);
@@ -146,6 +251,12 @@ namespace MiniCore.Core
             BindSessionReceiver(sessionId);
         }
 
+        public async UniTask InitializeUdpSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
+        {
+            await sessionComponent.CreateUdpSessionAsync(sessionId, host, port, token);
+            BindSessionReceiver(sessionId);
+        }
+
         public void BindSessionReceiver(string sessionId)
         {
             BindSessionReceiverInternal(sessionId, HeartbeatMode.Client);
@@ -154,6 +265,87 @@ namespace MiniCore.Core
         public void BindServerSessionReceiver(string sessionId)
         {
             BindSessionReceiverInternal(sessionId, HeartbeatMode.Server);
+        }
+
+        public UniTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null, CancellationToken token = default)
+        {
+            if (sessionComponent == null)
+            {
+                throw new InvalidOperationException("NetworkSessionComponent is not initialized.");
+            }
+            return sessionComponent.StartKcpServerAsync(host, port, config, token);
+        }
+
+        public UniTask StartTcpServerAsync(string host, int port, CancellationToken token = default)
+        {
+            if (sessionComponent == null)
+            {
+                throw new InvalidOperationException("NetworkSessionComponent is not initialized.");
+            }
+            return sessionComponent.StartTcpServerAsync(host, port, token);
+        }
+
+        public UniTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null, CancellationToken token = default)
+        {
+            if (sessionComponent == null)
+            {
+                throw new InvalidOperationException("NetworkSessionComponent is not initialized.");
+            }
+            return sessionComponent.StartUdpServerAsync(host, port, config, token);
+        }
+
+        public void StopKcpServer()
+        {
+            if (sessionComponent == null)
+            {
+                return;
+            }
+            sessionComponent.StopKcpServer();
+        }
+
+        public void StopTcpServer()
+        {
+            if (sessionComponent == null)
+            {
+                return;
+            }
+            sessionComponent.StopTcpServer();
+        }
+
+        public void StopUdpServer()
+        {
+            if (sessionComponent == null)
+            {
+                return;
+            }
+            sessionComponent.StopUdpServer();
+        }
+
+        public List<NetworkSession> GetServerSessionsSnapshot()
+        {
+            if (sessionComponent == null)
+            {
+                return new List<NetworkSession>();
+            }
+            return sessionComponent.GetServerSessionsSnapshot();
+        }
+
+        public NetworkSession GetSession(string sessionId)
+        {
+            if (sessionComponent == null)
+            {
+                return null;
+            }
+            return sessionComponent.GetSession(sessionId);
+        }
+
+        public void DisconnectSession(string sessionId)
+        {
+            if (sessionComponent == null)
+            {
+                return;
+            }
+            sessionComponent.DisconnectSession(sessionId);
         }
 
         protected override void Update()
@@ -175,11 +367,13 @@ namespace MiniCore.Core
         {
             if (!heartbeatStates.TryGetValue(sessionId, out var state))
             {
+                LogSwitch.Warning($"Probe failed: heartbeat state missing. session:{sessionId}");
                 return false;
             }
 
             if (!TryGetSession(sessionId, out var session))
             {
+                LogSwitch.Warning($"Probe failed: session missing. session:{sessionId}");
                 return false;
             }
             long lastPong = state.LastPongTicks;
@@ -193,8 +387,9 @@ namespace MiniCore.Core
                     {
                         await SendPingAsync(session, token);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        LogSwitch.Warning($"Probe ping send failed. session:{sessionId} err:{ex.Message}");
                         return false;
                     }
                     nextPing = DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(200);
@@ -205,6 +400,8 @@ namespace MiniCore.Core
                 }
                 await UniTask.Delay(50, cancellationToken: token);
             }
+
+            LogSwitch.Warning($"Probe timeout. session:{sessionId} timeoutMs:{(int)timeout.TotalMilliseconds}");
             return false;
         }
 
@@ -219,20 +416,39 @@ namespace MiniCore.Core
             where TRequest : IRequest
             where TResponse : IResponse
         {
-            if (!clientSendEnabled)
-            {
-                return CreateLocalErrorResponse<TResponse>("Client disconnected.");
-            }
             if (!TryGetSession(sessionId, out var session))
             {
                 return CreateLocalErrorResponse<TResponse>($"Session {sessionId} not found.");
             }
+            if (!session.IsConnected)
+            {
+                return CreateLocalErrorResponse<TResponse>($"Session {sessionId} not connected.");
+            }
 
-            long rpcId = rpcIdGenerator++;
+            long rpcId = Interlocked.Increment(ref rpcIdGenerator);
             request.RpcId = rpcId;
 
             var tcs = new UniTaskCompletionSource<object>();
-            pendingRpcs[rpcId] = new PendingRpc { ResponseType = typeof(TResponse), Tcs = tcs };
+            lock (pendingRpcLock)
+            {
+                pendingRpcs[rpcId] = new PendingRpc { SessionId = sessionId, ResponseType = typeof(TResponse), Tcs = tcs };
+            }
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            if (RpcTimeout > TimeSpan.Zero)
+            {
+                linkedCts.CancelAfter(RpcTimeout);
+            }
+            using var registration = linkedCts.Token.Register(() =>
+            {
+                if (TryRemovePendingRpc(rpcId, out var pending))
+                {
+                    Exception ex = token.IsCancellationRequested
+                        ? new OperationCanceledException(token)
+                        : new TimeoutException($"RPC timeout. session:{sessionId} rpcId:{rpcId}");
+                    pending.Tcs.TrySetException(ex);
+                }
+            });
 
             uint opcode = ResolveOpcode(request.GetType(), request.Opcode);
             string sendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
@@ -244,7 +460,15 @@ namespace MiniCore.Core
                 LogSwitch.Info($"[{sendTime}] 发送RPC内容: {payloadText}");
             }
             byte[] body = BuildPacket(opcode, rpcId, payload);
-            await session.SendAsync(new ArraySegment<byte>(body), token);
+            try
+            {
+                await session.SendAsync(new ArraySegment<byte>(body), linkedCts.Token);
+            }
+            catch (Exception ex)
+            {
+                TryFailPendingRpc(rpcId, ex);
+                throw;
+            }
 
             object result = await tcs.Task;
             return (TResponse)result;
@@ -257,11 +481,6 @@ namespace MiniCore.Core
 
         public async UniTask SendAsync<TMessage>(string sessionId, TMessage message, CancellationToken token = default) where TMessage : IProtocol
         {
-            if (!clientSendEnabled)
-            {
-                LogSwitch.Warning("Client disconnected, send skipped.");
-                return;
-            }
             if (!TryGetSession(sessionId, out var session))
             {
                 LogSwitch.Warning($"Session {sessionId} not found, send skipped.");
@@ -393,8 +612,8 @@ namespace MiniCore.Core
             int length = 4 + 8 + (payload?.Length ?? 0);
             byte[] buffer = new byte[length];
 
-            WriteUInt32BE(buffer, 0, opcode);
-            WriteInt64BE(buffer, 4, rpcId);
+            NetBinaryCodec.WriteUInt32BE(buffer, 0, opcode);
+            NetBinaryCodec.WriteInt64BE(buffer, 4, rpcId);
 
             if (payload != null && payload.Length > 0)
             {
@@ -411,8 +630,8 @@ namespace MiniCore.Core
                 return;
             }
 
-            uint opcode = ReadUInt32BE(data, 0);
-            long rpcId = ReadInt64BE(data, 4);
+            uint opcode = NetBinaryCodec.ReadUInt32BE(data.Span, 0);
+            long rpcId = NetBinaryCodec.ReadInt64BE(data.Span, 4);
 
             int payloadLength = data.Length - 12;
             ReadOnlyMemory<byte> payload = payloadLength > 0 ? data.Slice(12, payloadLength) : ReadOnlyMemory<byte>.Empty;
@@ -423,11 +642,9 @@ namespace MiniCore.Core
             // Heartbeat handling
             if (opcode == PingOpcode)
             {
-                if (TryGetHeartbeatMode(session.SessionId, out var mode) && mode == HeartbeatMode.Server)
-                {
-                    TouchPing(session.SessionId);
-                    await SendPongAsync(session, rpcId);
-                }
+                // Always respond pong to ping to avoid race during server-session bootstrap.
+                TouchPing(session.SessionId);
+                await SendPongAsync(session, rpcId);
                 return;
             }
             if (opcode == PongOpcode)
@@ -439,12 +656,11 @@ namespace MiniCore.Core
                 return;
             }
 
-            if (rpcId != 0 && pendingRpcs.TryGetValue(rpcId, out PendingRpc pending))
+            if (rpcId != 0 && TryRemovePendingRpc(rpcId, out var pending))
             {
                 try
                 {
                     object resp = GetSerializer().Deserialize(pending.ResponseType, payload);
-                    pendingRpcs.Remove(rpcId);
                     pending.Tcs.TrySetResult(resp);
                 }
                 catch (Exception ex)
@@ -697,56 +913,6 @@ namespace MiniCore.Core
             return now - state.LastPingTicks > HeartbeatTimeout.TotalMilliseconds;
         }
 
-        private void WriteInt64BE(byte[] buffer, int offset, long value)
-        {
-            buffer[offset] = (byte)((value >> 56) & 0xFF);
-            buffer[offset + 1] = (byte)((value >> 48) & 0xFF);
-            buffer[offset + 2] = (byte)((value >> 40) & 0xFF);
-            buffer[offset + 3] = (byte)((value >> 32) & 0xFF);
-            buffer[offset + 4] = (byte)((value >> 24) & 0xFF);
-            buffer[offset + 5] = (byte)((value >> 16) & 0xFF);
-            buffer[offset + 6] = (byte)((value >> 8) & 0xFF);
-            buffer[offset + 7] = (byte)(value & 0xFF);
-        }
-
-        private void WriteUInt32BE(byte[] buffer, int offset, uint value)
-        {
-            buffer[offset] = (byte)((value >> 24) & 0xFF);
-            buffer[offset + 1] = (byte)((value >> 16) & 0xFF);
-            buffer[offset + 2] = (byte)((value >> 8) & 0xFF);
-            buffer[offset + 3] = (byte)(value & 0xFF);
-        }
-
-        private uint ReadUInt32BE(ReadOnlySpan<byte> buffer, int offset)
-        {
-            uint v = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                v = (v << 8) | buffer[offset + i];
-            }
-            return v;
-        }
-
-        private long ReadInt64BE(ReadOnlySpan<byte> buffer, int offset)
-        {
-            long v = 0;
-            for (int i = 0; i < 8; i++)
-            {
-                v = (v << 8) | buffer[offset + i];
-            }
-            return v;
-        }
-
-        private uint ReadUInt32BE(ReadOnlyMemory<byte> buffer, int offset)
-        {
-            return ReadUInt32BE(buffer.Span, offset);
-        }
-
-        private long ReadInt64BE(ReadOnlyMemory<byte> buffer, int offset)
-        {
-            return ReadInt64BE(buffer.Span, offset);
-        }
-
         private bool TryGetSession(string sessionId, out NetworkSession session)
         {
             session = sessionComponent?.GetSession(sessionId);
@@ -757,6 +923,102 @@ namespace MiniCore.Core
 
             LogSwitch.Warning($"Session {sessionId} not found.");
             return false;
+        }
+
+        private void PrepareSessionForReconnect(string sessionId)
+        {
+            if (string.IsNullOrEmpty(sessionId) || sessionComponent == null)
+            {
+                return;
+            }
+
+            var existing = sessionComponent.GetSession(sessionId);
+            if (existing == null)
+            {
+                return;
+            }
+
+            try
+            {
+                existing.Close();
+            }
+            catch
+            {
+            }
+
+            sessionComponent.RemoveSession(sessionId);
+            boundSessionReceivers.Remove(sessionId);
+            StopHeartbeat(sessionId);
+            FailPendingRpcsBySession(sessionId, new InvalidOperationException($"Session reconnect reset: {sessionId}"));
+        }
+
+        private bool TryRemovePendingRpc(long rpcId, out PendingRpc pending)
+        {
+            lock (pendingRpcLock)
+            {
+                if (pendingRpcs.TryGetValue(rpcId, out pending))
+                {
+                    pendingRpcs.Remove(rpcId);
+                    return true;
+                }
+            }
+
+            pending = null;
+            return false;
+        }
+
+        private void TryFailPendingRpc(long rpcId, Exception ex)
+        {
+            if (TryRemovePendingRpc(rpcId, out var pending))
+            {
+                pending.Tcs.TrySetException(ex);
+            }
+        }
+
+        private void FailPendingRpcsBySession(string sessionId, Exception ex)
+        {
+            List<PendingRpc> toFail = null;
+            List<long> toRemove = null;
+            lock (pendingRpcLock)
+            {
+                foreach (var kv in pendingRpcs)
+                {
+                    if (!string.Equals(kv.Value.SessionId, sessionId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (toFail == null)
+                    {
+                        toFail = new List<PendingRpc>();
+                    }
+                    if (toRemove == null)
+                    {
+                        toRemove = new List<long>();
+                    }
+
+                    toFail.Add(kv.Value);
+                    toRemove.Add(kv.Key);
+                }
+
+                if (toRemove != null)
+                {
+                    foreach (var rpcId in toRemove)
+                    {
+                        pendingRpcs.Remove(rpcId);
+                    }
+                }
+            }
+
+            if (toFail == null)
+            {
+                return;
+            }
+
+            foreach (var pending in toFail)
+            {
+                pending.Tcs.TrySetException(ex);
+            }
         }
 
         private TResponse CreateLocalErrorResponse<TResponse>(string message) where TResponse : IResponse
@@ -834,14 +1096,17 @@ namespace MiniCore.Core
                 throw new InvalidOperationException($"Session {sessionId} not found or not connected.");
             }
 
+            if (!boundSessionReceivers.Add(sessionId))
+            {
+                return;
+            }
+
             session.Transport.OnDataReceived += data => EnqueueIncoming(session, data);
             session.Transport.OnDisconnected += () =>
             {
+                boundSessionReceivers.Remove(session.SessionId);
                 StopHeartbeat(session.SessionId);
-                if (mode == HeartbeatMode.Client)
-                {
-                    clientSendEnabled = false;
-                }
+                FailPendingRpcsBySession(session.SessionId, new InvalidOperationException($"Session disconnected: {session.SessionId}"));
                 string side = GetLogSide(session.SessionId);
                 string text = $"{side}连接已断开，会话:{session.SessionId}";
                 LogSwitch.Warning(text);
@@ -876,7 +1141,6 @@ namespace MiniCore.Core
                 {
                     try
                     {
-                        await UniTask.SwitchToMainThread();
                         await HandleIncoming(packet.Session, new ReadOnlyMemory<byte>(packet.Buffer, 0, packet.Length));
                     }
                     finally
@@ -889,6 +1153,30 @@ namespace MiniCore.Core
             {
                 Interlocked.Exchange(ref processingQueue, 0);
             }
+        }
+
+        private void HandleServerSessionCreated(NetworkSession session)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            BindServerSessionReceiver(session.SessionId);
+            OnServerSessionCreated?.Invoke(session);
+        }
+
+        private void HandleServerSessionClosed(string sessionId)
+        {
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                return;
+            }
+
+            boundSessionReceivers.Remove(sessionId);
+            StopHeartbeat(sessionId);
+            FailPendingRpcsBySession(sessionId, new InvalidOperationException($"Session closed: {sessionId}"));
+            OnServerSessionClosed?.Invoke(sessionId);
         }
 
         private string GetLogSide(string sessionId)

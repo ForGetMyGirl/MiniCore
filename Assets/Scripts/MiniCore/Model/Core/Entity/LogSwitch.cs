@@ -4,7 +4,7 @@ namespace MiniCore.Model
 {
     public static class LogSwitch
     {
-        public static bool EnableLog = false;
+        public static bool EnableLog = true;
         public static bool EnablePayloadLog = false;
 
         public static void Info(string message)

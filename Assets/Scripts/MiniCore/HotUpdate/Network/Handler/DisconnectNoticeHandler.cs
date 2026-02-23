@@ -13,7 +13,7 @@ namespace MiniCore.HotUpdate
                 ? $"服务端通知断开，会话:{session.SessionId}{reason}"
                 : $"对端请求断开，会话:{session.SessionId}{reason}";
 
-            EventCenter.Broadcast(GameEvent.LogInfo, text);
+            LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
 
             Global.Com.Get<NetworkSessionComponent>().DisconnectSession(session.SessionId);

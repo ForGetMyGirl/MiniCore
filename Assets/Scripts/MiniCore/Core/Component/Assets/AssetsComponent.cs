@@ -26,7 +26,7 @@ namespace MiniCore.Core
             {
                 if (resourcesComponent == null)
                 {
-                    EventCenter.Broadcast(GameEvent.LogError, "资源加载组件没有注册，请调用RegisterResourcesComponent(IResourcesComponent)方法注册资源加载组件");
+                    LogSwitch.Error("资源加载组件没有注册，请调用RegisterResourcesComponent(IResourcesComponent)方法注册资源加载组件");
                     throw new System.Exception("资源加载组件没有注册，请调用RegisterResourcesComponent(IResourcesComponent)方法注册资源加载组件");
                 }
                 return resourcesComponent;

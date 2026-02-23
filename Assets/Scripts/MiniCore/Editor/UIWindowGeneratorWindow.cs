@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using UnityEditor;
 using UnityEngine;
 using MiniCore.Core;
@@ -7,9 +7,9 @@ using MiniCore.Model;
 namespace MiniCore.EditorTools
 {
     /// <summary>
-    /// 简单的 UI 窗口代码生成器。
-    /// 支持选择 View/Presenter 输出目录，填写界面名，一键生成 View 和 Presenter 脚本。
-    /// 可选外部模板（使用占位符 {VIEW_CLASS} 和 {PRESENTER_CLASS}）。
+    /// Simple UI window script generator.
+    /// Supports picking output folders and generating View/Presenter scripts.
+    /// Optional templates can use {VIEW_CLASS} and {PRESENTER_CLASS} placeholders.
     /// </summary>
     public class UIWindowGeneratorWindow : EditorWindow
     {
@@ -27,21 +27,21 @@ namespace MiniCore.EditorTools
 
         private void OnGUI()
         {
-            GUILayout.Label("生成设置", EditorStyles.boldLabel);
+            GUILayout.Label("Generator Settings", EditorStyles.boldLabel);
 
-            uiName = EditorGUILayout.TextField("界面名", uiName);
-
-            EditorGUILayout.Space();
-            DrawFolderField("View 输出目录", ref viewFolder);
-            DrawFolderField("Presenter 输出目录", ref presenterFolder);
+            uiName = EditorGUILayout.TextField("UI Name", uiName);
 
             EditorGUILayout.Space();
-            GUILayout.Label("可选模板（占位符 {VIEW_CLASS} / {PRESENTER_CLASS}）", EditorStyles.boldLabel);
-            DrawFileField("View 模板", ref viewTemplatePath, "选择 View 模板");
-            DrawFileField("Presenter 模板", ref presenterTemplatePath, "选择 Presenter 模板");
+            DrawFolderField("View Output Folder", ref viewFolder);
+            DrawFolderField("Presenter Output Folder", ref presenterFolder);
 
             EditorGUILayout.Space();
-            if (GUILayout.Button("生成脚本", GUILayout.Height(32)))
+            GUILayout.Label("Optional Templates ({VIEW_CLASS} / {PRESENTER_CLASS})", EditorStyles.boldLabel);
+            DrawFileField("View Template", ref viewTemplatePath, "Select View Template");
+            DrawFileField("Presenter Template", ref presenterTemplatePath, "Select Presenter Template");
+
+            EditorGUILayout.Space();
+            if (GUILayout.Button("Generate Scripts", GUILayout.Height(32)))
             {
                 GenerateScripts();
             }
@@ -56,7 +56,7 @@ namespace MiniCore.EditorTools
                 string selected = EditorUtility.OpenFolderPanel(label, Application.dataPath, string.Empty);
                 if (!string.IsNullOrEmpty(selected))
                 {
-                    // 尝试转为相对 Assets 的路径，便于项目内使用
+                    // Try convert to Assets-relative path for project usage.
                     if (selected.StartsWith(Application.dataPath))
                     {
                         path = "Assets" + selected.Substring(Application.dataPath.Length);
@@ -96,7 +96,7 @@ namespace MiniCore.EditorTools
         {
             if (string.IsNullOrEmpty(uiName))
             {
-                EditorUtility.DisplayDialog("生成失败", "请先输入界面名", "OK");
+                EditorUtility.DisplayDialog("Generate Failed", "Please input UI Name first.", "OK");
                 return;
             }
 
@@ -113,7 +113,7 @@ namespace MiniCore.EditorTools
             WriteFile(presenterPath, BuildPresenterContent(viewClass, presenterClass));
 
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("生成完成", $"已生成\n{viewPath}\n{presenterPath}", "OK");
+            EditorUtility.DisplayDialog("Generate Done", $"Generated:\n{viewPath}\n{presenterPath}", "OK");
         }
 
         private string BuildViewContent(string viewClass, string presenterClass)
@@ -131,7 +131,7 @@ namespace MiniCore.EditorTools
             string content = TryLoadTemplate(presenterTemplatePath);
             if (string.IsNullOrEmpty(content))
             {
-                content = "using MiniCore.Model;\\n\\npublic class {PRESENTER_CLASS} : APresenter<{VIEW_CLASS}>\\n{\\n    protected override void OnBind()\\n    {\\n        // TODO: 初始化 Presenter 逻辑\\n    }\\n}\\n";
+                content = "using MiniCore.Model;\\n\\npublic class {PRESENTER_CLASS} : APresenter<{VIEW_CLASS}>\\n{\\n    protected override void OnBind()\\n    {\\n        // TODO: initialize presenter logic\\n    }\\n}\\n";
             }
             return ApplyTokens(content, viewClass, presenterClass);
         }
@@ -168,7 +168,7 @@ namespace MiniCore.EditorTools
             }
             catch (System.Exception ex)
             {
-                EventCenter.Broadcast(GameEvent.LogWarning, $"读取模板失败: {fullPath} => {ex.Message}");
+                LogSwitch.Warning($"Template read failed: {fullPath} => {ex.Message}");
             }
             return null;
         }
@@ -184,7 +184,8 @@ namespace MiniCore.EditorTools
             {
                 return folder;
             }
-            // 如果是绝对路径，尝试转回相对 Assets
+
+            // If absolute path, try converting back to Assets-relative path.
             if (fullPath.StartsWith(Application.dataPath))
             {
                 return "Assets" + fullPath.Substring(Application.dataPath.Length);

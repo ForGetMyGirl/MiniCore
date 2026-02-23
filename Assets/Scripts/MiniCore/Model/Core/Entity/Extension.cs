@@ -97,7 +97,7 @@ namespace MiniCore.Model
         public static T BytesToObject<T>(this byte[] buffer)
         {
             string jsonStr = Encoding.UTF8.GetString(buffer);
-            EventCenter.Broadcast(GameEvent.LogInfo, "json:" + jsonStr);
+            LogSwitch.Info("json:" + jsonStr);
             return JsonConvert.DeserializeObject<T>(jsonStr);
         }
 
@@ -107,7 +107,7 @@ namespace MiniCore.Model
         public static byte[] ObjectToBytes(this object obj)
         {
             string jsonStr = GetLowerJson(obj);
-            EventCenter.Broadcast(GameEvent.LogInfo, jsonStr);
+            LogSwitch.Info(jsonStr);
             return Encoding.UTF8.GetBytes(jsonStr);
         }
 

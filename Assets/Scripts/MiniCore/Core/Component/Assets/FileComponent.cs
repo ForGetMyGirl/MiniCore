@@ -99,7 +99,7 @@ namespace MiniCore.Core
             }
             catch (Exception e)
             {
-                EventCenter.Broadcast(GameEvent.LogError, e);
+                LogSwitch.Error(e.ToString());
             }
 
             return string.Empty;
@@ -124,7 +124,7 @@ namespace MiniCore.Core
             if (DialogFileHelper.GetSaveFileName(dialogFile))
             {
                 string filepath = dialogFile.file;
-                EventCenter.Broadcast(GameEvent.LogInfo, "Path :" + filepath);
+                LogSwitch.Info("Path :" + filepath);
                 return filepath;
             }
             return "";

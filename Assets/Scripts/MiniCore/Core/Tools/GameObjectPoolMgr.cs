@@ -73,7 +73,7 @@ namespace MiniCore.Core
                     //获取对应组的对象池
                     if (!groupPool.TryGetValue(group, out GameObjectPool pool))
                     {
-                        EventCenter.Broadcast(GameEvent.LogInfo, $"没有找到对应的对象池分组：{group}");
+                        LogSwitch.Info($"没有找到对应的对象池分组：{group}");
                     }
                     else
                     {
@@ -86,7 +86,7 @@ namespace MiniCore.Core
             }
             else
             {
-                EventCenter.Broadcast(GameEvent.LogInfo, $"没有找到对应的类型:{type}");
+                LogSwitch.Info($"没有找到对应的类型:{type}");
             }
         }
 

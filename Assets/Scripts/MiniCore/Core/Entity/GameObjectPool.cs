@@ -71,7 +71,7 @@ namespace MiniCore.Core
             }
             catch (Exception e)
             {
-                EventCenter.Broadcast(GameEvent.LogInfo, $"尝试移除不存在的池对象\n{e}");
+                LogSwitch.Info($"尝试移除不存在的池对象\n{e}");
             }
 
         }

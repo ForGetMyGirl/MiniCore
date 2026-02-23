@@ -8,7 +8,7 @@ namespace MiniCore.HotUpdate
         public override UniTask HandleAsync(NetworkSession session, DemoRpcRequest request, DemoRpcResponse response)
         {
             string text = $"收到RPC请求，会话:{session.SessionId} 内容:{request.Payload}";
-            EventCenter.Broadcast(GameEvent.LogInfo, text);
+            LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
 
             response.ErrorCode = 0;
