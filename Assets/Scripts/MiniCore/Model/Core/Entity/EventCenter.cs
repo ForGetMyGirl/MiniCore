@@ -12,6 +12,7 @@ namespace MiniCore.Model
         //}
 
         public static Dictionary<string, Delegate> globalEventDic = new Dictionary<string, Delegate>();
+        private static readonly object syncRoot = new object();
 
         #region 添加监听
         /// <summary>
@@ -20,8 +21,11 @@ namespace MiniCore.Model
         /// <param name="gameEvent"></param>
         /// <param name="action"></param>
         public static void AddListener(string gameEvent, Action action) {
-            CreateOrThrow(gameEvent, action);
-            globalEventDic[gameEvent] = (Action)globalEventDic[gameEvent] + action;
+            lock (syncRoot)
+            {
+                CreateOrThrow(gameEvent, action);
+                globalEventDic[gameEvent] = (Action)globalEventDic[gameEvent] + action;
+            }
         }
 
         /// <summary>
@@ -31,13 +35,19 @@ namespace MiniCore.Model
         /// <param name="gameEvent"></param>
         /// <param name="action"></param>
         public static void AddListener<T>(string gameEvent, Action<T> action) {
-            CreateOrThrow(gameEvent, action);
-            globalEventDic[gameEvent] = (Action<T>)globalEventDic[gameEvent] + action;
+            lock (syncRoot)
+            {
+                CreateOrThrow(gameEvent, action);
+                globalEventDic[gameEvent] = (Action<T>)globalEventDic[gameEvent] + action;
+            }
         }
 
         public static void AddListener<T, K>(string gameEvent, Action<T, K> action) {
-            CreateOrThrow(gameEvent, action);
-            globalEventDic[gameEvent] = (Action<T, K>)globalEventDic[gameEvent] + action;
+            lock (syncRoot)
+            {
+                CreateOrThrow(gameEvent, action);
+                globalEventDic[gameEvent] = (Action<T, K>)globalEventDic[gameEvent] + action;
+            }
         }
 
         #endregion
@@ -49,9 +59,12 @@ namespace MiniCore.Model
         /// <param name="gameEvent"></param>
         /// <param name="action"></param>
         public static void RemoveListener(string gameEvent, Action action) {
-            RemoveOrThrow(gameEvent, action);
-            globalEventDic[gameEvent] = (Action)globalEventDic[gameEvent] - action;
-            RemoveNullEvent(gameEvent);
+            lock (syncRoot)
+            {
+                RemoveOrThrow(gameEvent, action);
+                globalEventDic[gameEvent] = (Action)globalEventDic[gameEvent] - action;
+                RemoveNullEvent(gameEvent);
+            }
         }
 
         /// <summary>
@@ -61,15 +74,21 @@ namespace MiniCore.Model
         /// <param name="gameEvent"></param>
         /// <param name="action"></param>
         public static void RemoveListener<T>(string gameEvent, Action<T> action) {
-            RemoveOrThrow(gameEvent, action);
-            globalEventDic[gameEvent] = (Action<T>)globalEventDic[gameEvent] - action;
-            RemoveNullEvent(gameEvent);
+            lock (syncRoot)
+            {
+                RemoveOrThrow(gameEvent, action);
+                globalEventDic[gameEvent] = (Action<T>)globalEventDic[gameEvent] - action;
+                RemoveNullEvent(gameEvent);
+            }
         }
 
         public static void RemoveListener<T, K>(string gameEvent, Action<T, K> action) {
-            RemoveOrThrow(gameEvent, action);
-            globalEventDic[gameEvent] = (Action<T, K>)globalEventDic[gameEvent] - action;
-            RemoveNullEvent(gameEvent);
+            lock (syncRoot)
+            {
+                RemoveOrThrow(gameEvent, action);
+                globalEventDic[gameEvent] = (Action<T, K>)globalEventDic[gameEvent] - action;
+                RemoveNullEvent(gameEvent);
+            }
         }
 
 
@@ -82,13 +101,19 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="gameEvent"></param>
         public static void Broadcast(string gameEvent) {
-            if (globalEventDic.TryGetValue(gameEvent, out Delegate action)) {
-                Action callback = action as Action;
-                if (callback != null) {
-                    callback();
-                } else {
-                    throw new Exception($"广播消息类型错误：要广播的事件{gameEvent}与存在的事件类型{action.GetType()}不符");
-                }
+            Delegate action;
+            lock (syncRoot)
+            {
+                globalEventDic.TryGetValue(gameEvent, out action);
+            }
+
+            if (action == null) return;
+
+            Action callback = action as Action;
+            if (callback != null) {
+                callback();
+            } else {
+                throw new Exception($"广播消息类型错误：要广播的事件{gameEvent}与存在的事件类型{action.GetType()}不符");
             }
         }
 
@@ -99,24 +124,36 @@ namespace MiniCore.Model
         /// <param name="gameEvent"></param>
         /// <param name="arg"></param>
         public static void Broadcast<T>(string gameEvent, T arg) {
-            if (globalEventDic.TryGetValue(gameEvent, out Delegate action)) {
-                Action<T> callback = action as Action<T>;
-                if (callback != null) {
-                    callback(arg);
-                } else {
-                    throw new Exception($"广播消息类型错误：要广播的事件{gameEvent}与存在的事件类型{action.GetType()}不符");
-                }
+            Delegate action;
+            lock (syncRoot)
+            {
+                globalEventDic.TryGetValue(gameEvent, out action);
+            }
+
+            if (action == null) return;
+
+            Action<T> callback = action as Action<T>;
+            if (callback != null) {
+                callback(arg);
+            } else {
+                throw new Exception($"广播消息类型错误：要广播的事件{gameEvent}与存在的事件类型{action.GetType()}不符");
             }
         }
 
         public static void Broadcast<T, K>(string gameEvent, T arg1, K arg2) {
-            if (globalEventDic.TryGetValue(gameEvent, out Delegate action)) {
-                Action<T, K> callback = action as Action<T, K>;
-                if (callback != null)
-                    callback(arg1, arg2);
-                else {
-                    throw new Exception($"广播消息类型错误：要广播的事件{gameEvent}与存在的事件类型{action.GetType()}不符");
-                }
+            Delegate action;
+            lock (syncRoot)
+            {
+                globalEventDic.TryGetValue(gameEvent, out action);
+            }
+
+            if (action == null) return;
+
+            Action<T, K> callback = action as Action<T, K>;
+            if (callback != null)
+                callback(arg1, arg2);
+            else {
+                throw new Exception($"广播消息类型错误：要广播的事件{gameEvent}与存在的事件类型{action.GetType()}不符");
             }
         }
 

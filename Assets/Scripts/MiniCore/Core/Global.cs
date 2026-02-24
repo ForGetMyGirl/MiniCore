@@ -10,6 +10,7 @@ namespace MiniCore.Core
     {
         private bool disposed;
         private bool isQuitting;
+        private List<AComponent> componentSnapshot;
         //public MiniCoreComponent Com { get; private set; }
         //protected override void Init()
         //{
@@ -62,6 +63,28 @@ namespace MiniCore.Core
         private void OnDestroy()
         {
             Shutdown();
+        }
+
+        void Update()
+        {
+            if (components != null)
+            {
+                int snapshotCount = RefreshSnapshot();
+                if (snapshotCount == 0)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < componentSnapshot.Count; i++)
+                {
+                    var component = componentSnapshot[i];
+                    if (component == null)
+                    {
+                        continue;
+                    }
+                    component.MonoUpdate();
+                }
+            }
         }
 
         #endregion
@@ -137,19 +160,22 @@ namespace MiniCore.Core
 
         public void Add(AComponent component)
         {
+            if (component == null)
+            {
+                throw new ArgumentNullException(nameof(component));
+            }
+
             Type type = component.GetType();
             if (components == null)
             {
                 components = new Dictionary<Type, AComponent>();
             }
-            else
+
+            if (!components.ContainsKey(type))
             {
-                if (!components.ContainsKey(type))
-                {
-                    component.Awake();
-                    components.Add(type, component);
-                    component.IsActive = true;
-                }
+                component.Awake();
+                components.Add(type, component);
+                component.IsActive = true;
             }
         }
 
@@ -211,17 +237,6 @@ namespace MiniCore.Core
             return obj;
         }
 
-        void Update()
-        {
-            if (components != null)
-            {
-                foreach (var component in components.Values)
-                {
-                    component.MonoUpdate();
-                }
-            }
-        }
-
         #endregion
         protected virtual void Init()
         {
@@ -231,10 +246,22 @@ namespace MiniCore.Core
         public virtual void Dispose()
         {
             //调用子类的Dispose
-            foreach (AComponent component in components.Values)
+            int snapshotCount = RefreshSnapshot();
+            if (snapshotCount == 0)
             {
-                component.Dispose();
+                if (!isQuitting)
+                {
+                    Destroy(gameObject);
+                }
+                return;
             }
+
+            for (int i = 0; i < componentSnapshot.Count; i++)
+            {
+                var component = componentSnapshot[i];
+                component?.Dispose();
+            }
+            componentSnapshot.Clear();
             if (!isQuitting)
             {
                 Destroy(gameObject);
@@ -253,6 +280,23 @@ namespace MiniCore.Core
                 return;
             }
             Dispose();
+        }
+
+        private int RefreshSnapshot()
+        {
+            if (components == null || components.Count == 0)
+            {
+                return 0;
+            }
+
+            if (componentSnapshot == null)
+            {
+                componentSnapshot = new List<AComponent>(Math.Max(components.Count, 4));
+            }
+
+            componentSnapshot.Clear();
+            componentSnapshot.AddRange(components.Values);
+            return componentSnapshot.Count;
         }
     }
 

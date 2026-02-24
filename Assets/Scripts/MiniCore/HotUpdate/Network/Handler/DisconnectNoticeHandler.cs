@@ -16,7 +16,7 @@ namespace MiniCore.HotUpdate
             LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
 
-            Global.Com.Get<NetworkSessionComponent>().DisconnectSession(session.SessionId);
+            Global.Com.Get<NetworkMessageComponent>().DisconnectSession(session.SessionId);
             return UniTask.CompletedTask;
         }
     }

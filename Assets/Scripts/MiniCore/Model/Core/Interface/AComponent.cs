@@ -7,6 +7,7 @@ namespace MiniCore.Model
     public abstract class AComponent : IDisposable
     {
         private Dictionary<Type, AComponent> components;
+        private List<AComponent> componentSnapshot;
 
         public bool IsActive { get; set; }
 
@@ -18,19 +19,22 @@ namespace MiniCore.Model
 
         public void AddComponent(AComponent component)
         {
+            if (component == null)
+            {
+                throw new ArgumentNullException(nameof(component));
+            }
+
             Type type = component.GetType();
             if (components == null)
             {
                 components = new Dictionary<Type, AComponent>();
             }
-            else
+
+            if (!components.ContainsKey(type))
             {
-                if (!components.ContainsKey(type))
-                {
-                    component.Awake();
-                    components.Add(type, component);
-                    component.IsActive = true;
-                }
+                component.Awake();
+                components.Add(type, component);
+                component.IsActive = true;
             }
         }
 
@@ -40,10 +44,15 @@ namespace MiniCore.Model
 
         public void RemoveComponent(AComponent component)
         {
-            if (components.ContainsKey(component.GetType()))
+            if (component == null || components == null)
             {
-                component = null;
-                components.Remove(component.GetType());
+                return;
+            }
+
+            Type type = component.GetType();
+            if (components.ContainsKey(type))
+            {
+                components.Remove(type);
                 component.IsActive = false;
             }
         }
@@ -115,11 +124,19 @@ namespace MiniCore.Model
             //}
             if (components != null)
             {
-                foreach (var type in components.Keys)
+                int snapshotCount = RefreshSnapshot();
+                if (snapshotCount == 0)
                 {
-                    components[type].Dispose();
-                    components[type] = null;
+                    IsActive = false;
+                    return;
                 }
+
+                for (int i = 0; i < componentSnapshot.Count; i++)
+                {
+                    var component = componentSnapshot[i];
+                    component?.Dispose();
+                }
+                componentSnapshot.Clear();
                 components.Clear();
             }
             IsActive = false;
@@ -132,13 +149,37 @@ namespace MiniCore.Model
             if (!IsActive) return;
             if (components != null)
             {
-                foreach (var component in components.Values)
+                int snapshotCount = RefreshSnapshot();
+                if (snapshotCount == 0)
                 {
-                    //if (component.IsActive)
-                    component.MonoUpdate();
+                    Update();
+                    return;
+                }
+
+                for (int i = 0; i < componentSnapshot.Count; i++)
+                {
+                    var component = componentSnapshot[i];
+                    component?.MonoUpdate();
                 }
             }
             Update();
+        }
+
+        private int RefreshSnapshot()
+        {
+            if (components == null || components.Count == 0)
+            {
+                return 0;
+            }
+
+            if (componentSnapshot == null)
+            {
+                componentSnapshot = new List<AComponent>(Math.Max(components.Count, 2));
+            }
+
+            componentSnapshot.Clear();
+            componentSnapshot.AddRange(components.Values);
+            return componentSnapshot.Count;
         }
     }
 
