@@ -1,7 +1,7 @@
 {
     "FileVersion": "1.0.0",
     "PackageName": "DefaultPackage",
-    "PackageVersion": "2026-02-23-1307",
+    "PackageVersion": "2026-02-24-682",
     "Wrappers": [
         {
             "BundleGUID": "1e2ae605eb2e2d8c23a77abd735d9701",

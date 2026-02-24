@@ -3,6 +3,7 @@ using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -15,8 +16,10 @@ namespace MiniCore.HotUpdate
         private const string TcpClientSessionId = "tcp-client";
         private const string KcpClientSessionId = "kcp-client";
         private const string UdpClientSessionId = "udp-client";
+        private const int MaxLogs = 300;
 
         private readonly List<string> logs = new List<string>();
+        private readonly ConcurrentQueue<string> pendingLogs = new ConcurrentQueue<string>();
 
         private NetworkMessageComponent net;
 
@@ -99,14 +102,20 @@ namespace MiniCore.HotUpdate
 
             GUILayout.Space(16);
             GUILayout.Label("Logs", sectionStyle);
+            string[] logSnapshot = logs.ToArray();
             logScroll = GUILayout.BeginScrollView(logScroll, GUILayout.Height(500));
-            for (int i = 0; i < logs.Count; i++)
+            for (int i = 0; i < logSnapshot.Length; i++)
             {
-                GUILayout.Label(logs[i], logStyle);
+                GUILayout.Label(logSnapshot[i], logStyle);
             }
             GUILayout.EndScrollView();
             GUILayout.EndArea();
             GUI.matrix = oldMatrix;
+        }
+
+        private void Update()
+        {
+            FlushPendingLogs();
         }
 
         private void DrawInputs()
@@ -129,7 +138,7 @@ namespace MiniCore.HotUpdate
             message = GUILayout.TextField(message, textFieldStyle, GUILayout.Width(980), GUILayout.Height(40));
             if (GUILayout.Button("Clear Logs", buttonStyle, GUILayout.Width(180), GUILayout.Height(46)))
             {
-                logs.Clear();
+                ClearLogs();
             }
             GUILayout.EndHorizontal();
         }
@@ -533,10 +542,26 @@ namespace MiniCore.HotUpdate
         private void AddLog(string text)
         {
             string line = $"[{DateTime.Now:HH:mm:ss.fff}] {text}";
-            logs.Add(line);
-            if (logs.Count > 300)
+            pendingLogs.Enqueue(line);
+        }
+
+        private void FlushPendingLogs()
+        {
+            while (pendingLogs.TryDequeue(out string line))
             {
-                logs.RemoveAt(0);
+                logs.Add(line);
+                if (logs.Count > MaxLogs)
+                {
+                    logs.RemoveAt(0);
+                }
+            }
+        }
+
+        private void ClearLogs()
+        {
+            logs.Clear();
+            while (pendingLogs.TryDequeue(out _))
+            {
             }
         }
 

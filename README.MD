@@ -2,7 +2,7 @@
 
 ## 框架结构说明
 
-MIniCore大部分功能都写成了Component的形式，通过Global.Com.Add<'AComponent>和Global.Com.Get<'AComponent>的形式可以添加或者获取组件；
+MIniCore大部分功能都写成了Component的形式，通过Global.Com.Add<'AComponent>和Global.Com.Get<'AComponent>的形式可以添加或者获取组件，新版本增加了TryGet<'T>()和GetOrAdd<'T>()等方法，方便安全添加和获取；
 目前实现的组件有：CSV表读取、文件操作、UI窗体（MVP的形式）、网络组件（Tcp、Kcp、Udp）等；
 整个框架分为3个模块，分别是MiniCore.Model、MiniCore.Core和MiniCore.HotUpdate;
 
@@ -15,7 +15,7 @@ MIniCore大部分功能都写成了Component的形式，通过Global.Com.Add<'AC
 2. 网络组件目前支持Tcp\Kcp\Udp，并且可以自定义序列化，可以灵活的使用Json、Protocol等。
 3. 写好网络请求体和响应体（entity）及其相关的Handler以后，可以点击MiniCore==>Opcode==>Generate(HotUpdate)自动生成opcode与网络消息类型的绑定。注意：自动生成代码只会在名字中含有HotUpdate的程序集中查找，建议直接写在MiniCore.HotUpdate程序集中，可以直接无缝衔接HybridCLR做代码热更新；
 4. Kcp目前是通过AI将[Kcp C#版](https://github.com/KumoKyaku/kcp)引入的方式生成的，由于只审查了部分代码，因此可能存在潜在的bug还没及时修复，如有问题，可以联系我，看到后我会及时修复。
-5. 目前使用YooAsset作为默认资源加载方案，使用前请先进行资源打包；如需使用HybridCLR，需要自己去官网下载安装，可以无缝集成到本系统中。
+5. 目前使用YooAsset作为默认资源加载方案，使用前请先进行资源打包；如需使用HybridCLR，需要自己去官网下载安装，可以无缝集成到本系统中。如需其他资源加载方案，请实现IResourcesComponent类，并在AssetsComponent.RegisterResourcesComponent(component)方法中注册自定义的资源加载方案（注意目前仅支持注册实现了AComponent类的对象）
 
 ## 引用的插件
 
@@ -37,5 +37,6 @@ MIniCore大部分功能都写成了Component的形式，通过Global.Com.Add<'AC
 
 ## 注意事项
 
-本框架中还有AI生成的代码（AI代码根据作者的设计思路进行的框架结构的部分代码补全），使用前请注意审查。
+- 本框架中含有AI生成的代码（AI代码根据作者的设计思路进行的框架结构的部分代码补全），使用前请注意审查。
+
 ---

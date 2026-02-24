@@ -165,17 +165,42 @@ namespace MiniCore.Model
             catch (ObjectDisposedException)
             {
             }
-            catch (SocketException)
+            catch (SocketException ex) when (IsExpectedSocketClosure(ex))
             {
+            }
+            catch (SocketException ex)
+            {
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"{GetType().Name} receive loop error: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
-                LogSwitch.Warning($"{GetType().Name} receive loop error: {ex.Message}");
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"{GetType().Name} receive loop error: {ex.Message}");
+                }
             }
             finally
             {
                 Disconnect();
             }
+        }
+
+        private bool IsActiveDisconnect()
+        {
+            return Interlocked.CompareExchange(ref disconnected, 0, 0) != 0;
+        }
+
+        private static bool IsExpectedSocketClosure(SocketException ex)
+        {
+            return ex.SocketErrorCode == SocketError.OperationAborted
+                || ex.SocketErrorCode == SocketError.Interrupted
+                || ex.SocketErrorCode == SocketError.ConnectionAborted
+                || ex.SocketErrorCode == SocketError.ConnectionReset
+                || ex.SocketErrorCode == SocketError.Shutdown
+                || ex.SocketErrorCode == SocketError.NotSocket;
         }
 
         private async UniTask<bool> ReadExactAsync(byte[] buffer, int size, CancellationToken token)

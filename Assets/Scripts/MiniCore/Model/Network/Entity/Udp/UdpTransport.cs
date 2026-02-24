@@ -1,19 +1,21 @@
 ﻿using Cysharp.Threading.Tasks;
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
 namespace MiniCore.Model
 {
     /// <summary>
-    /// UDP transport implementation using connected datagrams.
+    /// UDP transport implementation using unconnected datagrams.
     /// </summary>
     public class UdpTransport : INetworkTransport
     {
         private const int MaxDatagramSize = 65507;
-        private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan DefaultInitTimeout = TimeSpan.FromSeconds(3);
 
         private Socket socket;
+        private EndPoint remoteEndPoint;
         private CancellationTokenSource receiveCts;
         private int disconnected;
 
@@ -27,18 +29,18 @@ namespace MiniCore.Model
             Disconnect();
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
-            var connectTask = socket.ConnectAsync(host, port);
+            UniTask resolveTask = ResolveRemoteEndPointAsync(host, port);
             int winner = await UniTask.WhenAny(
-                connectTask.AsUniTask(),
-                UniTask.Delay(DefaultConnectTimeout, cancellationToken: token));
+                resolveTask,
+                UniTask.Delay(DefaultInitTimeout, cancellationToken: token));
 
             if (winner != 0)
             {
                 TryCloseSocket();
-                throw new TimeoutException($"UDP connect timeout to {host}:{port}");
+                throw new TimeoutException($"UDP init timeout to {host}:{port}");
             }
 
-            await connectTask;
+            await resolveTask;
             disconnected = 0;
             receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
             _ = ReceiveLoopAsync(receiveCts.Token);
@@ -51,7 +53,12 @@ namespace MiniCore.Model
                 throw new InvalidOperationException("UDP is not connected; cannot send data.");
             }
 
-            await socket.SendAsync(data, SocketFlags.None, token);
+            if (remoteEndPoint == null)
+            {
+                throw new InvalidOperationException("UDP remote endpoint is not initialized.");
+            }
+
+            await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint).ConfigureAwait(false);
         }
 
         private async UniTask ReceiveLoopAsync(CancellationToken token)
@@ -64,11 +71,23 @@ namespace MiniCore.Model
                     byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
                     try
                     {
-                        int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None, token).ConfigureAwait(false);
+                        EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+                        SocketReceiveFromResult result = await socket.ReceiveFromAsync(
+                            new ArraySegment<byte>(buffer),
+                            SocketFlags.None,
+                            from).ConfigureAwait(false);
+
+                        int received = result.ReceivedBytes;
                         if (received <= 0)
                         {
                             break;
                         }
+
+                        if (!IsExpectedRemote(result.RemoteEndPoint))
+                        {
+                            continue;
+                        }
+
                         await InvokeDataReceivedAsync(new ReadOnlyMemory<byte>(buffer, 0, received));
                     }
                     finally
@@ -80,9 +99,25 @@ namespace MiniCore.Model
             catch (OperationCanceledException)
             {
             }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SocketException ex) when (IsExpectedSocketClosure(ex))
+            {
+            }
+            catch (SocketException ex)
+            {
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"UdpTransport receive loop error: {ex.Message}");
+                }
+            }
             catch (Exception ex)
             {
-                LogSwitch.Warning($"UdpTransport receive loop error: {ex.Message}");
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"UdpTransport receive loop error: {ex.Message}");
+                }
             }
             finally
             {
@@ -103,7 +138,9 @@ namespace MiniCore.Model
             {
                 currentCts?.Cancel();
             }
-            catch { }
+            catch
+            {
+            }
             finally
             {
                 currentCts?.Dispose();
@@ -137,12 +174,75 @@ namespace MiniCore.Model
             }
 
             socket = null;
+            remoteEndPoint = null;
         }
 
         private async UniTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }
+
+        private async UniTask ResolveRemoteEndPointAsync(string host, int port)
+        {
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                throw new ArgumentException("Host is empty.", nameof(host));
+            }
+
+            if (IPAddress.TryParse(host, out var ip))
+            {
+                remoteEndPoint = new IPEndPoint(ip, port);
+                return;
+            }
+
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(host);
+            foreach (var address in addresses)
+            {
+                if (address.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    remoteEndPoint = new IPEndPoint(address, port);
+                    return;
+                }
+            }
+
+            throw new SocketException((int)SocketError.AddressFamilyNotSupported);
+        }
+
+        private bool IsExpectedRemote(EndPoint remote)
+        {
+            if (remoteEndPoint == null)
+            {
+                return true;
+            }
+
+            if (!(remoteEndPoint is IPEndPoint expected) || !(remote is IPEndPoint actual))
+            {
+                return Equals(remoteEndPoint, remote);
+            }
+
+            if (expected.Port != actual.Port)
+            {
+                return false;
+            }
+
+            IPAddress expectedIp = expected.Address.MapToIPv4();
+            IPAddress actualIp = actual.Address.MapToIPv4();
+            return expectedIp.Equals(actualIp);
+        }
+
+        private bool IsActiveDisconnect()
+        {
+            return Volatile.Read(ref disconnected) != 0;
+        }
+
+        private static bool IsExpectedSocketClosure(SocketException ex)
+        {
+            return ex.SocketErrorCode == SocketError.OperationAborted
+                || ex.SocketErrorCode == SocketError.Interrupted
+                || ex.SocketErrorCode == SocketError.ConnectionAborted
+                || ex.SocketErrorCode == SocketError.ConnectionReset
+                || ex.SocketErrorCode == SocketError.NotSocket;
+        }
+
     }
 }
-

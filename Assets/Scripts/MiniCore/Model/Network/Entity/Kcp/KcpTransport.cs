@@ -159,9 +159,25 @@ namespace MiniCore.Model
             catch (OperationCanceledException)
             {
             }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SocketException ex) when (IsExpectedSocketClosure(ex))
+            {
+            }
+            catch (SocketException ex)
+            {
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"KcpTransport receive loop error: {ex.Message}");
+                }
+            }
             catch (Exception ex)
             {
-                LogSwitch.Warning($"KcpTransport receive loop error: {ex.Message}");
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"KcpTransport receive loop error: {ex.Message}");
+                }
             }
             finally
             {
@@ -194,9 +210,25 @@ namespace MiniCore.Model
             catch (OperationCanceledException)
             {
             }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SocketException ex) when (IsExpectedSocketClosure(ex))
+            {
+            }
+            catch (SocketException ex)
+            {
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"KcpTransport update loop error: {ex.Message}");
+                }
+            }
             catch (Exception ex)
             {
-                LogSwitch.Warning($"KcpTransport update loop error: {ex.Message}");
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"KcpTransport update loop error: {ex.Message}");
+                }
             }
         }
 
@@ -219,9 +251,18 @@ namespace MiniCore.Model
                     ByteBufferPool.Shared.Return(payload);
                 }
             }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SocketException ex) when (IsExpectedSocketClosure(ex))
+            {
+            }
             catch (Exception ex)
             {
-                LogSwitch.Warning($"KcpTransport output error: {ex.Message}");
+                if (!IsActiveDisconnect())
+                {
+                    LogSwitch.Warning($"KcpTransport output error: {ex.Message}");
+                }
             }
         }
 
@@ -279,6 +320,20 @@ namespace MiniCore.Model
         private static int TimeDiff(uint later, uint earlier)
         {
             return (int)(later - earlier);
+        }
+
+        private bool IsActiveDisconnect()
+        {
+            return Volatile.Read(ref disconnected) != 0;
+        }
+
+        private static bool IsExpectedSocketClosure(SocketException ex)
+        {
+            return ex.SocketErrorCode == SocketError.OperationAborted
+                || ex.SocketErrorCode == SocketError.Interrupted
+                || ex.SocketErrorCode == SocketError.ConnectionAborted
+                || ex.SocketErrorCode == SocketError.ConnectionReset
+                || ex.SocketErrorCode == SocketError.NotSocket;
         }
 
         private readonly struct ReceivedPacket
