@@ -18,7 +18,6 @@ namespace MiniCore.HotUpdate
             assetsComponent = Global.Com.GetOrAdd<AssetsComponent>();
             assetsComponent.RegisterResourcesComponent(yooAssetResourceComponent);
             Global.Com.GetOrAdd<UIFactoryComponent>();
-            Global.Com.GetOrAdd<NetworkSessionComponent>();
 
             var net = Global.Com.GetOrAdd<NetworkMessageComponent>();
             net.SetSerializer(new NewtonsoftJsonSerializer());

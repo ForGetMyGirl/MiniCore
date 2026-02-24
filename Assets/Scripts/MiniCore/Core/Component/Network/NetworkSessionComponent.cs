@@ -10,7 +10,7 @@ namespace MiniCore.Core
     /// Session manager component for creating and disposing network sessions.
     /// Supports client sessions and server sessions for TCP/KCP/UDP.
     /// </summary>
-    public class NetworkSessionComponent : AComponent
+    public class NetworkSessionComponent : AComponent, INetworkSessionService
     {
         private readonly object sessionLock = new object();
         private readonly Dictionary<string, ISession> sessions = new Dictionary<string, ISession>();

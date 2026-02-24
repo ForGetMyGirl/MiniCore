@@ -20,7 +20,6 @@ namespace MiniCore.HotUpdate
             assetsComponent = Global.Com.Add<AssetsComponent>();
             assetsComponent.RegisterResourcesComponent(yooAssetResourceComponent);
             Global.Com.Add<UIFactoryComponent>();
-            Global.Com.Add<NetworkSessionComponent>();
             var netMsg = Global.Com.Add<NetworkMessageComponent>();
             netMsg.SetSerializer(new NewtonsoftJsonSerializer());
             netMsg.RpcTimeout = TimeSpan.FromSeconds(8);

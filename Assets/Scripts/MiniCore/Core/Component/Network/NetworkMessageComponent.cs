@@ -15,7 +15,7 @@ namespace MiniCore.Core
     /// </summary>
     public class NetworkMessageComponent : AComponent
     {
-        private NetworkSessionComponent sessionComponent;
+        private INetworkSessionService sessionComponent;
         private INetworkSerializer serializer;
         private long rpcIdGenerator = 1;
         private readonly object pendingRpcLock = new object();
@@ -24,9 +24,9 @@ namespace MiniCore.Core
         private readonly Dictionary<long, PendingRpc> pendingRpcs = new Dictionary<long, PendingRpc>();
         private readonly Dictionary<uint, HandlerInfo> handlers = new Dictionary<uint, HandlerInfo>();
         private readonly Dictionary<uint, RpcHandlerInfo> rpcHandlers = new Dictionary<uint, RpcHandlerInfo>();
-        private readonly Dictionary<string, HeartbeatState> heartbeatStates = new Dictionary<string, HeartbeatState>();
+        private readonly Dictionary<string, NetworkHeartbeatState> heartbeatStates = new Dictionary<string, NetworkHeartbeatState>();
         private readonly Dictionary<Type, uint> opcodeCache = new Dictionary<Type, uint>();
-        private readonly ConcurrentQueue<IncomingPacket> incomingPackets = new ConcurrentQueue<IncomingPacket>();
+        private readonly ConcurrentQueue<NetworkIncomingPacket> incomingPackets = new ConcurrentQueue<NetworkIncomingPacket>();
         private int processingQueue;
 
 
@@ -50,31 +50,6 @@ namespace MiniCore.Core
             public Func<NetworkSession, object, IResponse, UniTask> Invoker;
         }
 
-        private enum HeartbeatMode
-        {
-            Client,
-            Server
-        }
-
-        private class HeartbeatState
-        {
-            public CancellationTokenSource Cts;
-            public long LastPongTicks;
-            public long LastPingTicks;
-            public long LastPingSentTicks;
-            public int LastRttMs;
-            public int MinRttMs;
-            public long MinRttWindowStartTicks;
-            public HeartbeatMode Mode;
-        }
-
-        private struct IncomingPacket
-        {
-            public NetworkSession Session;
-            public byte[] Buffer;
-            public int Length;
-        }
-
         public string DefaultSessionId { get; set; } = "default";
         public uint PingOpcode { get; set; } = 1;
         public uint PongOpcode { get; set; } = 2;
@@ -90,12 +65,6 @@ namespace MiniCore.Core
         public override void Awake()
         {
             base.Awake();
-            sessionComponent = Global.Com.Get<NetworkSessionComponent>();
-            if (sessionComponent != null)
-            {
-                sessionComponent.OnServerSessionCreated += HandleServerSessionCreated;
-                sessionComponent.OnServerSessionClosed += HandleServerSessionClosed;
-            }
             serializer = null;
             AutoRegisterHandlersFromAssembly("HotUpdate");
         }
@@ -103,11 +72,7 @@ namespace MiniCore.Core
         public override void Dispose()
         {
             base.Dispose();
-            if (sessionComponent != null)
-            {
-                sessionComponent.OnServerSessionCreated -= HandleServerSessionCreated;
-                sessionComponent.OnServerSessionClosed -= HandleServerSessionClosed;
-            }
+            UnbindSessionServiceEvents();
 
             lock (pendingRpcLock)
             {
@@ -178,7 +143,10 @@ namespace MiniCore.Core
             bool ok = await ProbeSessionAsync(sessionId, probeTimeout, token);
             if (!ok)
             {
-                sessionComponent?.RemoveSession(sessionId);
+                if (TryEnsureSessionService(out var service))
+                {
+                    service.RemoveSession(sessionId);
+                }
             }
 
             return ok;
@@ -206,7 +174,10 @@ namespace MiniCore.Core
             bool ok = await ProbeSessionAsync(sessionId, probeTimeout, token);
             if (!ok)
             {
-                sessionComponent?.RemoveSession(sessionId);
+                if (TryEnsureSessionService(out var service))
+                {
+                    service.RemoveSession(sessionId);
+                }
             }
             return ok;
         }
@@ -233,7 +204,10 @@ namespace MiniCore.Core
             bool ok = await ProbeSessionAsync(sessionId, probeTimeout, token);
             if (!ok)
             {
-                sessionComponent?.RemoveSession(sessionId);
+                if (TryEnsureSessionService(out var service))
+                {
+                    service.RemoveSession(sessionId);
+                }
             }
 
             return ok;
@@ -241,111 +215,99 @@ namespace MiniCore.Core
 
         public async UniTask InitializeSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
         {
-            await sessionComponent.CreateTcpSessionAsync(sessionId, host, port, token);
+            await EnsureSessionService().CreateTcpSessionAsync(sessionId, host, port, token);
             BindSessionReceiver(sessionId);
         }
 
         public async UniTask InitializeKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
         {
-            await sessionComponent.CreateKcpSessionAsync(sessionId, host, port, conv, config, token);
+            await EnsureSessionService().CreateKcpSessionAsync(sessionId, host, port, conv, config, token);
             BindSessionReceiver(sessionId);
         }
 
         public async UniTask InitializeUdpSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
         {
-            await sessionComponent.CreateUdpSessionAsync(sessionId, host, port, token);
+            await EnsureSessionService().CreateUdpSessionAsync(sessionId, host, port, token);
             BindSessionReceiver(sessionId);
         }
 
         public void BindSessionReceiver(string sessionId)
         {
-            BindSessionReceiverInternal(sessionId, HeartbeatMode.Client);
+            BindSessionReceiverInternal(sessionId, NetworkHeartbeatMode.Client);
         }
 
         public void BindServerSessionReceiver(string sessionId)
         {
-            BindSessionReceiverInternal(sessionId, HeartbeatMode.Server);
+            BindSessionReceiverInternal(sessionId, NetworkHeartbeatMode.Server);
         }
 
         public UniTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null, CancellationToken token = default)
         {
-            if (sessionComponent == null)
-            {
-                throw new InvalidOperationException("NetworkSessionComponent is not initialized.");
-            }
-            return sessionComponent.StartKcpServerAsync(host, port, config, token);
+            return EnsureSessionService().StartKcpServerAsync(host, port, config, token);
         }
 
         public UniTask StartTcpServerAsync(string host, int port, CancellationToken token = default)
         {
-            if (sessionComponent == null)
-            {
-                throw new InvalidOperationException("NetworkSessionComponent is not initialized.");
-            }
-            return sessionComponent.StartTcpServerAsync(host, port, token);
+            return EnsureSessionService().StartTcpServerAsync(host, port, token);
         }
 
         public UniTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null, CancellationToken token = default)
         {
-            if (sessionComponent == null)
-            {
-                throw new InvalidOperationException("NetworkSessionComponent is not initialized.");
-            }
-            return sessionComponent.StartUdpServerAsync(host, port, config, token);
+            return EnsureSessionService().StartUdpServerAsync(host, port, config, token);
         }
 
         public void StopKcpServer()
         {
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return;
             }
-            sessionComponent.StopKcpServer();
+            service.StopKcpServer();
         }
 
         public void StopTcpServer()
         {
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return;
             }
-            sessionComponent.StopTcpServer();
+            service.StopTcpServer();
         }
 
         public void StopUdpServer()
         {
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return;
             }
-            sessionComponent.StopUdpServer();
+            service.StopUdpServer();
         }
 
         public List<NetworkSession> GetServerSessionsSnapshot()
         {
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return new List<NetworkSession>();
             }
-            return sessionComponent.GetServerSessionsSnapshot();
+            return service.GetServerSessionsSnapshot();
         }
 
         public NetworkSession GetSession(string sessionId)
         {
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return null;
             }
-            return sessionComponent.GetSession(sessionId);
+            return service.GetSession(sessionId);
         }
 
         public void DisconnectSession(string sessionId)
         {
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return;
             }
-            sessionComponent.DisconnectSession(sessionId);
+            service.DisconnectSession(sessionId);
         }
 
         protected override void Update()
@@ -649,7 +611,7 @@ namespace MiniCore.Core
             }
             if (opcode == PongOpcode)
             {
-                if (TryGetHeartbeatMode(session.SessionId, out var mode) && mode == HeartbeatMode.Client)
+                if (TryGetHeartbeatMode(session.SessionId, out var mode) && mode == NetworkHeartbeatMode.Client)
                 {
                     TouchPong(session.SessionId);
                 }
@@ -723,18 +685,18 @@ namespace MiniCore.Core
             }
         }
 
-        private void StartHeartbeat(NetworkSession session, HeartbeatMode mode)
+        private void StartHeartbeat(NetworkSession session, NetworkHeartbeatMode mode)
         {
             StopHeartbeat(session.SessionId);
             var cts = new CancellationTokenSource();
-            heartbeatStates[session.SessionId] = new HeartbeatState
+            heartbeatStates[session.SessionId] = new NetworkHeartbeatState
             {
                 Cts = cts,
                 LastPongTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 LastPingTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 Mode = mode
             };
-            if (mode == HeartbeatMode.Client)
+            if (mode == NetworkHeartbeatMode.Client)
             {
                 _ = HeartbeatLoopClient(session, cts.Token);
             }
@@ -879,12 +841,12 @@ namespace MiniCore.Core
         public bool TryGetTransportRttMs(string sessionId, out int rttMs)
         {
             rttMs = 0;
-            if (sessionComponent == null)
+            if (!TryEnsureSessionService(out var service))
             {
                 return false;
             }
 
-            var session = sessionComponent.GetSession(sessionId);
+            var session = service.GetSession(sessionId);
             if (session?.Transport is KcpTransport kcpTransport)
             {
                 return kcpTransport.TryGetSmoothedRttMs(out rttMs);
@@ -915,7 +877,14 @@ namespace MiniCore.Core
 
         private bool TryGetSession(string sessionId, out NetworkSession session)
         {
-            session = sessionComponent?.GetSession(sessionId);
+            session = null;
+            if (!TryEnsureSessionService(out var service))
+            {
+                LogSwitch.Warning($"Session service missing. session:{sessionId}");
+                return false;
+            }
+
+            session = service.GetSession(sessionId);
             if (session != null)
             {
                 return true;
@@ -927,12 +896,12 @@ namespace MiniCore.Core
 
         private void PrepareSessionForReconnect(string sessionId)
         {
-            if (string.IsNullOrEmpty(sessionId) || sessionComponent == null)
+            if (string.IsNullOrEmpty(sessionId) || !TryEnsureSessionService(out var service))
             {
                 return;
             }
 
-            var existing = sessionComponent.GetSession(sessionId);
+            var existing = service.GetSession(sessionId);
             if (existing == null)
             {
                 return;
@@ -946,7 +915,7 @@ namespace MiniCore.Core
             {
             }
 
-            sessionComponent.RemoveSession(sessionId);
+            service.RemoveSession(sessionId);
             boundSessionReceivers.Remove(sessionId);
             StopHeartbeat(sessionId);
             FailPendingRpcsBySession(sessionId, new InvalidOperationException($"Session reconnect reset: {sessionId}"));
@@ -1077,20 +1046,21 @@ namespace MiniCore.Core
             };
         }
 
-        private bool TryGetHeartbeatMode(string sessionId, out HeartbeatMode mode)
+        private bool TryGetHeartbeatMode(string sessionId, out NetworkHeartbeatMode mode)
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
             {
                 mode = state.Mode;
                 return true;
             }
-            mode = HeartbeatMode.Client;
+            mode = NetworkHeartbeatMode.Client;
             return false;
         }
 
-        private void BindSessionReceiverInternal(string sessionId, HeartbeatMode mode)
+        private void BindSessionReceiverInternal(string sessionId, NetworkHeartbeatMode mode)
         {
-            var session = sessionComponent.GetSession(sessionId);
+            var sessionService = EnsureSessionService();
+            var session = sessionService.GetSession(sessionId);
             if (session?.Transport == null)
             {
                 throw new InvalidOperationException($"Session {sessionId} not found or not connected.");
@@ -1124,7 +1094,7 @@ namespace MiniCore.Core
             int length = data.Length;
             byte[] buffer = ByteBufferPool.Shared.Rent(length);
             data.Span.CopyTo(buffer);
-            incomingPackets.Enqueue(new IncomingPacket
+            incomingPackets.Enqueue(new NetworkIncomingPacket
             {
                 Session = session,
                 Buffer = buffer,
@@ -1179,11 +1149,90 @@ namespace MiniCore.Core
             OnServerSessionClosed?.Invoke(sessionId);
         }
 
+        private INetworkSessionService EnsureSessionService()
+        {
+            if (sessionComponent != null)
+            {
+                return sessionComponent;
+            }
+
+            if (NetworkSessionServiceRegistry.TryResolve(out var resolved) && resolved != null)
+            {
+                sessionComponent = resolved;
+                BindSessionServiceEvents();
+                return sessionComponent;
+            }
+
+            if (Global.Com.TryGet<NetworkSessionComponent>(out var existing))
+            {
+                sessionComponent = existing;
+            }
+            else
+            {
+                sessionComponent = Global.Com.GetOrAdd<NetworkSessionComponent>();
+            }
+
+            BindSessionServiceEvents();
+            return sessionComponent;
+        }
+
+        private bool TryEnsureSessionService(out INetworkSessionService service)
+        {
+            if (sessionComponent != null)
+            {
+                service = sessionComponent;
+                return true;
+            }
+
+            if (NetworkSessionServiceRegistry.TryResolve(out var resolved) && resolved != null)
+            {
+                sessionComponent = resolved;
+                BindSessionServiceEvents();
+                service = sessionComponent;
+                return true;
+            }
+
+            if (Global.Com.TryGet<NetworkSessionComponent>(out var existing))
+            {
+                sessionComponent = existing;
+                BindSessionServiceEvents();
+                service = sessionComponent;
+                return true;
+            }
+
+            service = null;
+            return false;
+        }
+
+        private void BindSessionServiceEvents()
+        {
+            if (sessionComponent == null)
+            {
+                return;
+            }
+
+            sessionComponent.OnServerSessionCreated -= HandleServerSessionCreated;
+            sessionComponent.OnServerSessionClosed -= HandleServerSessionClosed;
+            sessionComponent.OnServerSessionCreated += HandleServerSessionCreated;
+            sessionComponent.OnServerSessionClosed += HandleServerSessionClosed;
+        }
+
+        private void UnbindSessionServiceEvents()
+        {
+            if (sessionComponent == null)
+            {
+                return;
+            }
+
+            sessionComponent.OnServerSessionCreated -= HandleServerSessionCreated;
+            sessionComponent.OnServerSessionClosed -= HandleServerSessionClosed;
+        }
+
         private string GetLogSide(string sessionId)
         {
             if (TryGetHeartbeatMode(sessionId, out var mode))
             {
-                return mode == HeartbeatMode.Server ? "服务端" : "客户端";
+                return mode == NetworkHeartbeatMode.Server ? "服务端" : "客户端";
             }
 
             return "未知端";
