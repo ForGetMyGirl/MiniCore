@@ -40,7 +40,13 @@ namespace MiniCore.Core
 
     public static class ExcelTool
     {
+        #region Private 私有成员
 
+        private static readonly object assetsOwner = new object(); // 静态表格工具在异步加载期间持有资源组件的专用 owner。
+
+        #endregion
+
+        #region Public 公共成员
 
         /// <summary>
         /// 异步加载Csv文件
@@ -50,11 +56,18 @@ namespace MiniCore.Core
         /// <returns>返回CsvTable<T>类型的对象</returns>
         public static async UniTask<CsvTable<T>> LoadCsvFileAsync<T>(string path) where T : ICsvTable, new()
         {
-            TextAsset context = await Global.Com.Get<AssetsComponent>().LoadAssetAsync<TextAsset>(path);
-            string contextResult = context.text.TrimEnd('\r', '\n');
-            return DeserializeContext<T>(contextResult);
+            AssetsComponent assetsComponent = Global.Com.Get<AssetsComponent>(assetsOwner);
+            try
+            {
+                TextAsset context = await assetsComponent.LoadAssetAsync<TextAsset>(path);
+                string contextResult = context.text.TrimEnd('\r', '\n');
+                return DeserializeContext<T>(contextResult);
+            }
+            finally
+            {
+                Global.Com.Remove<AssetsComponent>(assetsOwner);
+            }
         }
-
 
         /// <summary>
         /// 反序列化Csv文本信息
@@ -159,6 +172,9 @@ namespace MiniCore.Core
             return csvTable;
         }
 
+        #endregion
+
+        #region Private 私有成员
 
         private static void InsertDefaultValue(object obj, string propertyName)
         {
@@ -278,6 +294,8 @@ namespace MiniCore.Core
             return propertyType.IsPrimitive || propertyType == typeof(string);
 
         }
+
+        #endregion
     }
 
     /// <summary>

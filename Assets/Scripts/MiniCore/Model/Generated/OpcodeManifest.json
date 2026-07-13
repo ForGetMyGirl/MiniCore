@@ -1,0 +1,26 @@
+{
+    "NormalStartOpcode": 100001,
+    "RpcStartOpcode": 200001,
+    "Entries": [
+        {
+            "TypeName": "MiniCore.HotUpdate.DemoNormalMessage",
+            "Opcode": 100001
+        },
+        {
+            "TypeName": "MiniCore.HotUpdate.DemoRpcRequest",
+            "Opcode": 200001
+        },
+        {
+            "TypeName": "MiniCore.HotUpdate.DemoRpcResponse",
+            "Opcode": 200002
+        },
+        {
+            "TypeName": "MiniCore.HotUpdate.DisconnectNotice",
+            "Opcode": 100002
+        },
+        {
+            "TypeName": "MiniCore.HotUpdate.TestNetworkData",
+            "Opcode": 100003
+        }
+    ]
+}

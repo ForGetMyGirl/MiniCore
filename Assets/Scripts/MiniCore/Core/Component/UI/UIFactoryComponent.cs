@@ -18,8 +18,17 @@ namespace MiniCore.Core
         {
             uiBaseAndPresenterMapping = new Dictionary<Type, Type>();
             LoadUIBaseAndPresenter();
-            assetsComponent = Global.Com.Get<AssetsComponent>();
-            tagsComponent = Global.Com.Get<TagsComponent>();
+            assetsComponent = Global.Com.Get<AssetsComponent>(this);
+            tagsComponent = Global.Com.Get<TagsComponent>(this);
+        }
+
+        /// <summary>
+        /// 释放 UI 工厂持有的全局资源与标签组件引用。
+        /// </summary>
+        public override void Dispose()
+        {
+            Global.Com.ReleaseAll(this);
+            base.Dispose();
         }
 
         /// <summary>

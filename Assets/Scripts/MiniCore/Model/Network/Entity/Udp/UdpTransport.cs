@@ -7,23 +7,39 @@ using System.Threading;
 namespace MiniCore.Model
 {
     /// <summary>
-    /// UDP transport implementation using unconnected datagrams.
+    /// 基于无连接数据报的客户端 UDP 传输实现。
     /// </summary>
     public class UdpTransport : INetworkTransport
     {
-        private const int MaxDatagramSize = 65507;
-        private static readonly TimeSpan DefaultInitTimeout = TimeSpan.FromSeconds(3);
+        private const int MaxDatagramSize = 65507; // UDP 数据报理论最大长度。
+        private static readonly TimeSpan DefaultInitTimeout = TimeSpan.FromSeconds(3); // 解析远端地址的默认超时。
 
-        private Socket socket;
-        private EndPoint remoteEndPoint;
-        private CancellationTokenSource receiveCts;
-        private int disconnected;
+        private Socket socket; // UDP 客户端套接字。
+        private EndPoint remoteEndPoint; // 发送数据报的远端终结点。
+        private CancellationTokenSource receiveCts; // 接收循环取消令牌源。
+        private int disconnected; // 断开状态的原子标志。
 
+        /// <summary>
+        /// UDP 套接字是否已建立。
+        /// </summary>
         public bool IsConnected => socket != null;
 
+        /// <summary>
+        /// 接收到一个完整 UDP 数据报时触发。
+        /// </summary>
         public event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        /// <summary>
+        /// 传输关闭时触发。
+        /// </summary>
         public event Action OnDisconnected;
 
+        /// <summary>
+        /// 解析远端地址、创建套接字并启动接收循环。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask ConnectAsync(string host, int port, CancellationToken token = default)
         {
             Disconnect();
@@ -46,6 +62,12 @@ namespace MiniCore.Model
             _ = ReceiveLoopAsync(receiveCts.Token);
         }
 
+        /// <summary>
+        /// 向远端发送一个完整 UDP 数据报。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
         {
             if (!IsConnected)
@@ -61,6 +83,11 @@ namespace MiniCore.Model
             await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// 执行 ReceiveLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             try
@@ -125,6 +152,9 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 取消接收循环、关闭套接字并通知断开事件。
+        /// </summary>
         public void Disconnect()
         {
             if (Interlocked.Exchange(ref disconnected, 1) != 0)
@@ -153,11 +183,17 @@ namespace MiniCore.Model
             handler?.Invoke();
         }
 
+        /// <summary>
+        /// 释放 UDP 传输资源。
+        /// </summary>
         public void Dispose()
         {
             Disconnect();
         }
 
+        /// <summary>
+        /// 执行 TryCloseSocket 相关处理。
+        /// </summary>
         private void TryCloseSocket()
         {
             if (socket == null)
@@ -177,11 +213,22 @@ namespace MiniCore.Model
             remoteEndPoint = null;
         }
 
+        /// <summary>
+        /// 执行 InvokeDataReceivedAsync 相关处理。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }
 
+        /// <summary>
+        /// 执行 ResolveRemoteEndPointAsync 相关处理。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask ResolveRemoteEndPointAsync(string host, int port)
         {
             if (string.IsNullOrWhiteSpace(host))
@@ -208,6 +255,11 @@ namespace MiniCore.Model
             throw new SocketException((int)SocketError.AddressFamilyNotSupported);
         }
 
+        /// <summary>
+        /// 执行 IsExpectedRemote 相关处理。
+        /// </summary>
+        /// <param name="remote">执行该方法所需的 remote 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool IsExpectedRemote(EndPoint remote)
         {
             if (remoteEndPoint == null)
@@ -230,11 +282,20 @@ namespace MiniCore.Model
             return expectedIp.Equals(actualIp);
         }
 
+        /// <summary>
+        /// 执行 IsActiveDisconnect 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private bool IsActiveDisconnect()
         {
             return Volatile.Read(ref disconnected) != 0;
         }
 
+        /// <summary>
+        /// 执行 IsExpectedSocketClosure 相关处理。
+        /// </summary>
+        /// <param name="ex">执行该方法所需的 ex 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private static bool IsExpectedSocketClosure(SocketException ex)
         {
             return ex.SocketErrorCode == SocketError.OperationAborted

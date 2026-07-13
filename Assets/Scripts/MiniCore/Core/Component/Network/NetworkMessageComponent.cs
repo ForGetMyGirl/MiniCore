@@ -11,57 +11,103 @@ using UnityEngine;
 namespace MiniCore.Core
 {
     /// <summary>
-    /// Network message hub: handles RPC, normal messages, heartbeat. Shared serializer, optional multi-session.
+    /// 网络消息中枢，负责多会话的发包、收包、RPC、心跳和处理器派发。
     /// </summary>
     public class NetworkMessageComponent : AComponent
     {
-        private INetworkSessionService sessionComponent;
-        private INetworkSerializer serializer;
-        private long rpcIdGenerator = 1;
-        private readonly object pendingRpcLock = new object();
-        private readonly HashSet<string> boundSessionReceivers = new HashSet<string>();
+        #region Private 私有成员
 
-        private readonly Dictionary<long, PendingRpc> pendingRpcs = new Dictionary<long, PendingRpc>();
-        private readonly Dictionary<uint, HandlerInfo> handlers = new Dictionary<uint, HandlerInfo>();
-        private readonly Dictionary<uint, RpcHandlerInfo> rpcHandlers = new Dictionary<uint, RpcHandlerInfo>();
-        private readonly Dictionary<string, NetworkHeartbeatState> heartbeatStates = new Dictionary<string, NetworkHeartbeatState>();
-        private readonly Dictionary<Type, uint> opcodeCache = new Dictionary<Type, uint>();
-        private readonly ConcurrentQueue<NetworkIncomingPacket> incomingPackets = new ConcurrentQueue<NetworkIncomingPacket>();
-        private int processingQueue;
+        private INetworkSessionService sessionComponent; // 会话服务实现缓存。
+        private INetworkSerializer serializer; // 当前网络序列化器。
+        private long rpcIdGenerator = 1; // 单调递增的 RPC 标识生成器。
+        private readonly object pendingRpcLock = new object(); // 待完成 RPC 表的同步锁。
+        private readonly HashSet<string> boundSessionReceivers = new HashSet<string>(); // 已绑定收包回调的会话标识。
+
+        private readonly Dictionary<long, PendingRpc> pendingRpcs = new Dictionary<long, PendingRpc>(); // 等待响应的 RPC 请求。
+        private readonly Dictionary<uint, HandlerInfo> handlers = new Dictionary<uint, HandlerInfo>(); // 普通消息处理器映射。
+        private readonly Dictionary<uint, RpcHandlerInfo> rpcHandlers = new Dictionary<uint, RpcHandlerInfo>(); // RPC 处理器映射。
+        private readonly Dictionary<string, NetworkHeartbeatState> heartbeatStates = new Dictionary<string, NetworkHeartbeatState>(); // 各会话心跳状态。
+        private readonly Dictionary<Type, uint> opcodeCache = new Dictionary<Type, uint>(); // 协议类型到 opcode 的缓存。
+        private readonly ConcurrentQueue<NetworkIncomingPacket> incomingPackets = new ConcurrentQueue<NetworkIncomingPacket>(); // 等待主线程处理的收包队列。
+        private int processingQueue; // 收包队列处理任务的互斥标志。
+        private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2); // 连接探测的默认超时。
 
 
         private class PendingRpc
         {
-            public string SessionId;
-            public Type ResponseType;
-            public UniTaskCompletionSource<object> Tcs;
+            /// <summary>
+            /// 网络模块公开成员 SessionId 的说明。
+            /// </summary>
+            public string SessionId; // RPC 所属会话标识。
+            public Type ResponseType; // 期望的 RPC 响应类型。
+            public UniTaskCompletionSource<object> Tcs; // 等待响应完成的任务源。
         }
 
         private class HandlerInfo
         {
-            public Type MessageType;
-            public Func<NetworkSession, object, UniTask> Invoker;
+            /// <summary>
+            /// 网络模块公开成员 MessageType 的说明。
+            /// </summary>
+            public Type MessageType; // 普通消息运行时类型。
+            public INetworkMessageHandlerInvoker Invoker; // 无反射普通消息派发器。
         }
 
         private class RpcHandlerInfo
         {
-            public Type RequestType;
-            public Type ResponseType;
-            public Func<NetworkSession, object, IResponse, UniTask> Invoker;
+            /// <summary>
+            /// 网络模块公开成员 RequestType 的说明。
+            /// </summary>
+            public Type RequestType; // RPC 请求运行时类型。
+            public Type ResponseType; // RPC 响应运行时类型。
+            public INetworkRpcHandlerInvoker Invoker; // 无反射 RPC 派发器。
+            public Func<IResponse> ResponseFactory; // 已缓存的 RPC 响应对象工厂。
         }
 
-        public string DefaultSessionId { get; set; } = "default";
-        public uint PingOpcode { get; set; } = 1;
-        public uint PongOpcode { get; set; } = 2;
-        public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);
-        public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(15);
-        public TimeSpan RpcTimeout { get; set; } = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2);
+        #endregion
 
+        #region Public 公共成员
+
+        /// <summary>
+        /// 默认客户端会话标识。
+        /// </summary>
+        public string DefaultSessionId { get; set; } = "default";
+        /// <summary>
+        /// 心跳请求的 opcode。
+        /// </summary>
+        public uint PingOpcode { get; set; } = 1;
+        /// <summary>
+        /// 心跳响应的 opcode。
+        /// </summary>
+        public uint PongOpcode { get; set; } = 2;
+        /// <summary>
+        /// 客户端发送心跳或服务端检查心跳的间隔。
+        /// </summary>
+        public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);
+        /// <summary>
+        /// 判定连接心跳超时的时长。
+        /// </summary>
+        public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(15);
+        /// <summary>
+        /// 未指定取消令牌时使用的 RPC 超时时长。
+        /// </summary>
+        public TimeSpan RpcTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// 服务端创建逻辑会话后触发。
+        /// </summary>
         public event Action<NetworkSession> OnServerSessionCreated;
+        /// <summary>
+        /// 服务端逻辑会话关闭后触发。
+        /// </summary>
         public event Action<string> OnServerSessionClosed;
 
+        #endregion
 
+        #region Override 重写实现
+
+        /// <summary>
+        /// 初始化消息中枢并注册 HotUpdate 程序集中的处理器。
+        /// </summary>
         public override void Awake()
         {
             base.Awake();
@@ -69,9 +115,11 @@ namespace MiniCore.Core
             AutoRegisterHandlersFromAssembly("HotUpdate");
         }
 
+        /// <summary>
+        /// 解除事件订阅、取消心跳并终止等待中的 RPC。
+        /// </summary>
         public override void Dispose()
         {
-            base.Dispose();
             UnbindSessionServiceEvents();
 
             lock (pendingRpcLock)
@@ -89,38 +137,99 @@ namespace MiniCore.Core
             }
 
             boundSessionReceivers.Clear();
+            Global.Com.ReleaseAll(this);
+            base.Dispose();
         }
 
+        #endregion
+
+        #region Public 公共成员
+
+        /// <summary>
+        /// 设置本消息中枢使用的协议序列化器。
+        /// </summary>
+        /// <param name="customSerializer">执行该方法所需的 customSerializer 参数。</param>
         public void SetSerializer(INetworkSerializer customSerializer)
         {
             serializer = customSerializer;
         }
 
+        /// <summary>
+        /// 创建并绑定默认 TCP 客户端会话。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask InitializeDefaultSessionAsync(string host, int port, CancellationToken token = default)
         {
             await InitializeSessionAsync(DefaultSessionId, host, port, token);
         }
         /*
+                /// <summary>
+                /// 执行 InitializeDefaultKcpSessionAsync 相关处理。
+                /// </summary>
+                /// <param name="host">执行该方法所需的 host 参数。</param>
+                /// <param name="port">执行该方法所需的 port 参数。</param>
+                /// <param name="conv">执行该方法所需的 conv 参数。</param>
+                /// <param name="config">执行该方法所需的 config 参数。</param>
+                /// <param name="token">执行该方法所需的 token 参数。</param>
+                /// <returns>执行处理后的结果。</returns>
                 public async UniTask InitializeDefaultKcpSessionAsync(string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
                 {
                     await InitializeKcpSessionAsync(DefaultSessionId, host, port, conv, config, token);
                 }*/
 
+        /// <summary>
+        /// 连接默认 KCP 会话，并通过心跳探测确认可用性。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="conv">执行该方法所需的 conv 参数。</param>
+        /// <param name="probeTimeout">执行该方法所需的 probeTimeout 参数。</param>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask<bool> ConnectDefaultKcpSessionAsync(string host, int port, uint conv, TimeSpan probeTimeout = default, KcpTransportConfig config = null, CancellationToken token = default)
         {
             return ConnectKcpSessionAsync(DefaultSessionId, host, port, conv, probeTimeout, config, token);
         }
 
+        /// <summary>
+        /// 连接默认 TCP 会话，并通过心跳探测确认可用性。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="probeTimeout">执行该方法所需的 probeTimeout 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask<bool> ConnectDefaultTcpSessionAsync(string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
         {
             return ConnectTcpSessionAsync(DefaultSessionId, host, port, probeTimeout, token);
         }
 
+        /// <summary>
+        /// 连接默认 UDP 会话，并通过心跳探测确认可用性。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="probeTimeout">执行该方法所需的 probeTimeout 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask<bool> ConnectDefaultUdpSessionAsync(string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
         {
             return ConnectUdpSessionAsync(DefaultSessionId, host, port, probeTimeout, token);
         }
 
+        /// <summary>
+        /// 重建指定 TCP 会话，并探测其是否能够收发心跳。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="probeTimeout">执行该方法所需的 probeTimeout 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask<bool> ConnectTcpSessionAsync(string sessionId, string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
         {
             PrepareSessionForReconnect(sessionId);
@@ -152,6 +261,17 @@ namespace MiniCore.Core
             return ok;
         }
 
+        /// <summary>
+        /// 重建指定 KCP 会话，并探测其是否能够收发心跳。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="conv">执行该方法所需的 conv 参数。</param>
+        /// <param name="probeTimeout">执行该方法所需的 probeTimeout 参数。</param>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask<bool> ConnectKcpSessionAsync(string sessionId, string host, int port, uint conv, TimeSpan probeTimeout = default, KcpTransportConfig config = null, CancellationToken token = default)
         {
             PrepareSessionForReconnect(sessionId);
@@ -182,6 +302,15 @@ namespace MiniCore.Core
             return ok;
         }
 
+        /// <summary>
+        /// 重建指定 UDP 会话，并探测其是否能够收发心跳。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="probeTimeout">执行该方法所需的 probeTimeout 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask<bool> ConnectUdpSessionAsync(string sessionId, string host, int port, TimeSpan probeTimeout = default, CancellationToken token = default)
         {
             PrepareSessionForReconnect(sessionId);
@@ -213,49 +342,109 @@ namespace MiniCore.Core
             return ok;
         }
 
+        /// <summary>
+        /// 创建 TCP 客户端会话并绑定其收包回调。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask InitializeSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
         {
             await EnsureSessionService().CreateTcpSessionAsync(sessionId, host, port, token);
             BindSessionReceiver(sessionId);
         }
 
+        /// <summary>
+        /// 创建 KCP 客户端会话并绑定其收包回调。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="conv">执行该方法所需的 conv 参数。</param>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask InitializeKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
         {
             await EnsureSessionService().CreateKcpSessionAsync(sessionId, host, port, conv, config, token);
             BindSessionReceiver(sessionId);
         }
 
+        /// <summary>
+        /// 创建 UDP 客户端会话并绑定其收包回调。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask InitializeUdpSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
         {
             await EnsureSessionService().CreateUdpSessionAsync(sessionId, host, port, token);
             BindSessionReceiver(sessionId);
         }
 
+        /// <summary>
+        /// 以客户端心跳模式绑定指定会话的收包回调。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         public void BindSessionReceiver(string sessionId)
         {
             BindSessionReceiverInternal(sessionId, NetworkHeartbeatMode.Client);
         }
 
+        /// <summary>
+        /// 以服务端心跳模式绑定指定会话的收包回调。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         public void BindServerSessionReceiver(string sessionId)
         {
             BindSessionReceiverInternal(sessionId, NetworkHeartbeatMode.Server);
         }
 
+        /// <summary>
+        /// 启动 KCP 服务端监听。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null, CancellationToken token = default)
         {
             return EnsureSessionService().StartKcpServerAsync(host, port, config, token);
         }
 
+        /// <summary>
+        /// 启动 TCP 服务端监听。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask StartTcpServerAsync(string host, int port, CancellationToken token = default)
         {
             return EnsureSessionService().StartTcpServerAsync(host, port, token);
         }
 
+        /// <summary>
+        /// 启动 UDP 服务端监听。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null, CancellationToken token = default)
         {
             return EnsureSessionService().StartUdpServerAsync(host, port, config, token);
         }
 
+        /// <summary>
+        /// 停止 KCP 服务端及其关联会话。
+        /// </summary>
         public void StopKcpServer()
         {
             if (!TryEnsureSessionService(out var service))
@@ -265,6 +454,9 @@ namespace MiniCore.Core
             service.StopKcpServer();
         }
 
+        /// <summary>
+        /// 停止 TCP 服务端及其关联会话。
+        /// </summary>
         public void StopTcpServer()
         {
             if (!TryEnsureSessionService(out var service))
@@ -274,6 +466,9 @@ namespace MiniCore.Core
             service.StopTcpServer();
         }
 
+        /// <summary>
+        /// 停止 UDP 服务端及其关联会话。
+        /// </summary>
         public void StopUdpServer()
         {
             if (!TryEnsureSessionService(out var service))
@@ -283,6 +478,10 @@ namespace MiniCore.Core
             service.StopUdpServer();
         }
 
+        /// <summary>
+        /// 获取当前服务端逻辑会话的快照。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         public List<NetworkSession> GetServerSessionsSnapshot()
         {
             if (!TryEnsureSessionService(out var service))
@@ -292,6 +491,11 @@ namespace MiniCore.Core
             return service.GetServerSessionsSnapshot();
         }
 
+        /// <summary>
+        /// 按标识获取逻辑会话；不存在时返回空。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public NetworkSession GetSession(string sessionId)
         {
             if (!TryEnsureSessionService(out var service))
@@ -301,6 +505,10 @@ namespace MiniCore.Core
             return service.GetSession(sessionId);
         }
 
+        /// <summary>
+        /// 断开并移除指定逻辑会话。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         public void DisconnectSession(string sessionId)
         {
             if (!TryEnsureSessionService(out var service))
@@ -310,6 +518,13 @@ namespace MiniCore.Core
             service.DisconnectSession(sessionId);
         }
 
+        #endregion
+
+        #region Override 重写实现
+
+        /// <summary>
+        /// 执行 Update 相关处理。
+        /// </summary>
         protected override void Update()
         {
             if (incomingPackets.IsEmpty)
@@ -325,6 +540,17 @@ namespace MiniCore.Core
             ProcessQueueAsync().Forget();
         }
 
+        #endregion
+
+        #region Public 公共成员
+
+        /// <summary>
+        /// 在限定时间内发送心跳，验证指定会话是否可达。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="timeout">执行该方法所需的 timeout 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask<bool> ProbeSessionAsync(string sessionId, TimeSpan timeout, CancellationToken token = default)
         {
             if (!heartbeatStates.TryGetValue(sessionId, out var state))
@@ -367,6 +593,12 @@ namespace MiniCore.Core
             return false;
         }
 
+        /// <summary>
+        /// 通过默认会话发送 RPC 请求并等待对应响应。
+        /// </summary>
+        /// <param name="request">执行该方法所需的 request 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request, CancellationToken token = default)
             where TRequest : IRequest
             where TResponse : IResponse
@@ -374,6 +606,13 @@ namespace MiniCore.Core
             return CallAsync<TRequest, TResponse>(DefaultSessionId, request, token);
         }
 
+        /// <summary>
+        /// 通过指定会话发送 RPC 请求并等待对应响应。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="request">执行该方法所需的 request 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask<TResponse> CallAsync<TRequest, TResponse>(string sessionId, TRequest request, CancellationToken token = default)
             where TRequest : IRequest
             where TResponse : IResponse
@@ -436,11 +675,24 @@ namespace MiniCore.Core
             return (TResponse)result;
         }
 
+        /// <summary>
+        /// 通过默认会话发送普通协议消息。
+        /// </summary>
+        /// <param name="message">执行该方法所需的 message 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask SendAsync<TMessage>(TMessage message, CancellationToken token = default) where TMessage : IProtocol
         {
             return SendAsync(DefaultSessionId, message, token);
         }
 
+        /// <summary>
+        /// 通过指定会话发送普通协议消息。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="message">执行该方法所需的 message 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask SendAsync<TMessage>(string sessionId, TMessage message, CancellationToken token = default) where TMessage : IProtocol
         {
             if (!TryGetSession(sessionId, out var session))
@@ -467,8 +719,9 @@ namespace MiniCore.Core
         }
 
         /// <summary>
-        /// Scan assemblies for AMHandler<> and ARpcHandler<,> to auto-bind opcodes.
+        /// 扫描目标程序集，自动注册普通消息与 RPC 消息处理器。
         /// </summary>
+        /// <param name="assemblyName">执行该方法所需的 assemblyName 参数。</param>
         public void AutoRegisterHandlersFromAssembly(string assemblyName)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -512,15 +765,21 @@ namespace MiniCore.Core
                 }
 
                 object handlerInstance = Activator.CreateInstance(type);
-                var handleMethod = type.GetMethod("HandleAsync", BindingFlags.Instance | BindingFlags.Public);
-                if (handleMethod == null)
-                {
-                    LogSwitch.Warning($"未找到 HandleAsync 方法: {type.FullName}");
-                    continue;
-                }
 
                 if (isRpc)
                 {
+                    if (!(handlerInstance is INetworkRpcHandlerInvoker rpcInvoker))
+                    {
+                        LogSwitch.Warning($"RPC处理器未实现 {nameof(INetworkRpcHandlerInvoker)}: {type.FullName}");
+                        continue;
+                    }
+
+                    if (rpcInvoker.RequestType != requestType || rpcInvoker.ResponseType != responseType)
+                    {
+                        LogSwitch.Warning($"RPC处理器类型与 opcode 注册信息不匹配: {type.FullName}");
+                        continue;
+                    }
+
                     if (rpcHandlers.ContainsKey(opcode))
                     {
                         LogSwitch.Error($"RPC opcode 冲突:{opcode}，已跳过 {type.FullName}");
@@ -531,12 +790,25 @@ namespace MiniCore.Core
                     {
                         RequestType = requestType,
                         ResponseType = responseType,
-                        Invoker = CreateRpcInvoker(handlerInstance, handleMethod)
+                        Invoker = rpcInvoker,
+                        ResponseFactory = rpcInvoker.CreateResponse
                     };
                     rpcCount++;
                 }
                 else
                 {
+                    if (!(handlerInstance is INetworkMessageHandlerInvoker messageInvoker))
+                    {
+                        LogSwitch.Warning($"普通消息处理器未实现 {nameof(INetworkMessageHandlerInvoker)}: {type.FullName}");
+                        continue;
+                    }
+
+                    if (messageInvoker.MessageType != requestType)
+                    {
+                        LogSwitch.Warning($"普通消息处理器类型与 opcode 注册信息不匹配: {type.FullName}");
+                        continue;
+                    }
+
                     if (handlers.ContainsKey(opcode))
                     {
                         LogSwitch.Error($"普通消息 opcode 冲突:{opcode}，{type.FullName} 与 {handlers[opcode].MessageType.FullName} 冲突，已跳过");
@@ -546,7 +818,7 @@ namespace MiniCore.Core
                     handlers[opcode] = new HandlerInfo
                     {
                         MessageType = requestType,
-                        Invoker = (session, msg) => (UniTask)handleMethod.Invoke(handlerInstance, new object[] { session, msg })
+                        Invoker = messageInvoker
                     };
                     normalCount++;
                 }
@@ -555,6 +827,16 @@ namespace MiniCore.Core
             LogSwitch.Info($"自动注册完成: 普通消息 {normalCount} 个，RPC {rpcCount} 个，程序集: {asm.FullName}");
         }
 
+        #endregion
+
+        #region Private 私有成员
+
+        /// <summary>
+        /// 执行 ResolveType 相关处理。
+        /// </summary>
+        /// <param name="assemblies">执行该方法所需的 assemblies 参数。</param>
+        /// <param name="fullName">执行该方法所需的 fullName 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private Type ResolveType(Assembly[] assemblies, string fullName)
         {
             foreach (var asm in assemblies)
@@ -568,6 +850,13 @@ namespace MiniCore.Core
             return Type.GetType(fullName);
         }
 
+        /// <summary>
+        /// 执行 BuildPacket 相关处理。
+        /// </summary>
+        /// <param name="opcode">执行该方法所需的 opcode 参数。</param>
+        /// <param name="rpcId">执行该方法所需的 rpcId 参数。</param>
+        /// <param name="payload">执行该方法所需的 payload 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private byte[] BuildPacket(uint opcode, long rpcId, byte[] payload)
         {
             // header: opcode(4 bytes, big-endian) + rpcId(8 bytes, big-endian)
@@ -584,6 +873,12 @@ namespace MiniCore.Core
             return buffer;
         }
 
+        /// <summary>
+        /// 执行 HandleIncoming 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask HandleIncoming(NetworkSession session, ReadOnlyMemory<byte> data)
         {
             if (data.Length < 12)
@@ -635,8 +930,14 @@ namespace MiniCore.Core
 
             if (rpcId != 0 && rpcHandlers.TryGetValue(opcode, out RpcHandlerInfo rpcInfo))
             {
-                object req = GetSerializer().Deserialize(rpcInfo.RequestType, payload);
-                if (!(Activator.CreateInstance(rpcInfo.ResponseType) is IResponse response))
+                if (!(GetSerializer().Deserialize(rpcInfo.RequestType, payload) is IRequest req))
+                {
+                    LogSwitch.Error($"RPC请求反序列化失败，类型:{rpcInfo.RequestType?.FullName}");
+                    return;
+                }
+
+                IResponse response = rpcInfo.ResponseFactory();
+                if (response == null)
                 {
                     LogSwitch.Error($"RPC响应实例创建失败，类型:{rpcInfo.ResponseType?.FullName}");
                     return;
@@ -645,7 +946,7 @@ namespace MiniCore.Core
                 response.RpcId = rpcId;
                 try
                 {
-                    await rpcInfo.Invoker(session, req, response);
+                    await rpcInfo.Invoker.HandleAsync(session, req, response);
                 }
                 catch (Exception ex)
                 {
@@ -676,8 +977,13 @@ namespace MiniCore.Core
 
             if (handlers.TryGetValue(opcode, out HandlerInfo info))
             {
-                object msg = GetSerializer().Deserialize(info.MessageType, payload);
-                await info.Invoker(session, msg);
+                if (!(GetSerializer().Deserialize(info.MessageType, payload) is IProtocol msg))
+                {
+                    LogSwitch.Error($"普通消息反序列化失败，类型:{info.MessageType?.FullName}");
+                    return;
+                }
+
+                await info.Invoker.HandleAsync(session, msg);
             }
             else
             {
@@ -685,6 +991,11 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 StartHeartbeat 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="mode">执行该方法所需的 mode 参数。</param>
         private void StartHeartbeat(NetworkSession session, NetworkHeartbeatMode mode)
         {
             StopHeartbeat(session.SessionId);
@@ -706,6 +1017,10 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 StopHeartbeat 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         private void StopHeartbeat(string sessionId)
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
@@ -715,6 +1030,12 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 HeartbeatLoopClient 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask HeartbeatLoopClient(NetworkSession session, CancellationToken token)
         {
             try
@@ -740,6 +1061,12 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 HeartbeatLoopServer 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask HeartbeatLoopServer(NetworkSession session, CancellationToken token)
         {
             try
@@ -764,6 +1091,12 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 SendPingAsync 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask SendPingAsync(NetworkSession session, CancellationToken token)
         {
             if (heartbeatStates.TryGetValue(session.SessionId, out var state))
@@ -774,12 +1107,22 @@ namespace MiniCore.Core
             await session.SendAsync(new ArraySegment<byte>(body), token);
         }
 
+        /// <summary>
+        /// 执行 SendPongAsync 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="rpcId">执行该方法所需的 rpcId 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask SendPongAsync(NetworkSession session, long rpcId)
         {
             byte[] body = BuildPacket(PongOpcode, rpcId, null);
             await session.SendAsync(new ArraySegment<byte>(body));
         }
 
+        /// <summary>
+        /// 执行 TouchPong 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         private void TouchPong(string sessionId)
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
@@ -808,6 +1151,10 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 TouchPing 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         private void TouchPing(string sessionId)
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
@@ -816,6 +1163,16 @@ namespace MiniCore.Core
             }
         }
 
+        #endregion
+
+        #region Public 公共成员
+
+        /// <summary>
+        /// 获取最近一次心跳往返耗时。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="pingMs">执行该方法所需的 pingMs 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public bool TryGetLastPingMs(string sessionId, out int pingMs)
         {
             pingMs = 0;
@@ -827,6 +1184,12 @@ namespace MiniCore.Core
             return pingMs > 0;
         }
 
+        /// <summary>
+        /// 获取当前统计窗口内的最小心跳往返耗时。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="pingMs">执行该方法所需的 pingMs 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public bool TryGetMinPingMs(string sessionId, out int pingMs)
         {
             pingMs = 0;
@@ -838,6 +1201,12 @@ namespace MiniCore.Core
             return pingMs > 0;
         }
 
+        /// <summary>
+        /// 获取底层 KCP 传输层的平滑 RTT。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="rttMs">执行该方法所需的 rttMs 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public bool TryGetTransportRttMs(string sessionId, out int rttMs)
         {
             rttMs = 0;
@@ -855,6 +1224,15 @@ namespace MiniCore.Core
             return false;
         }
 
+        #endregion
+
+        #region Private 私有成员
+
+        /// <summary>
+        /// 执行 IsHeartbeatTimeout 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool IsHeartbeatTimeout(string sessionId)
         {
             if (!heartbeatStates.TryGetValue(sessionId, out var state))
@@ -865,6 +1243,11 @@ namespace MiniCore.Core
             return now - state.LastPongTicks > HeartbeatTimeout.TotalMilliseconds;
         }
 
+        /// <summary>
+        /// 执行 IsPingTimeout 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool IsPingTimeout(string sessionId)
         {
             if (!heartbeatStates.TryGetValue(sessionId, out var state))
@@ -875,6 +1258,12 @@ namespace MiniCore.Core
             return now - state.LastPingTicks > HeartbeatTimeout.TotalMilliseconds;
         }
 
+        /// <summary>
+        /// 执行 TryGetSession 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool TryGetSession(string sessionId, out NetworkSession session)
         {
             session = null;
@@ -894,6 +1283,10 @@ namespace MiniCore.Core
             return false;
         }
 
+        /// <summary>
+        /// 执行 PrepareSessionForReconnect 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         private void PrepareSessionForReconnect(string sessionId)
         {
             if (string.IsNullOrEmpty(sessionId) || !TryEnsureSessionService(out var service))
@@ -921,6 +1314,12 @@ namespace MiniCore.Core
             FailPendingRpcsBySession(sessionId, new InvalidOperationException($"Session reconnect reset: {sessionId}"));
         }
 
+        /// <summary>
+        /// 执行 TryRemovePendingRpc 相关处理。
+        /// </summary>
+        /// <param name="rpcId">执行该方法所需的 rpcId 参数。</param>
+        /// <param name="pending">执行该方法所需的 pending 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool TryRemovePendingRpc(long rpcId, out PendingRpc pending)
         {
             lock (pendingRpcLock)
@@ -936,6 +1335,11 @@ namespace MiniCore.Core
             return false;
         }
 
+        /// <summary>
+        /// 执行 TryFailPendingRpc 相关处理。
+        /// </summary>
+        /// <param name="rpcId">执行该方法所需的 rpcId 参数。</param>
+        /// <param name="ex">执行该方法所需的 ex 参数。</param>
         private void TryFailPendingRpc(long rpcId, Exception ex)
         {
             if (TryRemovePendingRpc(rpcId, out var pending))
@@ -944,6 +1348,11 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 FailPendingRpcsBySession 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="ex">执行该方法所需的 ex 参数。</param>
         private void FailPendingRpcsBySession(string sessionId, Exception ex)
         {
             List<PendingRpc> toFail = null;
@@ -990,6 +1399,11 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 CreateLocalErrorResponse<TResponse> 相关处理。
+        /// </summary>
+        /// <param name="message">执行该方法所需的 message 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private TResponse CreateLocalErrorResponse<TResponse>(string message) where TResponse : IResponse
         {
             if (Activator.CreateInstance(typeof(TResponse)) is TResponse response)
@@ -1002,6 +1416,10 @@ namespace MiniCore.Core
             throw new InvalidOperationException($"Response type {typeof(TResponse).FullName} cannot be created.");
         }
 
+        /// <summary>
+        /// 执行 GetSerializer 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private INetworkSerializer GetSerializer()
         {
             if (serializer == null)
@@ -1011,6 +1429,12 @@ namespace MiniCore.Core
             return serializer;
         }
 
+        /// <summary>
+        /// 执行 ResolveOpcode 相关处理。
+        /// </summary>
+        /// <param name="msgType">执行该方法所需的 msgType 参数。</param>
+        /// <param name="fallback">执行该方法所需的 fallback 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private uint ResolveOpcode(Type msgType, uint fallback)
         {
             if (opcodeCache.TryGetValue(msgType, out uint cached))
@@ -1030,22 +1454,12 @@ namespace MiniCore.Core
             throw new InvalidOperationException($"Opcode mapping missing for {msgType.FullName}, please regenerate mapping.");
         }
 
-        private Func<NetworkSession, object, IResponse, UniTask> CreateRpcInvoker(object handlerInstance, MethodInfo handleMethod)
-        {
-            return async (session, msg, response) =>
-            {
-                var resultObj = handleMethod.Invoke(handlerInstance, new object[] { session, msg, response });
-                if (resultObj is UniTask task)
-                {
-                    await task;
-                }
-                else
-                {
-                    throw new InvalidOperationException($"RPC处理器返回值必须是 UniTask: {handleMethod.DeclaringType?.FullName}.{handleMethod.Name}");
-                }
-            };
-        }
-
+        /// <summary>
+        /// 执行 TryGetHeartbeatMode 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="mode">执行该方法所需的 mode 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool TryGetHeartbeatMode(string sessionId, out NetworkHeartbeatMode mode)
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
@@ -1057,6 +1471,11 @@ namespace MiniCore.Core
             return false;
         }
 
+        /// <summary>
+        /// 执行 BindSessionReceiverInternal 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <param name="mode">执行该方法所需的 mode 参数。</param>
         private void BindSessionReceiverInternal(string sessionId, NetworkHeartbeatMode mode)
         {
             var sessionService = EnsureSessionService();
@@ -1084,6 +1503,12 @@ namespace MiniCore.Core
             StartHeartbeat(session, mode);
         }
 
+        /// <summary>
+        /// 执行 EnqueueIncoming 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private UniTask EnqueueIncoming(NetworkSession session, ReadOnlyMemory<byte> data)
         {
             if (data.IsEmpty)
@@ -1103,6 +1528,10 @@ namespace MiniCore.Core
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 执行 ProcessQueueAsync 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTaskVoid ProcessQueueAsync()
         {
             try
@@ -1125,6 +1554,10 @@ namespace MiniCore.Core
             }
         }
 
+        /// <summary>
+        /// 执行 HandleServerSessionCreated 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
         private void HandleServerSessionCreated(NetworkSession session)
         {
             if (session == null)
@@ -1136,6 +1569,10 @@ namespace MiniCore.Core
             OnServerSessionCreated?.Invoke(session);
         }
 
+        /// <summary>
+        /// 执行 HandleServerSessionClosed 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         private void HandleServerSessionClosed(string sessionId)
         {
             if (string.IsNullOrEmpty(sessionId))
@@ -1149,6 +1586,10 @@ namespace MiniCore.Core
             OnServerSessionClosed?.Invoke(sessionId);
         }
 
+        /// <summary>
+        /// 执行 EnsureSessionService 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private INetworkSessionService EnsureSessionService()
         {
             if (sessionComponent != null)
@@ -1163,19 +1604,17 @@ namespace MiniCore.Core
                 return sessionComponent;
             }
 
-            if (Global.Com.TryGet<NetworkSessionComponent>(out var existing))
-            {
-                sessionComponent = existing;
-            }
-            else
-            {
-                sessionComponent = Global.Com.GetOrAdd<NetworkSessionComponent>();
-            }
+            sessionComponent = Global.Com.GetOrAdd<NetworkSessionComponent>(this);
 
             BindSessionServiceEvents();
             return sessionComponent;
         }
 
+        /// <summary>
+        /// 执行 TryEnsureSessionService 相关处理。
+        /// </summary>
+        /// <param name="service">执行该方法所需的 service 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private bool TryEnsureSessionService(out INetworkSessionService service)
         {
             if (sessionComponent != null)
@@ -1192,18 +1631,13 @@ namespace MiniCore.Core
                 return true;
             }
 
-            if (Global.Com.TryGet<NetworkSessionComponent>(out var existing))
-            {
-                sessionComponent = existing;
-                BindSessionServiceEvents();
-                service = sessionComponent;
-                return true;
-            }
-
             service = null;
             return false;
         }
 
+        /// <summary>
+        /// 执行 BindSessionServiceEvents 相关处理。
+        /// </summary>
         private void BindSessionServiceEvents()
         {
             if (sessionComponent == null)
@@ -1217,6 +1651,9 @@ namespace MiniCore.Core
             sessionComponent.OnServerSessionClosed += HandleServerSessionClosed;
         }
 
+        /// <summary>
+        /// 执行 UnbindSessionServiceEvents 相关处理。
+        /// </summary>
         private void UnbindSessionServiceEvents()
         {
             if (sessionComponent == null)
@@ -1228,6 +1665,11 @@ namespace MiniCore.Core
             sessionComponent.OnServerSessionClosed -= HandleServerSessionClosed;
         }
 
+        /// <summary>
+        /// 执行 GetLogSide 相关处理。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private string GetLogSide(string sessionId)
         {
             if (TryGetHeartbeatMode(sessionId, out var mode))
@@ -1237,5 +1679,7 @@ namespace MiniCore.Core
 
             return "未知端";
         }
+
+        #endregion
     }
 }

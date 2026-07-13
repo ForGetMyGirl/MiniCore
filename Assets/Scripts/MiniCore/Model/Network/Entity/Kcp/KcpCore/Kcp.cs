@@ -3,6 +3,9 @@ using BufferOwner = System.Buffers.IMemoryOwner<byte>;
 
 namespace System.Net.Sockets.Kcp
 {
+    /// <summary>
+    /// 为 KCP Core 补充接收业务包能力的泛型实现。
+    /// </summary>
     public class Kcp<Segment> : KcpCore<Segment>
         where Segment : IKcpSegment
     {
@@ -13,6 +16,13 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 使用 conv、输出回调和可选缓冲池创建 KCP 实例。
+        /// </summary>
+        /// <param name="conv_">执行该方法所需的 conv_ 参数。</param>
+        /// <param name="callback">执行该方法所需的 callback 参数。</param>
+        /// <param name="rentable">执行该方法所需的 rentable 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public Kcp(uint conv_, IKcpCallback callback, IRentable rentable = null)
             : base(conv_)
         {
@@ -29,6 +39,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 执行 CreateBuffer 相关处理。
+        /// </summary>
+        /// <param name="needSize">执行该方法所需的 needSize 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         internal protected override BufferOwner CreateBuffer(int needSize)
         {
             var res = rentable?.RentBuffer(needSize);
@@ -53,6 +68,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 尝试以可回收缓冲区形式取出已重组的业务包。
+        /// </summary>
+        /// <param name="buffer">执行该方法所需的 buffer 参数。</param>
+        /// <param name="TryRecv">执行该方法所需的 TryRecv 参数。</param>
         public (BufferOwner buffer, int avalidLength) TryRecv()
         {
             var peekSize = -1;
@@ -108,6 +128,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 尝试将已重组业务包写入指定缓冲区写入器。
+        /// </summary>
+        /// <param name="writer">执行该方法所需的 writer 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int TryRecv(IBufferWriter<byte> writer)
         {
             var peekSize = -1;
@@ -159,6 +184,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 将下一条已重组业务包复制到指定跨度。
+        /// </summary>
+        /// <param name="buffer">执行该方法所需的 buffer 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Recv(Span<byte> buffer)
         {
             if (0 == rcv_queue.Count)
@@ -188,6 +218,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 将下一条已重组业务包写入指定缓冲区写入器。
+        /// </summary>
+        /// <param name="writer">执行该方法所需的 writer 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Recv(IBufferWriter<byte> writer)
         {
             if (0 == rcv_queue.Count)
@@ -335,6 +370,10 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 获取下一条已重组业务包所需的字节数。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         public int PeekSize()
         {
             lock (rcv_queueLock)
@@ -374,7 +413,6 @@ namespace System.Net.Sockets.Kcp
         }
     }
 }
-
 
 
 

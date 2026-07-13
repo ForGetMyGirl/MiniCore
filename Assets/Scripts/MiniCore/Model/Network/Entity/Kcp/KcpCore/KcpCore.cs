@@ -9,6 +9,9 @@ using BufferOwner = System.Buffers.IMemoryOwner<byte>;
 
 namespace System.Net.Sockets.Kcp
 {
+    /// <summary>
+    /// KCP 协议算法使用的默认常量集合。
+    /// </summary>
     public abstract class KcpConst
     {
         
@@ -53,6 +56,9 @@ namespace System.Net.Sockets.Kcp
 
         #region Const
 
+        /// <summary>
+        /// 网络模块公开成员 IKCP_RTO_NDL 的说明。
+        /// </summary>
         public const int IKCP_RTO_NDL = 30;  
         public const int IKCP_RTO_MIN = 100; 
         public const int IKCP_RTO_DEF = 200;
@@ -60,45 +66,75 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_CMD_PUSH 的说明。
+        /// </summary>
         public const int IKCP_CMD_PUSH = 81; 
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_CMD_ACK 的说明。
+        /// </summary>
         public const int IKCP_CMD_ACK = 82; 
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_CMD_WASK 的说明。
+        /// </summary>
         public const int IKCP_CMD_WASK = 83; 
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_CMD_WINS 的说明。
+        /// </summary>
         public const int IKCP_CMD_WINS = 84; 
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_ASK_SEND 的说明。
+        /// </summary>
         public const int IKCP_ASK_SEND = 1;  
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_ASK_TELL 的说明。
+        /// </summary>
         public const int IKCP_ASK_TELL = 2;  
         public const int IKCP_WND_SND = 32;
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_WND_RCV 的说明。
+        /// </summary>
         public const int IKCP_WND_RCV = 128; 
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_MTU_DEF 的说明。
+        /// </summary>
         public const int IKCP_MTU_DEF = 1400;
         public const int IKCP_ACK_FAST = 3;
         public const int IKCP_INTERVAL = 100;
         public const int IKCP_OVERHEAD = 24;
+        /// <summary>
+        /// 网络模块公开成员 IKCP_DEADLINK 的说明。
+        /// </summary>
         public const int IKCP_DEADLINK = 20;
         public const int IKCP_THRESH_INIT = 2;
         public const int IKCP_THRESH_MIN = 2;
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IKCP_PROBE_INIT 的说明。
+        /// </summary>
         public const int IKCP_PROBE_INIT = 7000;   
         public const int IKCP_PROBE_LIMIT = 120000; 
         public const int IKCP_FASTACK_LIMIT = 5;        
@@ -108,6 +144,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 网络模块公开成员 IsLittleEndian 的说明。
+        /// </summary>
         public static bool IsLittleEndian = true;
     }
 
@@ -117,6 +156,9 @@ namespace System.Net.Sockets.Kcp
     
     
     
+    /// <summary>
+    /// KCP 可靠传输算法核心，负责窗口、确认、重传与拥塞控制。
+    /// </summary>
     public partial class KcpCore<Segment> : KcpConst, IKcpSetting, IKcpUpdate, IDisposable
         where Segment : IKcpSegment
     {
@@ -124,6 +166,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// KCP 会话标识。
+        /// </summary>
         public uint conv { get; protected set; }
         
         
@@ -241,7 +286,13 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 快速重传阈值。
+        /// </summary>
         public int fastresend;
+        /// <summary>
+        /// 快速确认次数上限。
+        /// </summary>
         public int fastlimit;
         
         
@@ -251,6 +302,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 是否启用 KCP 流模式。
+        /// </summary>
         public int stream;
         protected BufferOwner buffer;
 
@@ -294,11 +348,22 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 等待发送或确认的分片数量。
+        /// </summary>
         public int WaitSnd => snd_buf.Count + snd_queue.Count;
 
         #endregion
 
+        /// <summary>
+        /// 负责分片分配和回收的管理器。
+        /// </summary>
         public ISegmentManager<Segment> SegmentManager { get; set; }
+        /// <summary>
+        /// 使用指定 conv 创建 KCP 算法核心。
+        /// </summary>
+        /// <param name="conv_">执行该方法所需的 conv_ 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public KcpCore(uint conv_)
         {
             conv = conv_;
@@ -327,6 +392,10 @@ namespace System.Net.Sockets.Kcp
         
         private bool m_disposing = false;
 
+        /// <summary>
+        /// 执行 CheckDispose 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         protected bool CheckDispose()
         {
             if (m_disposing)
@@ -343,6 +412,10 @@ namespace System.Net.Sockets.Kcp
             return false;
         }
 
+        /// <summary>
+        /// 执行 Dispose 相关处理。
+        /// </summary>
+        /// <param name="disposing">执行该方法所需的 disposing 参数。</param>
         protected virtual void Dispose(bool disposing)
         {
             try
@@ -443,6 +516,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 释放 KCP 缓冲区和分片资源。
+        /// </summary>
         public void Dispose()
         {
             
@@ -456,16 +532,34 @@ namespace System.Net.Sockets.Kcp
         internal protected IKcpCallback callbackHandle;
         internal protected IKcpOutputWriter OutputWriter;
 
+        /// <summary>
+        /// 执行 Ibound 相关处理。
+        /// </summary>
+        /// <param name="lower">执行该方法所需的 lower 参数。</param>
+        /// <param name="middle">执行该方法所需的 middle 参数。</param>
+        /// <param name="upper">执行该方法所需的 upper 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         protected static uint Ibound(uint lower, uint middle, uint upper)
         {
             return Min(Max(lower, middle), upper);
         }
 
+        /// <summary>
+        /// 执行 Itimediff 相关处理。
+        /// </summary>
+        /// <param name="later">执行该方法所需的 later 参数。</param>
+        /// <param name="earlier">执行该方法所需的 earlier 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         protected static int Itimediff(uint later, uint earlier)
         {
             return ((int)(later - earlier));
         }
 
+        /// <summary>
+        /// 执行 CreateBuffer 相关处理。
+        /// </summary>
+        /// <param name="needSize">执行该方法所需的 needSize 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         internal protected virtual BufferOwner CreateBuffer(int needSize)
         {
             return new KcpInnerBuffer(needSize);
@@ -487,12 +581,20 @@ namespace System.Net.Sockets.Kcp
                 }
             }
 
+            /// <summary>
+            /// 执行 KcpInnerBuffer 相关处理。
+            /// </summary>
+            /// <param name="size">执行该方法所需的 size 参数。</param>
+            /// <returns>执行处理后的结果。</returns>
             public KcpInnerBuffer(int size)
             {
                 _memory = new Memory<byte>(new byte[size]);
             }
 
             bool alreadyDisposed = false;
+            /// <summary>
+            /// 执行 Dispose 相关处理。
+            /// </summary>
             public void Dispose()
             {
                 alreadyDisposed = true;
@@ -517,6 +619,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 计算下一次需要调用 Update 的时间。
+        /// </summary>
+        /// <param name="time">执行该方法所需的 time 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public DateTimeOffset Check(in DateTimeOffset time)
         {
             if (CheckDispose())
@@ -575,6 +682,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 执行 Move_Rcv_buf_2_Rcv_queue 相关处理。
+        /// </summary>
         protected void Move_Rcv_buf_2_Rcv_queue()
         {
             lock (rcv_bufLock)
@@ -604,6 +714,10 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 执行 Update_ack 相关处理。
+        /// </summary>
+        /// <param name="rtt">执行该方法所需的 rtt 参数。</param>
         protected void Update_ack(int rtt)
         {
             if (rx_srtt == 0)
@@ -634,6 +748,9 @@ namespace System.Net.Sockets.Kcp
             rx_rto = Ibound(rx_minrto, rto, IKCP_RTO_MAX);
         }
 
+        /// <summary>
+        /// 执行 Shrink_buf 相关处理。
+        /// </summary>
         protected void Shrink_buf()
         {
             lock (snd_bufLock)
@@ -642,6 +759,10 @@ namespace System.Net.Sockets.Kcp
             }
         }
 
+        /// <summary>
+        /// 执行 Parse_ack 相关处理。
+        /// </summary>
+        /// <param name="sn">执行该方法所需的 sn 参数。</param>
         protected void Parse_ack(uint sn)
         {
             if (Itimediff(sn, snd_una) < 0 || Itimediff(sn, snd_nxt) >= 0)
@@ -669,6 +790,10 @@ namespace System.Net.Sockets.Kcp
             }
         }
 
+        /// <summary>
+        /// 执行 Parse_una 相关处理。
+        /// </summary>
+        /// <param name="una">执行该方法所需的 una 参数。</param>
         protected void Parse_una(uint una)
         {
             
@@ -691,6 +816,11 @@ namespace System.Net.Sockets.Kcp
 
         }
 
+        /// <summary>
+        /// 执行 Parse_fastack 相关处理。
+        /// </summary>
+        /// <param name="sn">执行该方法所需的 sn 参数。</param>
+        /// <param name="ts">执行该方法所需的 ts 参数。</param>
         protected void Parse_fastack(uint sn, uint ts)
         {
             if (Itimediff(sn, snd_una) < 0 || Itimediff(sn, snd_nxt) >= 0)
@@ -726,6 +856,10 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 执行 Parse_data 相关处理。
+        /// </summary>
+        /// <param name="newseg">执行该方法所需的 newseg 参数。</param>
         internal virtual void Parse_data(Segment newseg)
         {
             var sn = newseg.sn;
@@ -791,6 +925,10 @@ namespace System.Net.Sockets.Kcp
             Move_Rcv_buf_2_Rcv_queue();
         }
 
+        /// <summary>
+        /// 执行 Wnd_unused 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         protected ushort Wnd_unused()
         {
             
@@ -816,6 +954,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 执行 Flush 相关处理。
+        /// </summary>
         protected void Flush()
         {
             var current_ = current;
@@ -1121,6 +1262,9 @@ namespace System.Net.Sockets.Kcp
             }
         }
 
+        /// <summary>
+        /// 执行 OnDeadlink 相关处理。
+        /// </summary>
         protected virtual void OnDeadlink()
         { 
 
@@ -1129,6 +1273,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 执行 Flush2 相关处理。
+        /// </summary>
         protected void Flush2()
         {
             var current_ = current;
@@ -1422,6 +1569,10 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 推进 KCP 时钟并执行刷新、重传和确认处理。
+        /// </summary>
+        /// <param name="time">执行该方法所需的 time 参数。</param>
         public void Update(in DateTimeOffset time)
         {
             if (CheckDispose())
@@ -1462,6 +1613,11 @@ namespace System.Net.Sockets.Kcp
 
         #region Settings
 
+        /// <summary>
+        /// 设置 KCP 最大传输单元并重建输出缓冲。
+        /// </summary>
+        /// <param name="mtu">执行该方法所需的 mtu 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int SetMtu(int mtu = IKCP_MTU_DEF)
         {
             if (mtu < 50 || mtu < IKCP_OVERHEAD)
@@ -1487,6 +1643,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 设置 KCP 刷新间隔。
+        /// </summary>
+        /// <param name="interval_">执行该方法所需的 interval_ 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Interval(int interval_)
         {
             if (interval_ > 5000)
@@ -1503,6 +1664,14 @@ namespace System.Net.Sockets.Kcp
             return 0;
         }
 
+        /// <summary>
+        /// 配置无延迟、刷新间隔、快速重传和拥塞控制。
+        /// </summary>
+        /// <param name="nodelay_">执行该方法所需的 nodelay_ 参数。</param>
+        /// <param name="interval_">执行该方法所需的 interval_ 参数。</param>
+        /// <param name="resend_">执行该方法所需的 resend_ 参数。</param>
+        /// <param name="nc_">执行该方法所需的 nc_ 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int NoDelay(int nodelay_, int interval_, int resend_, int nc_)
         {
 
@@ -1532,6 +1701,12 @@ namespace System.Net.Sockets.Kcp
             return Interval(interval_);
         }
 
+        /// <summary>
+        /// 设置发送与接收窗口大小。
+        /// </summary>
+        /// <param name="sndwnd">执行该方法所需的 sndwnd 参数。</param>
+        /// <param name="rcvwnd">执行该方法所需的 rcvwnd 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int WndSize(int sndwnd = IKCP_WND_SND, int rcvwnd = IKCP_WND_RCV)
         {
             if (sndwnd > 0)
@@ -1552,6 +1727,9 @@ namespace System.Net.Sockets.Kcp
 
     }
 
+    /// <summary>
+    /// KCP Core 的发送能力分部实现。
+    /// </summary>
     public partial class KcpCore<Segment> : IKcpSendable
     {
         
@@ -1560,6 +1738,12 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 将连续字节跨度分片后加入 KCP 发送队列。
+        /// </summary>
+        /// <param name="span">执行该方法所需的 span 参数。</param>
+        /// <param name="options">执行该方法所需的 options 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Send(ReadOnlySpan<byte> span, object options = null)
         {
             if (CheckDispose())
@@ -1637,6 +1821,12 @@ namespace System.Net.Sockets.Kcp
         }
 
         
+        /// <summary>
+        /// 将只读字节序列分片后加入 KCP 发送队列。
+        /// </summary>
+        /// <param name="span">执行该方法所需的 span 参数。</param>
+        /// <param name="options">执行该方法所需的 options 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Send(ReadOnlySequence<byte> span, object options = null)
         {
             if (CheckDispose())
@@ -1714,6 +1904,9 @@ namespace System.Net.Sockets.Kcp
         }
     }
 
+    /// <summary>
+    /// KCP Core 的收包解析能力分部实现。
+    /// </summary>
     public partial class KcpCore<Segment> : IKcpInputable
     {
         
@@ -1721,6 +1914,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 解析连续 KCP 数据报并更新接收、确认与重传状态。
+        /// </summary>
+        /// <param name="span">执行该方法所需的 span 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Input(ReadOnlySpan<byte> span)
         {
             if (CheckDispose())
@@ -1937,6 +2135,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 解析分段 KCP 数据报并更新接收、确认与重传状态。
+        /// </summary>
+        /// <param name="span">执行该方法所需的 span 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Input(ReadOnlySequence<byte> span)
         {
             if (CheckDispose())
@@ -2149,6 +2352,19 @@ namespace System.Net.Sockets.Kcp
             return 0;
         }
 
+        /// <summary>
+        /// 从 KCP 包头读取全部协议字段。
+        /// </summary>
+        /// <param name="header">执行该方法所需的 header 参数。</param>
+        /// <param name="conv_">执行该方法所需的 conv_ 参数。</param>
+        /// <param name="cmd">执行该方法所需的 cmd 参数。</param>
+        /// <param name="frg">执行该方法所需的 frg 参数。</param>
+        /// <param name="wnd">执行该方法所需的 wnd 参数。</param>
+        /// <param name="ts">执行该方法所需的 ts 参数。</param>
+        /// <param name="sn">执行该方法所需的 sn 参数。</param>
+        /// <param name="una">执行该方法所需的 una 参数。</param>
+        /// <param name="length">执行该方法所需的 length 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public static int ReadHeader(ReadOnlySpan<byte> header,
                               ref uint conv_,
                               ref byte cmd,

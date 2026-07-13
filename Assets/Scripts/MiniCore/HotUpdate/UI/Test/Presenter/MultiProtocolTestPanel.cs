@@ -48,7 +48,7 @@ namespace MiniCore.HotUpdate
 
         private void Awake()
         {
-            net = Global.Com.Get<NetworkMessageComponent>();
+            net = Global.Com.Get<NetworkMessageComponent>(this);
             if (net != null)
             {
                 net.OnServerSessionCreated += HandleServerSessionCreated;
@@ -73,6 +73,7 @@ namespace MiniCore.HotUpdate
             EventCenter.RemoveListener<string>(HotEvent.KcpTestMessage, OnNetworkMessage);
             EventCenter.RemoveListener<string>(GameEvent.LogInfo, OnInfoMessage);
             EventCenter.RemoveListener<string>(GameEvent.LogWarning, OnWarningMessage);
+            Global.Com.ReleaseAll(this);
         }
 
         private void OnGUI()

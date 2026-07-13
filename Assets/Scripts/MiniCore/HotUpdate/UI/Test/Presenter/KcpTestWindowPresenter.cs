@@ -22,7 +22,7 @@ namespace MiniCore.HotUpdate
 
         protected override void OnBind()
         {
-            net = Global.Com.Get<NetworkMessageComponent>();
+            net = Global.Com.Get<NetworkMessageComponent>(this);
             EventCenter.AddListener<string>(HotEvent.KcpTestMessage, OnKcpTestMessage);
             View.OnStartServerClicked += StartServer;
             View.OnStopServerClicked += () => StopServerAsync().Forget();
@@ -54,6 +54,7 @@ namespace MiniCore.HotUpdate
                 session.Transport.OnDisconnected -= clientDisconnectedHandler;
             }
 
+            Global.Com.ReleaseAll(this);
             base.UnbindView();
         }
 
@@ -367,4 +368,3 @@ namespace MiniCore.HotUpdate
         }
     }
 }
-

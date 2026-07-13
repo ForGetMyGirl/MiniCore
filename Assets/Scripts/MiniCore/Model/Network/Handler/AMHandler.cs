@@ -4,13 +4,12 @@ using System;
 namespace MiniCore.Model
 {
     /// <summary>
-    /// Base class for normal message handlers (non-RPC).
-    /// NetworkMessageComponent will reflect HandleAsync to dispatch messages.
+    /// 普通消息处理器基类，由网络消息组件派发反序列化后的协议对象。
     /// </summary>
-    public abstract class AMHandler<TMessage> where TMessage : IProtocol
+    public abstract class AMHandler<TMessage> : INetworkMessageHandlerInvoker where TMessage : IProtocol
     {
         /// <summary>
-        /// Resolve opcode from the registry for this message type.
+        /// 从 opcode 注册表解析当前消息类型对应的协议号。
         /// </summary>
         public virtual uint Opcode
         {
@@ -26,8 +25,23 @@ namespace MiniCore.Model
         }
 
         /// <summary>
-        /// Handle deserialized message.
+        /// 处理已反序列化的普通消息。
         /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="message">执行该方法所需的 message 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public abstract UniTask HandleAsync(NetworkSession session, TMessage message);
+
+        Type INetworkMessageHandlerInvoker.MessageType => typeof(TMessage);
+
+        UniTask INetworkMessageHandlerInvoker.HandleAsync(NetworkSession session, IProtocol message)
+        {
+            if (!(message is TMessage typedMessage))
+            {
+                throw new ArgumentException($"消息类型不匹配，期望:{typeof(TMessage).FullName} 实际:{message?.GetType().FullName}", nameof(message));
+            }
+
+            return HandleAsync(session, typedMessage);
+        }
     }
 }

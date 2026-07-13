@@ -5,29 +5,62 @@ using System.Threading;
 
 namespace MiniCore.Model
 {
+    /// <summary>
+    /// 为 TCP 传输提供四字节大端长度前缀拆包和粘包处理的基类。
+    /// </summary>
     public abstract class LengthPrefixedTcpTransportBase : INetworkTransport
     {
-        private readonly int maxPacketSize;
-        private readonly SemaphoreSlim sendLock = new SemaphoreSlim(1, 1);
+        private readonly int maxPacketSize; // 允许接收的单个业务包最大字节数。
+        private readonly SemaphoreSlim sendLock = new SemaphoreSlim(1, 1); // 保证长度头和包体连续发送的异步锁。
 
-        private Socket socket;
-        private CancellationTokenSource receiveCts;
-        private int disconnected = 1;
+        private Socket socket; // 当前已连接的 TCP 套接字。
+        private CancellationTokenSource receiveCts; // 接收循环取消令牌源。
+        private int disconnected = 1; // 传输断开状态的原子标志。
 
+        /// <summary>
+        /// 使用指定最大业务包大小创建 TCP 传输基类。
+        /// </summary>
+        /// <param name="maxPacketSize">执行该方法所需的 maxPacketSize 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         protected LengthPrefixedTcpTransportBase(int maxPacketSize = 4 * 1024 * 1024)
         {
             this.maxPacketSize = maxPacketSize;
         }
 
+        /// <summary>
+        /// 当前已连接套接字，供派生传输访问。
+        /// </summary>
         protected Socket Socket => socket;
 
+        /// <summary>
+        /// 当前套接字是否已连接。
+        /// </summary>
         public bool IsConnected => socket != null && socket.Connected;
 
+        /// <summary>
+        /// 接收到完整业务包时触发。
+        /// </summary>
         public event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        /// <summary>
+        /// 传输关闭时触发。
+        /// </summary>
         public event Action OnDisconnected;
 
+        /// <summary>
+        /// 由派生类实现到目标主机的连接过程。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public abstract UniTask ConnectAsync(string host, int port, CancellationToken token = default);
 
+        /// <summary>
+        /// 以长度前缀格式发送完整业务包。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public async UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
         {
             if (!IsConnected)
@@ -56,6 +89,9 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 取消接收循环、关闭套接字并通知断开事件。
+        /// </summary>
         public virtual void Disconnect()
         {
             if (Interlocked.Exchange(ref disconnected, 1) != 0)
@@ -96,11 +132,19 @@ namespace MiniCore.Model
             disconnectedHandler?.Invoke();
         }
 
+        /// <summary>
+        /// 释放传输资源。
+        /// </summary>
         public void Dispose()
         {
             Disconnect();
         }
 
+        /// <summary>
+        /// 附加已连接套接字并启动后台接收循环。
+        /// </summary>
+        /// <param name="connectedSocket">执行该方法所需的 connectedSocket 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
         protected void AttachConnectedSocket(Socket connectedSocket, CancellationToken token = default)
         {
             socket = connectedSocket ?? throw new ArgumentNullException(nameof(connectedSocket));
@@ -112,11 +156,21 @@ namespace MiniCore.Model
             _ = ReceiveLoopAsync(receiveCts.Token);
         }
 
+        /// <summary>
+        /// 向订阅者派发已完成拆包的数据。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         protected UniTask DispatchDataReceivedAsync(ReadOnlyMemory<byte> data)
         {
             return TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }
 
+        /// <summary>
+        /// 执行 ReceiveLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             try
@@ -188,11 +242,20 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 IsActiveDisconnect 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private bool IsActiveDisconnect()
         {
             return Interlocked.CompareExchange(ref disconnected, 0, 0) != 0;
         }
 
+        /// <summary>
+        /// 执行 IsExpectedSocketClosure 相关处理。
+        /// </summary>
+        /// <param name="ex">执行该方法所需的 ex 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private static bool IsExpectedSocketClosure(SocketException ex)
         {
             return ex.SocketErrorCode == SocketError.OperationAborted
@@ -203,6 +266,13 @@ namespace MiniCore.Model
                 || ex.SocketErrorCode == SocketError.NotSocket;
         }
 
+        /// <summary>
+        /// 执行 ReadExactAsync 相关处理。
+        /// </summary>
+        /// <param name="buffer">执行该方法所需的 buffer 参数。</param>
+        /// <param name="size">执行该方法所需的 size 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask<bool> ReadExactAsync(byte[] buffer, int size, CancellationToken token)
         {
             int read = 0;
@@ -230,6 +300,12 @@ namespace MiniCore.Model
             return true;
         }
 
+        /// <summary>
+        /// 执行 SendAllAsync 相关处理。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask SendAllAsync(ArraySegment<byte> data, CancellationToken token)
         {
             if (data.Array == null)
@@ -261,4 +337,3 @@ namespace MiniCore.Model
         }
     }
 }
-

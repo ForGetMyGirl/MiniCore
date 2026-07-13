@@ -7,22 +7,64 @@ using System.Threading.Tasks;
 
 namespace MiniCore.Model
 {
+    /// <summary>
+    /// 客户端 KCP 传输参数配置。
+    /// </summary>
     public class KcpTransportConfig
     {
+        /// <summary>
+        /// KCP 最大传输单元。
+        /// </summary>
         public int Mtu = 1400;
+        /// <summary>
+        /// KCP 发送窗口大小。
+        /// </summary>
         public int SendWindow = 128;
+        /// <summary>
+        /// KCP 接收窗口大小。
+        /// </summary>
         public int ReceiveWindow = 128;
+        /// <summary>
+        /// KCP 无延迟模式开关。
+        /// </summary>
         public int NoDelay = 1;
+        /// <summary>
+        /// KCP 内部刷新间隔（毫秒）。
+        /// </summary>
         public int Interval = 10;
+        /// <summary>
+        /// KCP 快速重传阈值。
+        /// </summary>
         public int Resend = 2;
+        /// <summary>
+        /// 是否禁用 KCP 拥塞控制。
+        /// </summary>
         public int NoCongestion = 1;
+        /// <summary>
+        /// 最小重传超时（毫秒）。
+        /// </summary>
         public int MinRto = 30;
+        /// <summary>
+        /// 快速重传触发参数。
+        /// </summary>
         public int FastResend = 2;
+        /// <summary>
+        /// 快速确认次数上限。
+        /// </summary>
         public int FastAck = 1;
+        /// <summary>
+        /// 判定 KCP 链路失效的重传次数。
+        /// </summary>
         public int DeadLink = 20;
+        /// <summary>
+        /// 是否启用流模式。
+        /// </summary>
         public bool Stream = false;
     }
 
+    /// <summary>
+    /// 基于 UDP 和 KCP 的可靠客户端传输实现。
+    /// </summary>
     public class KcpTransport : INetworkTransport
     {
         private const int MaxDatagramSize = 65507;
@@ -37,17 +79,39 @@ namespace MiniCore.Model
         private readonly object kcpLock = new object();
         private int disconnected;
 
+        /// <summary>
+        /// 底层 UDP 套接字是否已建立。
+        /// </summary>
         public bool IsConnected => socket != null;
 
+        /// <summary>
+        /// 接收到 KCP 重组后的完整业务包时触发。
+        /// </summary>
         public event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        /// <summary>
+        /// KCP 传输断开时触发。
+        /// </summary>
         public event Action OnDisconnected;
 
+        /// <summary>
+        /// 使用指定会话标识和配置创建 KCP 传输。
+        /// </summary>
+        /// <param name="conv">执行该方法所需的 conv 参数。</param>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public KcpTransport(uint conv, KcpTransportConfig config = null)
         {
             this.conv = conv;
             this.config = config ?? new KcpTransportConfig();
         }
 
+        /// <summary>
+        /// 初始化 UDP 套接字、KCP 状态并启动收包和更新循环。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask ConnectAsync(string host, int port, CancellationToken token = default)
         {
             Disconnect();
@@ -72,6 +136,12 @@ namespace MiniCore.Model
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 将完整业务包交给 KCP 分片并发送。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
         {
             if (!IsConnected)
@@ -92,6 +162,11 @@ namespace MiniCore.Model
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 尝试获取 KCP 平滑往返时延。
+        /// </summary>
+        /// <param name="rttMs">执行该方法所需的 rttMs 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public bool TryGetSmoothedRttMs(out int rttMs)
         {
             rttMs = 0;
@@ -106,6 +181,11 @@ namespace MiniCore.Model
             return rttMs > 0;
         }
 
+        /// <summary>
+        /// 执行 ReceiveLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
@@ -186,6 +266,11 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 UpdateLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask UpdateLoopAsync(CancellationToken token)
         {
             try
@@ -232,6 +317,11 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 KcpOutput 相关处理。
+        /// </summary>
+        /// <param name="buffer">执行该方法所需的 buffer 参数。</param>
+        /// <param name="size">执行该方法所需的 size 参数。</param>
         private void KcpOutput(byte[] buffer, int size)
         {
             if (socket == null || size <= 0)
@@ -266,11 +356,19 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 InvokeDataReceivedAsync 相关处理。
+        /// </summary>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }
 
+        /// <summary>
+        /// 停止 KCP 循环、关闭套接字并通知断开事件。
+        /// </summary>
         public void Disconnect()
         {
             if (Interlocked.Exchange(ref disconnected, 1) != 0)
@@ -307,26 +405,48 @@ namespace MiniCore.Model
             handler?.Invoke();
         }
 
+        /// <summary>
+        /// 释放 KCP 传输资源。
+        /// </summary>
         public void Dispose()
         {
             Disconnect();
         }
 
+        /// <summary>
+        /// 执行 CurrentMS 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private static uint CurrentMS()
         {
             return unchecked((uint)Environment.TickCount);
         }
 
+        /// <summary>
+        /// 执行 TimeDiff 相关处理。
+        /// </summary>
+        /// <param name="later">执行该方法所需的 later 参数。</param>
+        /// <param name="earlier">执行该方法所需的 earlier 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private static int TimeDiff(uint later, uint earlier)
         {
             return (int)(later - earlier);
         }
 
+        /// <summary>
+        /// 执行 IsActiveDisconnect 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private bool IsActiveDisconnect()
         {
             return Volatile.Read(ref disconnected) != 0;
         }
 
+        /// <summary>
+        /// 执行 IsExpectedSocketClosure 相关处理。
+        /// </summary>
+        /// <param name="ex">执行该方法所需的 ex 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private static bool IsExpectedSocketClosure(SocketException ex)
         {
             return ex.SocketErrorCode == SocketError.OperationAborted
@@ -338,9 +458,18 @@ namespace MiniCore.Model
 
         private readonly struct ReceivedPacket
         {
+            /// <summary>
+            /// 网络模块公开成员 Buffer 的说明。
+            /// </summary>
             public readonly byte[] Buffer;
             public readonly int Length;
 
+            /// <summary>
+            /// 执行 ReceivedPacket 相关处理。
+            /// </summary>
+            /// <param name="buffer">执行该方法所需的 buffer 参数。</param>
+            /// <param name="length">执行该方法所需的 length 参数。</param>
+            /// <returns>执行处理后的结果。</returns>
             public ReceivedPacket(byte[] buffer, int length)
             {
                 Buffer = buffer;
@@ -349,4 +478,3 @@ namespace MiniCore.Model
         }
     }
 }
-

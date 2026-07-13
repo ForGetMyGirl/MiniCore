@@ -1,0 +1,4 @@
+interface:
+  display_name: "C# 开发规范"
+  short_description: "执行 MiniCore 的注释、编码和 GC 控制规范。"
+  default_prompt: "按 MiniCore C# 开发规范实现本次代码变更。"

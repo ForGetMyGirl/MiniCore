@@ -7,30 +7,60 @@ using System.Threading;
 
 namespace MiniCore.Model
 {
+    /// <summary>
+    /// UDP 服务端接收行为配置。
+    /// </summary>
     public class UdpServerConfig
     {
+        /// <summary>
+        /// 单个 UDP 数据报允许接收的最大字节数。
+        /// </summary>
         public int MaxDatagramSize = 65507;
     }
 
+    /// <summary>
+    /// 按远端地址维护逻辑会话的 UDP 服务端。
+    /// </summary>
     public sealed class UdpServer
     {
-        private readonly UdpServerConfig config;
-        private readonly Dictionary<string, UdpServerSession> sessions = new Dictionary<string, UdpServerSession>();
-        private readonly object sessionLock = new object();
+        private readonly UdpServerConfig config; // UDP 服务端配置。
+        private readonly Dictionary<string, UdpServerSession> sessions = new Dictionary<string, UdpServerSession>(); // 远端地址对应的服务端会话。
+        private readonly object sessionLock = new object(); // 服务端会话表同步锁。
 
-        private Socket socket;
-        private CancellationTokenSource receiveCts;
-        private bool running;
+        private Socket socket; // UDP 监听套接字。
+        private CancellationTokenSource receiveCts; // 接收循环取消令牌源。
+        private bool running; // 服务端运行状态。
 
+        /// <summary>
+        /// 首次收到某远端数据报并创建会话时触发。
+        /// </summary>
         public event Action<IServerSession> OnSessionCreated;
+        /// <summary>
+        /// 服务端会话关闭时触发。
+        /// </summary>
         public event Action<IServerSession> OnSessionClosed;
+        /// <summary>
+        /// 接收到 UDP 业务数据报时触发。
+        /// </summary>
         public event Func<IServerSession, ReadOnlyMemory<byte>, UniTask> OnDataReceived;
 
+        /// <summary>
+        /// 使用指定配置创建 UDP 服务端。
+        /// </summary>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UdpServer(UdpServerConfig config = null)
         {
             this.config = config ?? new UdpServerConfig();
         }
 
+        /// <summary>
+        /// 绑定指定地址和端口并启动 UDP 接收循环。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask StartAsync(string host, int port, CancellationToken token = default)
         {
             if (running)
@@ -47,6 +77,9 @@ namespace MiniCore.Model
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 停止接收、关闭套接字并释放全部 UDP 服务端会话。
+        /// </summary>
         public void Stop()
         {
             if (!running)
@@ -94,6 +127,10 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 关闭并移除指定远端地址对应的服务端会话。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         public void CloseSession(string sessionId)
         {
             if (string.IsNullOrEmpty(sessionId))
@@ -115,6 +152,11 @@ namespace MiniCore.Model
             OnSessionClosed?.Invoke(session);
         }
 
+        /// <summary>
+        /// 执行 ReceiveLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             var buffer = ByteBufferPool.Shared.Rent(config.MaxDatagramSize);
@@ -175,6 +217,11 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 GetOrCreateSession 相关处理。
+        /// </summary>
+        /// <param name="remote">执行该方法所需的 remote 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private UdpServerSession GetOrCreateSession(EndPoint remote)
         {
             string sessionId = $"udp:{remote}";
@@ -199,6 +246,11 @@ namespace MiniCore.Model
             return session;
         }
 
+        /// <summary>
+        /// 执行 ParseAddress 相关处理。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private static IPAddress ParseAddress(string host)
         {
             if (string.IsNullOrWhiteSpace(host) || host == "0.0.0.0")

@@ -9,23 +9,68 @@ using System.Runtime.InteropServices;
 
 namespace MiniCore.Model
 {
+    /// <summary>
+    /// KCP 服务端监听和会话参数配置。
+    /// </summary>
     public class KcpServerConfig
     {
+        /// <summary>
+        /// KCP 最大传输单元。
+        /// </summary>
         public int Mtu = 1400;
+        /// <summary>
+        /// KCP 发送窗口大小。
+        /// </summary>
         public int SendWindow = 128;
+        /// <summary>
+        /// KCP 接收窗口大小。
+        /// </summary>
         public int ReceiveWindow = 128;
+        /// <summary>
+        /// KCP 无延迟模式开关。
+        /// </summary>
         public int NoDelay = 1;
+        /// <summary>
+        /// KCP 刷新间隔（毫秒）。
+        /// </summary>
         public int Interval = 10;
+        /// <summary>
+        /// KCP 快速重传阈值。
+        /// </summary>
         public int Resend = 2;
+        /// <summary>
+        /// 是否禁用 KCP 拥塞控制。
+        /// </summary>
         public int NoCongestion = 1;
+        /// <summary>
+        /// 最小重传超时（毫秒）。
+        /// </summary>
         public int MinRto = 30;
+        /// <summary>
+        /// 快速重传触发参数。
+        /// </summary>
         public int FastResend = 2;
+        /// <summary>
+        /// 快速确认次数上限。
+        /// </summary>
         public int FastAck = 1;
+        /// <summary>
+        /// 判定 KCP 链路失效的重传次数。
+        /// </summary>
         public int DeadLink = 20;
+        /// <summary>
+        /// 是否启用流模式。
+        /// </summary>
         public bool Stream = false;
+        /// <summary>
+        /// 服务端判定会话空闲超时的时长（毫秒）。
+        /// </summary>
         public int SessionTimeoutMs = 30000;
     }
 
+    /// <summary>
+    /// 基于 UDP 的 KCP 服务端，按 conv 和远端地址维护会话。
+    /// </summary>
     public sealed class KcpServer
     {
         private const int MaxDatagramSize = 65507;
@@ -40,15 +85,36 @@ namespace MiniCore.Model
         private bool running;
         private long lastConnectionResetLogTicks;
 
+        /// <summary>
+        /// 创建新的 KCP 服务端会话时触发。
+        /// </summary>
         public event Action<IServerSession> OnSessionCreated;
+        /// <summary>
+        /// KCP 服务端会话关闭时触发。
+        /// </summary>
         public event Action<IServerSession> OnSessionClosed;
+        /// <summary>
+        /// 接收到 KCP 重组后的业务包时触发。
+        /// </summary>
         public event Func<IServerSession, ReadOnlyMemory<byte>, UniTask> OnDataReceived;
 
+        /// <summary>
+        /// 使用指定配置创建 KCP 服务端。
+        /// </summary>
+        /// <param name="config">执行该方法所需的 config 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public KcpServer(KcpServerConfig config = null)
         {
             this.config = config ?? new KcpServerConfig();
         }
 
+        /// <summary>
+        /// 绑定地址并启动 KCP 收包和更新循环。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <param name="port">执行该方法所需的 port 参数。</param>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public UniTask StartAsync(string host, int port, CancellationToken token = default)
         {
             if (running)
@@ -68,6 +134,9 @@ namespace MiniCore.Model
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 停止 KCP 服务端并关闭其全部会话。
+        /// </summary>
         public void Stop()
         {
             if (!running)
@@ -108,6 +177,10 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 关闭指定 KCP 服务端会话。
+        /// </summary>
+        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         public void CloseSession(string sessionId)
         {
             if (string.IsNullOrEmpty(sessionId))
@@ -129,6 +202,11 @@ namespace MiniCore.Model
             OnSessionClosed?.Invoke(session);
         }
 
+        /// <summary>
+        /// 执行 ReceiveLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask ReceiveLoopAsync(CancellationToken token)
         {
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
@@ -217,6 +295,11 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 UpdateLoopAsync 相关处理。
+        /// </summary>
+        /// <param name="token">执行该方法所需的 token 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask UpdateLoopAsync(CancellationToken token)
         {
             try
@@ -252,6 +335,11 @@ namespace MiniCore.Model
             }
         }
 
+        /// <summary>
+        /// 执行 CloseSession 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="timeout">执行该方法所需的 timeout 参数。</param>
         private void CloseSession(KcpServerSession session, bool timeout)
         {
             bool removed;
@@ -277,6 +365,12 @@ namespace MiniCore.Model
             OnSessionClosed?.Invoke(session);
         }
 
+        /// <summary>
+        /// 执行 GetOrCreateSession 相关处理。
+        /// </summary>
+        /// <param name="conv">执行该方法所需的 conv 参数。</param>
+        /// <param name="remote">执行该方法所需的 remote 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private KcpServerSession GetOrCreateSession(uint conv, EndPoint remote)
         {
             string sessionId = $"{conv}:{remote}";
@@ -301,16 +395,31 @@ namespace MiniCore.Model
             return session;
         }
 
+        /// <summary>
+        /// 执行 InvokeDataReceivedAsync 相关处理。
+        /// </summary>
+        /// <param name="session">执行该方法所需的 session 参数。</param>
+        /// <param name="data">执行该方法所需的 data 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private async UniTask InvokeDataReceivedAsync(IServerSession session, ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, session, data);
         }
 
+        /// <summary>
+        /// 执行 CurrentMS 相关处理。
+        /// </summary>
+        /// <returns>执行处理后的结果。</returns>
         private static uint CurrentMS()
         {
             return unchecked((uint)Environment.TickCount);
         }
 
+        /// <summary>
+        /// 执行 ParseAddress 相关处理。
+        /// </summary>
+        /// <param name="host">执行该方法所需的 host 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         private static IPAddress ParseAddress(string host)
         {
             if (string.IsNullOrWhiteSpace(host) || host == "0.0.0.0")
@@ -324,6 +433,10 @@ namespace MiniCore.Model
             return IPAddress.Any;
         }
 
+        /// <summary>
+        /// 执行 TryDisableUdpConnReset 相关处理。
+        /// </summary>
+        /// <param name="udpSocket">执行该方法所需的 udpSocket 参数。</param>
         private static void TryDisableUdpConnReset(Socket udpSocket)
         {
             if (udpSocket == null)

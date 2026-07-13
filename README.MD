@@ -1,42 +1,80 @@
-# MiniCore v1.0
+# MiniCore
 
-## 框架结构说明
+MiniCore 是基于 Unity 2021.3 的组件化游戏框架。项目将基础定义、核心能力和热更新业务拆分为独立程序集，当前包含资源加载、UI MVP、计时器、CSV 读取、文件工具和 TCP/UDP/KCP 网络模块。
 
-MIniCore大部分功能都写成了Component的形式，通过Global.Com.Add<'AComponent>和Global.Com.Get<'AComponent>的形式可以添加或者获取组件，新版本增加了TryGet<'T>()和GetOrAdd<'T>()等方法，方便安全添加和获取；
-目前实现的组件有：CSV表读取、文件操作、UI窗体（MVP的形式）、网络组件（Tcp、Kcp、Udp）等；
-整个框架分为3个模块，分别是MiniCore.Model、MiniCore.Core和MiniCore.HotUpdate;
+## 模块
 
-- MiniCore.Model：主要存储一些基础的实体、接口等定义；
-- MiniCore.Core：主要是一些具体的组件的实现、工具类等；
-- MiniCore.HotUpdate：用于热更新的程序集，可以通过HybridCLR等进行热更新；
+| 模块 | 职责 |
+| --- | --- |
+| `MiniCore.Model` | 基础实体、接口、网络协议、Transport、序列化、KCP 实现和生成代码。 |
+| `MiniCore.Core` | Global 组件容器、资源、UI、网络、计时器和通用工具。 |
+| `MiniCore.HotUpdate` | 热更新业务协议、Handler、场景入口、UI View 与 Presenter。 |
 
-## 框架简单使用说明
-1. UI资源加载通过MVP的方式，可以通过Unity上方菜单栏 MiniCore ==》UI Window Generator输入窗体名称通过自定义模板（可自由更改）一键生成View和Presenter，并且通过UIFactoryComponent直接加载窗体；
-2. 网络组件目前支持Tcp\Kcp\Udp，并且可以自定义序列化，可以灵活的使用Json、Protocol等。
-3. 写好网络请求体和响应体（entity）及其相关的Handler以后，可以点击MiniCore==>Opcode==>Generate(HotUpdate)自动生成opcode与网络消息类型的绑定。注意：自动生成代码只会在名字中含有HotUpdate的程序集中查找，建议直接写在MiniCore.HotUpdate程序集中，可以直接无缝衔接HybridCLR做代码热更新；
-4. Kcp目前是通过AI将[Kcp C#版](https://github.com/KumoKyaku/kcp)引入的方式生成的，由于只审查了部分代码，因此可能存在潜在的bug还没及时修复，如有问题，可以联系我，看到后我会及时修复。
-5. 目前使用YooAsset作为默认资源加载方案，使用前请先进行资源打包；如需使用HybridCLR，需要自己去官网下载安装，可以无缝集成到本系统中。如需其他资源加载方案，请实现IResourcesComponent类，并在AssetsComponent.RegisterResourcesComponent(component)方法中注册自定义的资源加载方案（注意目前仅支持注册实现了AComponent类的对象）
+## 核心能力
 
-## 引用的插件
+- 组件化生命周期：`AComponent`、强类型 `ComponentInitArgs` 与 `AComponent<TArgs>`。
+- Global owner 引用计数：直接返回组件实例，避免租约包装对象。
+- UI：MVP 结构、窗口工厂、预加载与缓存。
+- 资源：默认 YooAsset 接入，可通过 `IResourcesComponent` 替换实现。
+- 网络：TCP、UDP、KCP，普通消息、RPC、心跳、客户端/服务端 Session。
+- 网络派发：主线程收包处理、缓冲池复用、运行时热路径无 `MethodInfo.Invoke`。
+- Opcode：稳定 manifest、自动生成映射和构建前校验。
 
-1. 官方插件：
+## Global 组件使用
 
-- [Newtonsoft Json]：目前主要用于默认网络报文序列化
+Global 组件必须声明 owner，通常传入 `this`。获取一次就对应释放一次；长期持有的对象应在 `Dispose`、`OnDestroy` 或解绑时调用 `ReleaseAll(this)`。
 
-2. 三方插件：
+```csharp
+// 基础设施：由 Global 根 owner 常驻持有，重复 Pin 不增加引用。
+NetworkMessageComponent network = Global.Com.Pin<NetworkMessageComponent>();
 
-- [UniTask](https://github.com/Cysharp/UniTask?tab=readme-ov-file#upm-package)
+// 临时或业务 owner：获取后负责 Remove / ReleaseAll。
+AssetsComponent assets = Global.Com.Get<AssetsComponent>(this);
+Global.Com.Remove<AssetsComponent>(this);
+
+// 不存在时创建；初始化参数只在首次创建时生效。
+YooAssetResourceComponent resources = Global.Com.GetOrAdd<YooAssetResourceComponent>(
+    this,
+    new YooAssetResourceComponentInitArgs("DefaultPackage"));
+
+// owner 销毁时的兜底释放。
+Global.Com.ReleaseAll(this);
+```
+
+`ForceRemove<T>()` 仅用于退出、切服等最高层中断流程；常规业务不要使用它替代 `Remove<T>(owner)`。
+
+## 网络快速说明
+
+- 普通消息实现 `IProtocol`，RPC 请求实现 `IRequest`，响应实现 `IResponse`。
+- 普通消息使用 `AMHandler<TMessage>`，RPC 使用 `ARpcHandler<TRequest, TResponse>`。
+- 业务协议和 Handler 放在 `MiniCore.HotUpdate`；opcode 映射由稳定 manifest 与生成文件维护。
+- 默认 serializer 是 `UnityJsonSerializer`；示例入口配置为 `NewtonsoftJsonSerializer`。
+- TCP 使用长度前缀，UDP 单个 datagram 对应单个 packet，KCP 在 UDP 上完成可靠重组。
+
+详细链路、包格式、Session 和扩展步骤见：[网络层解析](Docs/NetworkLayerAnalysis.md)。
+
+## 优化路线
+
+后续优化应先压测再改造。项目的阶段化待办、验收指标、风险与执行顺序见：[优化路线图](Docs/OptimizationRoadmap.md)。
+
+当前优先级：建立性能基线和监控、入站队列背压、RPC 生命周期调度、缓冲池容量治理。
+
+## 开发约定
+
+- 公开方法、字段、属性使用中文 XML 注释；私有字段使用简洁中文行尾注释。
+- 新建文件采用 UTF-8 无 BOM；已有文件保持原始编码。
+- 高频路径避免临时分配；优先复用字段、缓存或已有对象池。
+- 网络线程只负责接收与入队，Unity API 和业务 Handler 在主线程执行。
+
+## 依赖
+
+- Unity `2021.3.45f2c1`
+- [UniTask](https://github.com/Cysharp/UniTask)
 - [YooAsset](https://www.yooasset.com/docs/Introduce)
-
-## Unity版本
-- Unity2021.3.45f2c1
-
-## 总结
-
-整个框架使用简单，便捷，可以快速上手，由于个人经验以及时间的原因，可能存在一些问题，欢迎各位大佬指正。
+- Newtonsoft Json（Unity Package）
 
 ## 注意事项
 
-- 本框架中含有AI生成的代码（AI代码根据作者的设计思路进行的框架结构的部分代码补全），使用前请注意审查。
-
----
+- KCP 实现基于引入的 C# KCP 代码，修改算法前应补齐 TCP/UDP/KCP 的回归与压测。
+- HybridCLR 可按项目需要接入；HotUpdate 程序集的网络协议、Handler 与生成代码需要一起验证。
+- 项目包含辅助生成代码；提交前应审查生成结果和协议兼容性。

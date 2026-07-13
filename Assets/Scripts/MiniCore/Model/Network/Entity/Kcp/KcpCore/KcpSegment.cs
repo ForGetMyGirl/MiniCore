@@ -11,9 +11,18 @@ namespace System.Net.Sockets.Kcp
     
     
     
+    /// <summary>
+    /// 使用非托管内存保存 KCP 包头与负载的分片结构。
+    /// </summary>
     public struct KcpSegment : IKcpSegment
     {
         internal readonly unsafe byte* ptr;
+        /// <summary>
+        /// 使用已分配内存创建 KCP 分片视图。
+        /// </summary>
+        /// <param name="intPtr">执行该方法所需的 intPtr 参数。</param>
+        /// <param name="appendDateSize">执行该方法所需的 appendDateSize 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public unsafe KcpSegment(byte* intPtr, uint appendDateSize)
         {
             this.ptr = intPtr;
@@ -25,6 +34,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 分配包含 KCP 本地状态、包头和负载的非托管内存。
+        /// </summary>
+        /// <param name="appendDateSize">执行该方法所需的 appendDateSize 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public static KcpSegment AllocHGlobal(int appendDateSize)
         {
             var total = LocalOffset + HeadOffset + appendDateSize;
@@ -43,6 +57,10 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 释放由 <see cref="AllocHGlobal"/> 分配的非托管内存。
+        /// </summary>
+        /// <param name="seg">执行该方法所需的 seg 参数。</param>
         public static void FreeHGlobal(KcpSegment seg)
         {
             unsafe
@@ -55,6 +73,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 下一次重传的时间戳。
+        /// </summary>
         public uint resendts
         {
             get
@@ -76,6 +97,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 当前分片的重传超时。
+        /// </summary>
         public uint rto
         {
             get
@@ -97,6 +121,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 累计快速确认次数。
+        /// </summary>
         public uint fastack
         {
             get
@@ -118,6 +145,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 该分片已发送次数。
+        /// </summary>
         public uint xmit
         {
             get
@@ -137,13 +167,22 @@ namespace System.Net.Sockets.Kcp
         }
 
         
+        /// <summary>
+        /// 分片本地重传状态区长度。
+        /// </summary>
         public const int LocalOffset = 4 * 4;
+        /// <summary>
+        /// KCP 协议包头长度。
+        /// </summary>
         public const int HeadOffset = KcpConst.IKCP_OVERHEAD;
 
         
         
         
         
+        /// <summary>
+        /// KCP 会话标识。
+        /// </summary>
         public uint conv
         {
             get
@@ -165,6 +204,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// KCP 命令类型。
+        /// </summary>
         public byte cmd
         {
             get
@@ -186,6 +228,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 业务消息剩余分片数。
+        /// </summary>
         public byte frg
         {
             get
@@ -207,6 +252,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 发送方通告的可用接收窗口。
+        /// </summary>
         public ushort wnd
         {
             get
@@ -228,6 +276,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 发送该分片时的时间戳。
+        /// </summary>
         public uint ts
         {
             get
@@ -250,6 +301,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 分片序列号。
+        /// </summary>
         public uint sn
         {
             get
@@ -271,6 +325,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 接收方期望的下一个序列号。
+        /// </summary>
         public uint una
         {
             get
@@ -293,6 +350,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 分片负载字节长度。
+        /// </summary>
         public uint len
         {
             get
@@ -315,6 +375,9 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 分片负载的可写内存跨度。
+        /// </summary>
         public Span<byte> data
         {
             get
@@ -333,6 +396,11 @@ namespace System.Net.Sockets.Kcp
         
         
         
+        /// <summary>
+        /// 将 KCP 包头和负载编码到目标缓冲区。
+        /// </summary>
+        /// <param name="buffer">执行该方法所需的 buffer 参数。</param>
+        /// <returns>执行处理后的结果。</returns>
         public int Encode(Span<byte> buffer)
         {
             var datelen = (int)(HeadOffset + len);

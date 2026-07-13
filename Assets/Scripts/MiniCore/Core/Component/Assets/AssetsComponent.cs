@@ -39,7 +39,16 @@ namespace MiniCore.Core
 
         public override void Awake()
         {
-            tagsComponent = Global.Com.Get<TagsComponent>();
+            tagsComponent = Global.Com.Get<TagsComponent>(this);
+        }
+
+        /// <summary>
+        /// 释放由资源组件持有的全局依赖引用。
+        /// </summary>
+        public override void Dispose()
+        {
+            Global.Com.ReleaseAll(this);
+            base.Dispose();
         }
 
         private Dictionary<string, Object> preloadAssets = new Dictionary<string, Object>();

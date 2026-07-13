@@ -8,6 +8,9 @@ namespace System.Net.Sockets.Kcp
     
     
     
+    /// <summary>
+    /// 接收 KCP 输出分片的回调接口。
+    /// </summary>
     public interface IKcpCallback
     {
         
@@ -27,6 +30,9 @@ namespace System.Net.Sockets.Kcp
     
     
     
+    /// <summary>
+    /// 支持查询未刷新字节数和主动刷新的 KCP 输出写入器。
+    /// </summary>
     public interface IKcpOutputWriter : IBufferWriter<byte>
     {
         int UnflushedBytes { get; }
@@ -36,6 +42,9 @@ namespace System.Net.Sockets.Kcp
     
     
     
+    /// <summary>
+    /// 为 KCP Core 提供可回收字节缓冲区的接口。
+    /// </summary>
     public interface IRentable
     {
         
@@ -44,6 +53,9 @@ namespace System.Net.Sockets.Kcp
         BufferOwner RentBuffer(int length);
     }
 
+    /// <summary>
+    /// KCP 传输参数配置接口。
+    /// </summary>
     public interface IKcpSetting
     {
         int Interval(int interval);
@@ -78,11 +90,17 @@ namespace System.Net.Sockets.Kcp
         int WndSize(int sndwnd = 32, int rcvwnd = 128);
     }
 
+    /// <summary>
+    /// KCP 定时更新接口。
+    /// </summary>
     public interface IKcpUpdate
     {
         void Update(in DateTimeOffset time);
     }
 
+    /// <summary>
+    /// KCP 发送数据接口。
+    /// </summary>
     public interface IKcpSendable
     {
         
@@ -99,6 +117,9 @@ namespace System.Net.Sockets.Kcp
         int Send(ReadOnlySequence<byte> span, object options = null);
     }
 
+    /// <summary>
+    /// KCP 输入数据报接口。
+    /// </summary>
     public interface IKcpInputable
     {
         
@@ -116,6 +137,9 @@ namespace System.Net.Sockets.Kcp
     
     
     
+    /// <summary>
+    /// 组合 KCP 收发能力的异步 I/O 接口。
+    /// </summary>
     public interface IKcpIO : IKcpSendable, IKcpInputable
     {
         
@@ -142,7 +166,6 @@ namespace System.Net.Sockets.Kcp
     }
 
 }
-
 
 
 
