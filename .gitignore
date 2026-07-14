@@ -102,3 +102,4 @@ InitTestScene*.unity*
 # 自定义
 /[Aa]ssets/StreamingAssets/yoo
 /[Bb]undles
+/BenchmarkPerformance/History/

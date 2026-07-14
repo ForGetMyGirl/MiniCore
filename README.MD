@@ -55,7 +55,7 @@ Global.Com.ReleaseAll(this);
 
 ## 优化路线
 
-后续优化应先压测再改造。项目的阶段化待办、验收指标、风险与执行顺序见：[优化路线图](Docs/OptimizationRoadmap.md)。
+后续优化应先压测再改造。第一次使用 Unity Performance Testing 时，先按[第一次性能测试指南](Docs/PerformanceTestingGuide.md)建立 Handler 派发基线；每次性能测试结果会自动归档到 `BenchmarkPerformance/History`，可在 Unity 菜单 `MiniCore > Performance > History` 查看和比较；阶段化待办、验收指标、风险与执行顺序见：[优化路线图](Docs/OptimizationRoadmap.md)。
 
 当前优先级：建立性能基线和监控、入站队列背压、RPC 生命周期调度、缓冲池容量治理。
 

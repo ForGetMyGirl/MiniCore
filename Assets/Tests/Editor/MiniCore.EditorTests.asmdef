@@ -4,7 +4,9 @@
   "references": [
     "GUID:26aad5a806fd9f94bb9d2fc72472b0a0",
     "GUID:f51ebe6a0ceec4240a699833d6309b23",
-    "GUID:016897c86617a974691af1908707de1f"
+    "GUID:016897c86617a974691af1908707de1f",
+    "GUID:d810c3b99f1a924449e2f88f994df9ee",
+    "Unity.PerformanceTesting"
   ],
   "includePlatforms": [
     "Editor"

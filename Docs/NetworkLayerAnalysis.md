@@ -341,7 +341,7 @@ flowchart TB
 
 这种设计避免业务 handler 直接运行在底层 receive loop 中，也让业务派发集中在 Unity `Update` 驱动的组件流程里。
 
-当前实现使用 `processingQueue` 互斥标记，确保同一时刻只有一个 `ProcessQueueAsync` 消费循环。每个包在 `finally` 中归还其 `ByteBufferPool` 缓冲区。队列当前尚未设置消息数或字节数上限；背压、主线程处理预算和缓冲池容量治理属于后续优化项，详见 [优化路线图](OptimizationRoadmap.md)。
+当前实现使用 `processingQueue` 互斥标记，确保同一时刻只有一个 `ProcessQueueAsync` 消费循环。每个包在 `finally` 中归还其 `ByteBufferPool` 缓冲区。缓冲池已使用每桶内部加锁的数组槽位栈，并限制单数组 1 MB、单桶 8 MB、全局 32 MB 的保留量；收包队列本身仍未设置消息数或字节数上限，背压和主线程处理预算仍属于后续优化项，详见 [优化路线图](OptimizationRoadmap.md)。
 
 ## 连接与会话管理
 
@@ -647,7 +647,7 @@ net.SetSerializer(new NewtonsoftJsonSerializer());
 - TCP 还有 transport 层 4 字节长度前缀；UDP/KCP 没有 TCP 的长度前缀。
 - UDP 服务端按远端 endpoint 建 session；KCP 服务端按 `conv:endpoint` 建 session，客户端和服务端必须使用匹配的 conv。
 - 收包数据会复制进 `ConcurrentQueue<NetworkIncomingPacket>`，再由 Unity `Update` 触发处理；handler 不直接运行在底层 socket receive loop 中。
-- `ByteBufferPool` 会按 2 的幂 bucket 复用 byte array，收包后必须归还；当前框架内部已在 finally 中处理。
-- 当前收包队列和 `ByteBufferPool` 尚无容量上限。压力测试前不要假定它们在突发流量下具有背压能力。
+- `ByteBufferPool` 会按 2 的幂 bucket 复用 byte array，收包后必须归还；当前框架内部已在 finally 中处理。每个 bucket 使用内部锁保护数组槽位，外部调用方不需要额外加锁。
+- `ByteBufferPool` 不会保留超过 1 MB 的单个数组，单桶最多保留 8 MB，所有桶合计最多保留 32 MB；桶满时归还数组不会被缓存。收包队列仍无消息数或字节数上限，压力测试前不要假定它具有背压能力。
 - `CallAsync` 的响应匹配优先依赖 `rpcId`，只要命中 pending RPC，就按 pending 中记录的响应类型反序列化。
 - `MessageHandlerAttribute` 当前存在但主流程并未依赖它；实际注册依赖 handler 基类和生成出来的 `OpcodeRegistry`。
