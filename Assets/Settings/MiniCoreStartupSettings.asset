@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77d87d94177a34e98b862345b0cc4dca, type: 3}
+  m_Name: MiniCoreStartupSettings
+  m_EditorClassIdentifier: 
+  Modules:
+  - AssemblyQualifiedTypeName: MiniCore.Core.UIFactoryComponent, MiniCore.HotUpdate,
+      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    EnableClient: 1
+    EnableServer: 1
+    Arguments: []
+  - AssemblyQualifiedTypeName: MiniCore.HotUpdate.YooAssetResourceComponent, MiniCore.HotUpdate,
+      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    EnableClient: 1
+    EnableServer: 1
+    Arguments:
+    - MemberName: PackageName
+      UseCodeDefault: 1
+      Value: 
+  - AssemblyQualifiedTypeName: MiniCore.Core.TagsComponent, MiniCore.HotUpdate, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    EnableClient: 1
+    EnableServer: 1
+    Arguments: []
+  - AssemblyQualifiedTypeName: MiniCore.Core.NetworkMessageComponent, MiniCore.Network,
+      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    EnableClient: 1
+    EnableServer: 1
+    Arguments: []
+  - AssemblyQualifiedTypeName: MiniCore.Core.TimerComponent, MiniCore.Runtime, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    EnableClient: 1
+    EnableServer: 1
+    Arguments: []
+  - AssemblyQualifiedTypeName: MiniCore.Core.AssetsComponent, MiniCore.HotUpdate,
+      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    EnableClient: 1
+    EnableServer: 1
+    Arguments: []

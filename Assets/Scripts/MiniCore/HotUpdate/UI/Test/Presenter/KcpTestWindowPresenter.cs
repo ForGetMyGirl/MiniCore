@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 
 namespace MiniCore.HotUpdate
 {
@@ -22,7 +23,7 @@ namespace MiniCore.HotUpdate
 
         protected override void OnBind()
         {
-            net = Global.Com.Get<NetworkMessageComponent>(this);
+            net = Global.Get<NetworkMessageComponent>(this);
             EventCenter.AddListener<string>(HotEvent.KcpTestMessage, OnKcpTestMessage);
             View.OnStartServerClicked += StartServer;
             View.OnStopServerClicked += () => StopServerAsync().Forget();
@@ -54,7 +55,7 @@ namespace MiniCore.HotUpdate
                 session.Transport.OnDisconnected -= clientDisconnectedHandler;
             }
 
-            Global.Com.ReleaseAll(this);
+            Global.ReleaseAll(this);
             base.UnbindView();
         }
 
@@ -339,7 +340,7 @@ namespace MiniCore.HotUpdate
                 string payload = View.GetMessageOrDefault($"RPC test {DateTime.Now:O}");
                 var req = new DemoRpcRequest { Payload = payload };
                 DemoRpcResponse resp = await net.CallAsync<DemoRpcRequest, DemoRpcResponse>(ClientSessionId, req);
-                string msg = $"RPC response code:{resp.ErrorCode} msg:{resp.Message} echo:{resp.Echo}";
+                string msg = $"RPC response code:{resp.Code} msg:{resp.Msg} echo:{resp.Echo}";
                 View.UpdatePrompt(msg);
             }
             catch (Exception ex)

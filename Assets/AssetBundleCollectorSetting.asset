@@ -51,3 +51,16 @@ MonoBehaviour:
         FilterRuleName: CollectScene
         AssetTags: 
         UserData: 
+    - GroupName: Dlls
+      GroupDesc: "\u70ED\u66F4\u7A0B\u5E8F\u96C6"
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRes/Dlls
+        CollectorGUID: 4b92a3a5c3b2e417bb7bc0bea8cc2911
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 

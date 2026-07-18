@@ -12,9 +12,18 @@ namespace MiniCore.HotUpdate
         #region Public 公共成员
 
         /// <summary>
-        /// 获取 YooAsset 资源包名称。
+        /// 获取或设置 YooAsset 资源包名称。
+        /// 留空时组件初始化会明确报错，避免在运行时静默绑定到错误资源包。
         /// </summary>
-        public string PackageName { get; }
+        public string PackageName { get; set; } = "DefaultPackage";
+
+        /// <summary>
+        /// 使用代码默认值创建初始化参数。
+        /// 该无参构造函数供项目启动配置生成器使用。
+        /// </summary>
+        public YooAssetResourceComponentInitArgs()
+        {
+        }
 
         /// <summary>
         /// 使用资源包名称创建初始化参数。

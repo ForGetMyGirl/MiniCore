@@ -2,7 +2,6 @@ using System;
 using MiniCore.Core;
 using MiniCore.Model;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace MiniCore.EditorTests
 {
@@ -11,13 +10,6 @@ namespace MiniCore.EditorTests
     /// </summary>
     public sealed class GlobalComponentLifecycleTests
     {
-        #region Private 私有成员
-
-        private GameObject globalObject; // 当前测试创建的 Global 所在对象。
-        private Global global; // 当前测试使用的全局组件容器。
-
-        #endregion
-
         #region Public 公共成员
 
         /// <summary>
@@ -28,8 +20,10 @@ namespace MiniCore.EditorTests
         {
             CountingComponent.DisposeCount = 0;
             CountingComponent.AwakeCount = 0;
-            globalObject = new GameObject("GlobalComponentLifecycleTests");
-            global = globalObject.AddComponent<Global>();
+            TickAddedComponent.AwakeCount = 0;
+            TickAddedComponent.DisposeCount = 0;
+            Global.Shutdown();
+            Global.Initialize();
         }
 
         /// <summary>
@@ -38,13 +32,7 @@ namespace MiniCore.EditorTests
         [TearDown]
         public void TearDown()
         {
-            if (globalObject != null)
-            {
-                UnityEngine.Object.DestroyImmediate(globalObject);
-            }
-
-            globalObject = null;
-            global = null;
+            Global.Shutdown();
         }
 
         /// <summary>
@@ -55,17 +43,17 @@ namespace MiniCore.EditorTests
         {
             object firstOwner = new object();
             object secondOwner = new object();
-            CountingComponent firstComponent = global.GetOrAdd<CountingComponent>(firstOwner);
-            CountingComponent secondComponent = global.GetOrAdd<CountingComponent>(secondOwner);
+            CountingComponent firstComponent = Global.GetOrAdd<CountingComponent>(firstOwner);
+            CountingComponent secondComponent = Global.GetOrAdd<CountingComponent>(secondOwner);
 
             Assert.AreSame(firstComponent, secondComponent);
 
-            global.Remove<CountingComponent>(firstOwner);
+            Global.Remove<CountingComponent>(firstOwner);
 
             Assert.IsFalse(firstComponent.IsDisposed);
             Assert.AreEqual(0, CountingComponent.DisposeCount);
 
-            global.Remove<CountingComponent>(secondOwner);
+            Global.Remove<CountingComponent>(secondOwner);
 
             Assert.IsTrue(firstComponent.IsDisposed);
             Assert.IsFalse(firstComponent.IsActive);
@@ -80,11 +68,11 @@ namespace MiniCore.EditorTests
         {
             object holdingOwner = new object();
             object invalidOwner = new object();
-            global.GetOrAdd<CountingComponent>(holdingOwner);
+            Global.GetOrAdd<CountingComponent>(holdingOwner);
 
-            Assert.Throws<InvalidOperationException>(() => global.Remove<CountingComponent>(invalidOwner));
+            Assert.Throws<InvalidOperationException>(() => Global.Remove<CountingComponent>(invalidOwner));
 
-            global.Remove<CountingComponent>(holdingOwner);
+            Global.Remove<CountingComponent>(holdingOwner);
         }
 
         /// <summary>
@@ -95,14 +83,14 @@ namespace MiniCore.EditorTests
         {
             object firstOwner = new object();
             object secondOwner = new object();
-            CountingComponent component = global.GetOrAdd<CountingComponent>(firstOwner);
-            global.Get<CountingComponent>(firstOwner);
-            global.Get<CountingComponent>(secondOwner);
+            CountingComponent component = Global.GetOrAdd<CountingComponent>(firstOwner);
+            Global.Get<CountingComponent>(firstOwner);
+            Global.Get<CountingComponent>(secondOwner);
 
-            global.ReleaseAll(firstOwner);
+            Global.ReleaseAll(firstOwner);
 
             Assert.IsFalse(component.IsDisposed);
-            global.Remove<CountingComponent>(secondOwner);
+            Global.Remove<CountingComponent>(secondOwner);
             Assert.IsTrue(component.IsDisposed);
         }
 
@@ -113,16 +101,34 @@ namespace MiniCore.EditorTests
         public void Pin_NormalOwnerReleased_ComponentRemainsUntilUnpin()
         {
             object owner = new object();
-            CountingComponent pinnedComponent = global.Pin<CountingComponent>();
-            CountingComponent ownerComponent = global.Get<CountingComponent>(owner);
+            CountingComponent pinnedComponent = Global.Pin<CountingComponent>();
+            CountingComponent ownerComponent = Global.Get<CountingComponent>(owner);
 
             Assert.AreSame(pinnedComponent, ownerComponent);
 
-            global.Remove<CountingComponent>(owner);
+            Global.Remove<CountingComponent>(owner);
 
             Assert.IsFalse(pinnedComponent.IsDisposed);
-            global.Unpin<CountingComponent>();
+            Global.Unpin<CountingComponent>();
             Assert.IsTrue(pinnedComponent.IsDisposed);
+            Assert.AreEqual(1, CountingComponent.DisposeCount);
+        }
+
+        /// <summary>
+        /// 验证 Scope 释放时只归还该 Scope 获取的全部组件引用。
+        /// </summary>
+        [Test]
+        public void Scope_Dispose_ReleasesOwnedComponents()
+        {
+            CountingComponent component;
+            using (GlobalScope scope = Global.CreateScope("GlobalComponentLifecycleTests"))
+            {
+                component = scope.GetOrAdd<CountingComponent>();
+                scope.Get<CountingComponent>();
+                Assert.IsFalse(component.IsDisposed);
+            }
+
+            Assert.IsTrue(component.IsDisposed);
             Assert.AreEqual(1, CountingComponent.DisposeCount);
         }
 
@@ -134,13 +140,13 @@ namespace MiniCore.EditorTests
         {
             object firstOwner = new object();
             object secondOwner = new object();
-            CountingComponent component = global.GetOrAdd<CountingComponent>(firstOwner);
-            global.Get<CountingComponent>(secondOwner);
+            CountingComponent component = Global.GetOrAdd<CountingComponent>(firstOwner);
+            Global.Get<CountingComponent>(secondOwner);
 
-            global.ForceRemove<CountingComponent>();
+            Global.ForceRemove<CountingComponent>();
 
             Assert.IsTrue(component.IsDisposed);
-            Assert.Throws<InvalidOperationException>(() => global.Get<CountingComponent>(firstOwner));
+            Assert.Throws<InvalidOperationException>(() => Global.Get<CountingComponent>(firstOwner));
         }
 
         /// <summary>
@@ -150,28 +156,45 @@ namespace MiniCore.EditorTests
         public void Remove_LastReferenceReleased_CanCreateNewComponent()
         {
             object owner = new object();
-            CountingComponent firstComponent = global.GetOrAdd<CountingComponent>(owner);
+            CountingComponent firstComponent = Global.GetOrAdd<CountingComponent>(owner);
 
-            global.Remove<CountingComponent>(owner);
-            CountingComponent secondComponent = global.GetOrAdd<CountingComponent>(owner);
+            Global.Remove<CountingComponent>(owner);
+            CountingComponent secondComponent = Global.GetOrAdd<CountingComponent>(owner);
 
             Assert.AreNotSame(firstComponent, secondComponent);
             Assert.AreEqual(2, CountingComponent.AwakeCount);
         }
 
         /// <summary>
-        /// 验证 Global.Dispose 无论引用是否归零都会强制回收组件。
+        /// 验证 Global.Shutdown 无论引用是否归零都会强制回收组件。
         /// </summary>
         [Test]
-        public void Dispose_ReferencesRemain_ForceDisposesAllComponents()
+        public void Shutdown_ReferencesRemain_ForceDisposesAllComponents()
         {
             object owner = new object();
-            CountingComponent component = global.GetOrAdd<CountingComponent>(owner);
+            CountingComponent component = Global.GetOrAdd<CountingComponent>(owner);
 
-            global.Dispose();
+            Global.Shutdown();
 
             Assert.IsTrue(component.IsDisposed);
             Assert.AreEqual(1, CountingComponent.DisposeCount);
+        }
+
+        /// <summary>
+        /// 验证 Tick 期间增删组件时使用快照，不会破坏当前调度。
+        /// </summary>
+        [Test]
+        public void Tick_ComponentMutatesGlobalRegistry_UsesStableSnapshot()
+        {
+            object owner = new object();
+            TickMutationComponent component = Global.GetOrAdd<TickMutationComponent>(owner);
+
+            Global.Tick();
+
+            Assert.AreEqual(1, component.UpdateCount);
+            Assert.AreEqual(1, TickAddedComponent.AwakeCount);
+            Assert.AreEqual(1, TickAddedComponent.DisposeCount);
+            Global.Remove<TickMutationComponent>(owner);
         }
 
         /// <summary>
@@ -182,8 +205,8 @@ namespace MiniCore.EditorTests
         {
             object firstOwner = new object();
             object secondOwner = new object();
-            ArgumentComponent firstComponent = global.GetOrAdd<ArgumentComponent>(firstOwner, new TestInitArgs(42));
-            ArgumentComponent secondComponent = global.GetOrAdd<ArgumentComponent>(secondOwner, new TestInitArgs(7));
+            ArgumentComponent firstComponent = Global.GetOrAdd<ArgumentComponent>(firstOwner, new TestInitArgs(42));
+            ArgumentComponent secondComponent = Global.GetOrAdd<ArgumentComponent>(secondOwner, new TestInitArgs(7));
 
             Assert.AreSame(firstComponent, secondComponent);
             Assert.AreEqual(42, firstComponent.ReceivedValue);
@@ -279,6 +302,69 @@ namespace MiniCore.EditorTests
             {
                 AwakeCount++;
                 ReceivedValue = args.Value;
+            }
+
+            #endregion
+        }
+
+        /// <summary>
+        /// 在 Tick 中临时注册并释放另一组件的测试组件。
+        /// </summary>
+        private sealed class TickMutationComponent : AComponent
+        {
+            #region Public 公共成员
+
+            /// <summary>
+            /// 获取当前组件已执行的更新次数。
+            /// </summary>
+            public int UpdateCount { get; private set; }
+
+            /// <summary>
+            /// 在首帧增删组件，验证调度快照隔离。
+            /// </summary>
+            protected override void Update()
+            {
+                UpdateCount++;
+                TickAddedComponent added = Global.GetOrAdd<TickAddedComponent>(this);
+                Global.Remove<TickAddedComponent>(this);
+                Assert.IsTrue(added.IsDisposed);
+            }
+
+            #endregion
+        }
+
+        /// <summary>
+        /// 用于验证 Tick 中增删生命周期的测试组件。
+        /// </summary>
+        private sealed class TickAddedComponent : AComponent
+        {
+            #region Public 公共成员
+
+            /// <summary>
+            /// 获取或设置初始化次数。
+            /// </summary>
+            public static int AwakeCount { get; set; }
+
+            /// <summary>
+            /// 获取或设置释放次数。
+            /// </summary>
+            public static int DisposeCount { get; set; }
+
+            /// <summary>
+            /// 记录组件初始化。
+            /// </summary>
+            public override void Awake()
+            {
+                AwakeCount++;
+            }
+
+            /// <summary>
+            /// 记录组件释放。
+            /// </summary>
+            public override void Dispose()
+            {
+                DisposeCount++;
+                base.Dispose();
             }
 
             #endregion

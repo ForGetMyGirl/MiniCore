@@ -1,0 +1,14 @@
+{
+  "name": "MiniCore.Protocol",
+  "rootNamespace": "",
+  "references": ["MiniCore.Runtime"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

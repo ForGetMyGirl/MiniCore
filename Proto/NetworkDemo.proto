@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package minicore.demo;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+//[INormalMessage]
+message DemoNormalMessage {
+  string content = 1;
+}
+
+//[IRpcRequest]
+message DemoRpcRequest {
+  string payload = 1;
+}
+
+//[IRpcResponse]
+message DemoRpcResponse {
+  int32 code = 1;
+  string msg = 2;
+  string echo = 3;
+}
+
+//[INormalMessage]
+message DisconnectNotice {
+  bool is_server_shutdown = 1;
+  string reason = 2;
+}
+
+//[INormalMessage]
+message TestNetworkData {
+  int32 id = 1;
+  string content = 2;
+}

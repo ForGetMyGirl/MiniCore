@@ -88,24 +88,33 @@ BenchmarkPerformance/History/20260714_224500_123/
 
 历史窗口支持“删除此记录”“删除当前筛选结果”和“清空全部历史”，每种删除都需要二次确认。它们只删除 `BenchmarkPerformance/History` 内的自动归档目录，不会删除 `BenchmarkPerformance` 根目录的手动 CSV 文件。
 
-## 第二项测试：JSON 序列化
+## 第二项测试：Protobuf 正式路径与 JSON 对比基线
 
-当前网络场景入口显式设置了 `NewtonsoftJsonSerializer`，因此第二项测试使用这一实际运行时实现与真实的 `TestNetworkData` 业务协议。测试文件是 `Assets/Tests/Editor/NetworkJsonSerializationPerformanceTests.cs`，包含两条独立测试：
+`NetworkMessageComponent` 在未显式设置 serializer 时默认使用 `ProtobufSerializer`，这是当前正式网络路径。`NewtonsoftJsonSerializer` 仅保留为迁移和性能对比实现；JSON 测试不代表当前客户端或 Dedicated Server 的默认配置。
+
+先运行 Protobuf 序列化基准 `Assets/Tests/Editor/ProtobufSerializationPerformanceTests.cs`：
+
+| 测试名 | Sample Group | 测量内容 |
+| --- | --- | --- |
+| `ProtobufSerializer_SerializesMessage` | `Network.Protobuf.Serialize` | Protobuf 消息序列化的时间与 GC。 |
+| `ProtobufSerializer_DeserializesMessage` | `Network.Protobuf.Deserialize` | 通过生成 Parser Registry 反序列化的时间与 GC。 |
+
+保留的 JSON 对比测试在 `Assets/Tests/Editor/NetworkJsonSerializationPerformanceTests.cs`：
 
 | 测试名 | 测量问题 | 固定输入 |
 | --- | --- | --- |
 | `NewtonsoftJsonSerializer_SerializesMediumProtocolMessage` | 发送侧将协议对象编码为 UTF-8 JSON 字节需要多少时间、是否产生 GC。 | 一个携带固定中等长度文本的 `TestNetworkData`。 |
 | `NewtonsoftJsonSerializer_DeserializesMediumProtocolMessage` | 收包侧将固定 JSON 字节还原为协议对象需要多少时间、是否产生 GC。 | 与发送侧相同协议生成的 JSON 字节。 |
 
-在 Test Runner 的 `EditMode` 中分别运行这两条测试，每条各运行三次并导出 CSV。每组包含 `10,000` 次操作，报告中的时间是每 `10,000` 次的总耗时；计算单次成本时除以 `10,000`。测试仍不包含 Socket、协议包封装、跨线程队列和 Handler 派发。
+在 Test Runner 的 `EditMode` 中分别运行 Protobuf 和 JSON 测试，每条各运行三次并导出 CSV。每组包含 `10,000` 次操作，报告中的时间是每 `10,000` 次的总耗时；计算单次成本时除以 `10,000`。它们都不包含 Socket、协议包封装、跨线程队列和 Handler 派发。
 
-JSON 基线稳定后，第三项先测试网络线程到主线程的收包队列交接；TCP/UDP/KCP 到主线程 Handler 的端到端链路将作为第四项。每次只新增一段链路，才能准确判断性能变化来自哪里。
+Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包队列交接；随后分别运行 JSON 对比链路和 Protobuf 正式链路的完整入站包/RPC 基准。每次只新增一段链路，才能准确判断性能变化来自哪里。
 
 ## 第三项测试：网络收包队列交接
 
 测试文件是 `Assets/Tests/Editor/NetworkIncomingQueuePerformanceTests.cs`，测试名为 `IncomingQueue_TransfersMediumPackets_BetweenNetworkAndMainThread`。
 
-它用固定的 512 B 业务包模拟现有 `NetworkMessageComponent.EnqueueIncoming` 和 `ProcessQueueAsync` 中的内存路径：从传输层输入复制到 `ByteBufferPool` 租用的数组、放入 `ConcurrentQueue`、主线程出队、再归还数组。测试不启动 TCP/UDP/KCP，不做 JSON 反序列化，也不调用业务 Handler；因此它只回答“当前队列与缓冲池的基础交接成本是多少、是否产生异常 GC”。
+它用固定的 512 B 业务包模拟现有 `NetworkMessageComponent.EnqueueIncoming` 和 `ProcessQueueAsync` 中的内存路径：从传输层输入复制到 `ByteBufferPool` 租用的数组、放入 `ConcurrentQueue`、主线程出队、再归还数组。测试不启动 TCP/UDP/KCP，不做 JSON 或 Protobuf 反序列化，也不调用业务 Handler；因此它只回答“当前队列与缓冲池的基础交接成本是多少、是否产生异常 GC”。
 
 每个测量组连续处理 `10,000` 个业务包。报告中的 `Network.IncomingQueue.MediumPacket` 是这一整组的总耗时，换算单包成本时除以 `10,000`。在 Test Runner 的 `EditMode` 下单独运行它三次；每次完成后可在 `MiniCore > Performance > History` 中查看并保留记录。
 
@@ -125,5 +134,46 @@ JSON 基线稳定后，第三项先测试网络线程到主线程的收包队列
 当前 `ByteBufferPool` 已改为每桶内部加锁的 `byte[][]` 槽位栈，并设置单数组 1 MB、单桶 8 MB、全局 32 MB 的保留上限。下一次运行时，应重跑“仅租用/归还”和完整交接测试：稳定样本的 `GC()` 目标是接近当前测试环境的基础值 `5`。首次预热、池扩容或工作负载超过保留上限时仍可能发生数组分配，这是容量不足的正常诊断信号。
 
 缓冲池改造后，除已有四条性能测试外，还应在 EditMode 中运行 `ByteBufferPoolTests`。它验证同尺寸数组会被复用，并验证多个线程同时执行 `Rent/Return` 时不会返回无效数组或产生并发异常。
+
+## 第四项测试：关闭日志时的收包字符串分配
+
+`NetworkMessageComponent.HandleIncoming` 当前会在调用 `LogSwitch.Info` 前格式化时间并构造插值字符串。`LogSwitch.EnableLog = false` 只能阻止日志输出，不能阻止已经发生的字符串创建。
+
+测试文件 `NetworkIncomingLogPerformanceTests.cs` 使用相同的收包日志文本分别测量当前写法和候选优化写法：
+
+| 测试名 | Sample Group | 测量内容 |
+| --- | --- | --- |
+| `IncomingLog_BuildsStrings_WhenLoggingDisabled` | `Network.IncomingLog.Disabled.Legacy` | 先创建时间与日志字符串，再进入已关闭的 `LogSwitch.Info`。 |
+| `IncomingLog_SkipsStrings_WhenLoggingDisabled` | `Network.IncomingLog.Disabled.Guarded` | 先判断日志开关；关闭时不创建时间与日志字符串。 |
+
+两条测试均在日志关闭状态下每组执行 `10,000` 次。2026-07-15 的最终确认结果如下：
+
+| 路径 | 三次中位值 | GC 事件 |
+| --- | --- | --- |
+| `IncomingLog_BuildsStrings_WhenLoggingDisabled` | `22.116 / 22.168 / 22.318 ms` | 每次 `GC() = 10.0005` |
+| `IncomingLog_SkipsStrings_WhenLoggingDisabled` | `0.034 / 0.036 / 0.036 ms` | 每次 `GC() = 0` |
+
+因此已将网络收包、普通消息发送、RPC 请求和 RPC 响应的普通日志改为先判断开关再创建时间与字符串；日志开启时仍保留当前诊断信息。关闭日志时的收包日志热路径从旧路径中位数约 `22.168 ms / 10,000 次` 降至优化路径约 `0.036 ms / 10,000 次`，约减少 `99.84%`，且 `GC.Alloc` 采样归零。当前状态是框架阶段性能验证已确认，尚未做真实业务网络冒烟验证。
+
+`LogSwitch` 在 Editor 和 Development Build 中默认开启，在正式非开发构建中默认关闭。Payload 日志始终需要同时开启 `EnableLog && EnablePayloadLog`，避免日志已关闭时仍把字节正文转换为 UTF-8 字符串。
+
+## 第五项测试：完整入站普通业务包处理（JSON 对比）
+
+`NetworkInboundPacketPerformanceTests` 使用项目现有 `TestNetworkData` 和 `NewtonsoftJsonSerializer`，在测量前生成固定的完整业务 packet。它保留为迁移对比基线，测量过程覆盖普通消息成功路径中的包头读取、opcode 查表、运行时类型 JSON 反序列化和无反射 Handler 派发。
+
+测试名 `InboundPacket_ParsesDeserializesAndDispatchesNormalMessage` 的 Sample Group 为 `Network.InboundPacket.NormalMessage`。每组处理 `10,000` 个固定 512 B 级别的业务 packet；它不包含 Socket、跨线程队列、日志、真实业务 I/O 与 RPC 分支。
+
+这项基线用于与 Protobuf 正式链路对比。其结果应与第二项 JSON 反序列化和第一项 Handler 派发结合阅读，而不是简单相加。
+
+## 第六项测试：Protobuf 完整入站包与 RPC
+
+以下测试覆盖当前正式协议路径，均在 `Assets/Tests/Editor`：
+
+| 测试文件 | 测试名 | Sample Group | 覆盖范围 |
+| --- | --- | --- | --- |
+| `ProtobufInboundPacketPerformanceTests.cs` | `ProtobufInboundPacket_ParsesDeserializesAndDispatches` | `Network.Protobuf.InboundPacket` | 12 字节包头、Opcode、Protobuf 运行时类型反序列化、无反射普通 Handler 派发。 |
+| `ProtobufRpcPerformanceTests.cs` | `ProtobufRpc_ParsesRequestAndBuildsResponsePacket` | `Network.Protobuf.Rpc` | RPC 请求包头读取、`RpcId` 运行时写入、响应 `Code/Msg` 填充、Protobuf 响应封包。 |
+
+每组各处理 `10,000` 条固定输入。它们不包含真实 Socket、跨线程队列、日志和业务 I/O，目的是在可重复条件下比较框架编解码路径；端到端 TCP/UDP/KCP 冒烟仍需要单独场景验证。
 
 详细的长期优化顺序见 [优化路线图](OptimizationRoadmap.md)。

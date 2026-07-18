@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 
@@ -11,9 +12,9 @@ namespace MiniCore.EditorTools
         #region Public 公共成员
 
         /// <summary>
-        /// 在其他默认构建预处理器之前执行 opcode 校验。
+        /// 在 HybridCLR 清理临时 AOT 输出前执行发布产物校验。
         /// </summary>
-        public int callbackOrder => 0;
+        public int callbackOrder => -100;
 
         /// <summary>
         /// 阻止使用过期 opcode 映射的构建继续执行。
@@ -21,6 +22,22 @@ namespace MiniCore.EditorTools
         /// <param name="report">当前 Unity 构建报告。</param>
         public void OnPreprocessBuild(BuildReport report)
         {
+            if (EditorUserBuildSettings.buildScriptsOnly)
+            {
+                return;
+            }
+
+            if (!ProtoBuildValidator.Validate(out string protoError))
+            {
+                throw new BuildFailedException(protoError);
+            }
+
+            HybridClrBuildValidator.EnsureConfigured();
+            if (!HybridClrBuildValidator.Validate(out string hybridClrError))
+            {
+                throw new BuildFailedException(hybridClrError);
+            }
+
             if (!OpcodeRegistryGenerator.Validate(out string error))
             {
                 throw new BuildFailedException(error);

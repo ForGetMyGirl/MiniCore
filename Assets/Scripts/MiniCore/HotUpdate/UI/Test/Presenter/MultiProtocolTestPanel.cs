@@ -2,6 +2,7 @@ using Cysharp.Threading.Tasks;
 using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -48,7 +49,7 @@ namespace MiniCore.HotUpdate
 
         private void Awake()
         {
-            net = Global.Com.Get<NetworkMessageComponent>(this);
+            net = Global.Get<NetworkMessageComponent>(this);
             if (net != null)
             {
                 net.OnServerSessionCreated += HandleServerSessionCreated;
@@ -73,7 +74,7 @@ namespace MiniCore.HotUpdate
             EventCenter.RemoveListener<string>(HotEvent.KcpTestMessage, OnNetworkMessage);
             EventCenter.RemoveListener<string>(GameEvent.LogInfo, OnInfoMessage);
             EventCenter.RemoveListener<string>(GameEvent.LogWarning, OnWarningMessage);
-            Global.Com.ReleaseAll(this);
+            Global.ReleaseAll(this);
         }
 
         private void OnGUI()
@@ -498,7 +499,7 @@ namespace MiniCore.HotUpdate
             {
                 var req = new DemoRpcRequest { Payload = $"[{protocol}] {message}" };
                 var resp = await net.CallAsync<DemoRpcRequest, DemoRpcResponse>(sessionId, req);
-                AddLog($"{protocol} rpc response code:{resp.ErrorCode} msg:{resp.Message} echo:{resp.Echo}");
+                AddLog($"{protocol} rpc response code:{resp.Code} msg:{resp.Msg} echo:{resp.Echo}");
             }
             catch (Exception ex)
             {

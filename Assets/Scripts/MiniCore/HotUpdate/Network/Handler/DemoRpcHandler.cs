@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 
 namespace MiniCore.HotUpdate
 {
@@ -21,8 +22,8 @@ namespace MiniCore.HotUpdate
             LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
 
-            response.ErrorCode = 0;
-            response.Message = "RPC响应成功";
+            response.Code = 0;
+            response.Msg = "RPC响应成功";
             response.Echo = request.Payload;
             return UniTask.CompletedTask;
         }

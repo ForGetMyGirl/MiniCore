@@ -1,0 +1,14 @@
+{
+  "name": "MiniCore.Editor",
+  "rootNamespace": "",
+  "references": ["MiniCore.Runtime", "MiniCore.Protocol", "MiniCore.Network", "MiniCore.Unity", "MiniCore.HotUpdate", "HybridCLR.Editor", "YooAsset", "YooAsset.Editor"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

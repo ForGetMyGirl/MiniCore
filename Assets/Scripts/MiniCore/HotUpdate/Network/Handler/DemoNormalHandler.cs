@@ -1,5 +1,6 @@
 ﻿using Cysharp.Threading.Tasks;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 
 namespace MiniCore.HotUpdate
 {

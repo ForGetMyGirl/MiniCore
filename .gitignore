@@ -100,6 +100,10 @@ InitTestScene*.unity*
 
 
 # 自定义
+# HybridCLR 生成的热更 DLL、裁剪 AOT DLL、本机 IL2CPP 数据与安装缓存。
+/HybridCLRData/
+# Prepare DefaultPackage 自动复制的热更 DLL 与 AOT 元数据资源。
+/Assets/AssetRes/Dlls/
 /[Aa]ssets/StreamingAssets/yoo
 /[Bb]undles
 /BenchmarkPerformance/History/

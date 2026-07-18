@@ -15,8 +15,9 @@ namespace MiniCore.EditorTools
         #region Private 私有成员
 
         private const string AssemblyKeyword = "HotUpdate";
-        private const string OutputPath = "Assets/Scripts/MiniCore/Model/Generated/OpcodeRegistry.Generated.cs";
-        private const string ManifestPath = "Assets/Scripts/MiniCore/Model/Generated/OpcodeManifest.json";
+        private const string OutputPath = "Assets/Scripts/MiniCore/Protocol/Generated/Registry/OpcodeRegistry.Generated.cs";
+        private const string HandlerOutputPath = "Assets/Scripts/MiniCore/HotUpdate/Generated/Network/HotUpdateHandlerRegistry.Generated.cs";
+        private const string ManifestPath = "Proto/Manifest/OpcodeManifest.json";
         private const uint NormalStartOpcode = 100001;
         private const uint RpcStartOpcode = 200001;
         private static readonly UTF8Encoding Utf8WithoutBom = new UTF8Encoding(false); // 生成文件的固定编码。
@@ -24,6 +25,15 @@ namespace MiniCore.EditorTools
         #endregion
 
         #region Internal 内部成员
+
+        /// <summary>
+        /// 在 HotUpdate 源码变更后的下一次编译前，将直接引用 Handler 类型的生成表替换为空表。
+        /// 编译完成后会由自动同步重新生成当前 Handler 的直接注册表，避免删除或改名 Handler 时旧表阻断编译。
+        /// </summary>
+        internal static void InvalidateGeneratedHandlerRegistry()
+        {
+            WriteFileIfChanged(HandlerOutputPath, BuildEmptyHandlerRegistryContent());
+        }
 
         /// <summary>
         /// 执行 Synchronize 相关处理。
@@ -43,22 +53,24 @@ namespace MiniCore.EditorTools
                     return false;
                 }
 
-                OpcodeManifest manifest = LoadManifest(assembly, out bool createdManifest);
+                OpcodeManifest manifest = LoadManifest(out bool createdManifest);
                 List<HandlerBinding> bindings = BuildBindings(assembly, manifest, true, logBuilder, out Dictionary<Type, uint> messageOpcodes);
                 string manifestContent = JsonUtility.ToJson(manifest, true) + Environment.NewLine;
                 string generatedContent = BuildGeneratedContent(bindings, messageOpcodes, manifest);
+                string handlerGeneratedContent = BuildHandlerRegistryContent(bindings);
 
                 bool manifestWritten = WriteFileIfChanged(ManifestPath, manifestContent);
                 bool manifestChanged = createdManifest || manifestWritten;
                 bool generatedChanged = WriteFileIfChanged(OutputPath, generatedContent);
-                if (refreshAssets && (manifestChanged || generatedChanged))
+                bool handlerGeneratedChanged = WriteFileIfChanged(HandlerOutputPath, handlerGeneratedContent);
+                if (refreshAssets && (manifestChanged || generatedChanged || handlerGeneratedChanged))
                 {
                     AssetDatabase.Refresh();
                 }
 
                 logBuilder.AppendLine($"稳定清单: {manifest.Entries.Count} 条（含已删除协议保留项）。");
                 logBuilder.AppendLine($"当前绑定: {bindings.Count} 个处理器，{messageOpcodes.Count} 个协议。");
-                logBuilder.AppendLine(manifestChanged || generatedChanged ? "已同步 opcode 清单和生成映射。" : "opcode 清单和生成映射无需更新。");
+                logBuilder.AppendLine(manifestChanged || generatedChanged || handlerGeneratedChanged ? "已同步 opcode、协议和 Handler 生成映射。" : "opcode、协议和 Handler 生成映射无需更新。");
                 log = logBuilder.ToString();
                 return true;
             }
@@ -92,11 +104,13 @@ namespace MiniCore.EditorTools
                     return false;
                 }
 
-                OpcodeManifest manifest = LoadManifest(assembly, out _);
+                OpcodeManifest manifest = LoadManifest(out _);
                 var logBuilder = new StringBuilder();
                 List<HandlerBinding> bindings = BuildBindings(assembly, manifest, false, logBuilder, out Dictionary<Type, uint> messageOpcodes);
                 string expectedGeneratedContent = BuildGeneratedContent(bindings, messageOpcodes, manifest);
+                string expectedHandlerGeneratedContent = BuildHandlerRegistryContent(bindings);
                 string outputFullPath = GetFullPath(OutputPath);
+                string handlerOutputFullPath = GetFullPath(HandlerOutputPath);
                 if (!File.Exists(outputFullPath))
                 {
                     error = $"缺少 opcode 生成文件: {OutputPath}";
@@ -106,7 +120,13 @@ namespace MiniCore.EditorTools
                 string actualGeneratedContent = File.ReadAllText(outputFullPath, Utf8WithoutBom);
                 if (!string.Equals(actualGeneratedContent, expectedGeneratedContent, StringComparison.Ordinal))
                 {
-                    error = "Opcode 生成文件与稳定清单不一致，请等待编辑器自动同步或执行 MiniCore/Opcode/Generate (HotUpdate)。";
+                    error = "Opcode 生成文件与当前 Handler 不一致，请等待脚本编译后的自动同步完成。";
+                    return false;
+                }
+
+                if (!File.Exists(handlerOutputFullPath) || !string.Equals(File.ReadAllText(handlerOutputFullPath, Utf8WithoutBom), expectedHandlerGeneratedContent, StringComparison.Ordinal))
+                {
+                    error = "Handler 注册表生成文件与当前 Handler 不一致，请等待脚本编译后的自动同步完成。";
                     return false;
                 }
 
@@ -135,12 +155,11 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 执行 LoadManifest 相关处理。
+        /// 加载稳定 Opcode 清单；首次创建时仅保留编号区间，不为未绑定 Handler 的协议预分配号码。
         /// </summary>
-        /// <param name="assembly">执行该方法所需的 assembly 参数。</param>
-        /// <param name="createdManifest">执行该方法所需的 createdManifest 参数。</param>
-        /// <returns>执行处理后的结果。</returns>
-        private static OpcodeManifest LoadManifest(Assembly assembly, out bool createdManifest)
+        /// <param name="createdManifest">是否在本次加载中创建了新的清单文件。</param>
+        /// <returns>已完成默认值与唯一性校验的稳定 Opcode 清单。</returns>
+        private static OpcodeManifest LoadManifest(out bool createdManifest)
         {
             string manifestFullPath = GetFullPath(ManifestPath);
             createdManifest = !File.Exists(manifestFullPath);
@@ -152,7 +171,6 @@ namespace MiniCore.EditorTools
                     NormalStartOpcode = NormalStartOpcode,
                     RpcStartOpcode = RpcStartOpcode
                 };
-                SeedLegacyMappings(assembly, manifest);
             }
             else
             {
@@ -169,34 +187,14 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 执行 SeedLegacyMappings 相关处理。
-        /// </summary>
-        /// <param name="assembly">执行该方法所需的 assembly 参数。</param>
-        /// <param name="manifest">执行该方法所需的 manifest 参数。</param>
-        private static void SeedLegacyMappings(Assembly assembly, OpcodeManifest manifest)
-        {
-            foreach (Type protocolType in GetProtocolTypes(assembly))
-            {
-                if (OpcodeRegistry.TryGetOpcodeByMessage(protocolType, out uint opcode))
-                {
-                    manifest.Entries.Add(new OpcodeManifestEntry
-                    {
-                        TypeName = protocolType.FullName,
-                        Opcode = opcode
-                    });
-                }
-            }
-        }
-
-        /// <summary>
-        /// 执行 BuildBindings 相关处理。
+        /// 从已编译的 HotUpdate Handler 中建立协议绑定，并只为这些绑定分配或读取 Opcode。
         /// </summary>
         /// <param name="assembly">执行该方法所需的 assembly 参数。</param>
         /// <param name="manifest">执行该方法所需的 manifest 参数。</param>
         /// <param name="allowAllocate">执行该方法所需的 allowAllocate 参数。</param>
         /// <param name="logBuilder">执行该方法所需的 logBuilder 参数。</param>
-        /// <param name="messageOpcodes">执行该方法所需的 messageOpcodes 参数。</param>
-        /// <returns>执行处理后的结果。</returns>
+        /// <param name="messageOpcodes">输出 Handler 实际使用的消息类型与 Opcode 映射。</param>
+        /// <returns>按 Handler 类型发现并验证后的协议绑定集合。</returns>
         private static List<HandlerBinding> BuildBindings(
             Assembly assembly,
             OpcodeManifest manifest,
@@ -220,17 +218,6 @@ namespace MiniCore.EditorTools
                 {
                     logBuilder.AppendLine($"Normal: {binding.Opcode} -> {binding.HandlerType.FullName}");
                 }
-            }
-
-            foreach (Type protocolType in GetProtocolTypes(assembly))
-            {
-                if (messageOpcodes.ContainsKey(protocolType))
-                {
-                    continue;
-                }
-
-                bool isRpcProtocol = typeof(IRequest).IsAssignableFrom(protocolType) || typeof(IResponse).IsAssignableFrom(protocolType);
-                GetOrAllocateOpcode(protocolType, isRpcProtocol, manifest, messageOpcodes, allowAllocate);
             }
 
             manifest.Entries.Sort((left, right) => string.CompareOrdinal(left.TypeName, right.TypeName));
@@ -290,17 +277,16 @@ namespace MiniCore.EditorTools
             var requestOwners = new Dictionary<Type, HandlerBinding>();
             foreach (HandlerBinding binding in bindings)
             {
-                if (!typeof(IProtocol).IsAssignableFrom(binding.RequestType))
-                {
-                    throw new InvalidOperationException($"处理器请求类型未实现 IProtocol: {binding.HandlerType.FullName}");
-                }
-
                 if (binding.IsRpc)
                 {
-                    if (!typeof(IRequest).IsAssignableFrom(binding.RequestType) || !typeof(IResponse).IsAssignableFrom(binding.ResponseType))
+                    if (!typeof(IRpcRequest).IsAssignableFrom(binding.RequestType) || !typeof(IRpcResponse).IsAssignableFrom(binding.ResponseType))
                     {
                         throw new InvalidOperationException($"RPC处理器泛型类型无效: {binding.HandlerType.FullName}");
                     }
+                }
+                else if (!typeof(INormalMessage).IsAssignableFrom(binding.RequestType))
+                {
+                    throw new InvalidOperationException($"普通处理器请求类型未实现 INormalMessage: {binding.HandlerType.FullName}");
                 }
 
                 if (requestOwners.TryGetValue(binding.RequestType, out HandlerBinding existing))
@@ -431,18 +417,6 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 执行 GetProtocolTypes 相关处理。
-        /// </summary>
-        /// <param name="assembly">执行该方法所需的 assembly 参数。</param>
-        /// <returns>执行处理后的结果。</returns>
-        private static IEnumerable<Type> GetProtocolTypes(Assembly assembly)
-        {
-            return assembly.GetTypes()
-                .Where(type => typeof(IProtocol).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
-                .OrderBy(type => type.FullName);
-        }
-
-        /// <summary>
         /// 执行 FindGenericBase 相关处理。
         /// </summary>
         /// <param name="type">执行该方法所需的 type 参数。</param>
@@ -525,6 +499,80 @@ namespace MiniCore.EditorTools
                 builder.AppendLine($"            messageToOpcode[\"{pair.Key.FullName}\"] = {pair.Value};");
             }
 
+            builder.AppendLine("        }");
+            builder.AppendLine("    }");
+            builder.AppendLine("}");
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// 生成运行时直接注册 Handler 的源文件，避免加载 HotUpdate DLL 后再次反射扫描。
+        /// </summary>
+        /// <param name="bindings">当前发现的 Handler 绑定。</param>
+        /// <returns>Handler 注册表源代码。</returns>
+        private static string BuildHandlerRegistryContent(List<HandlerBinding> bindings)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("// Auto-generated by OpcodeRegistryGenerator. Do not modify by hand.");
+            builder.AppendLine("using MiniCore.Core;");
+            builder.AppendLine();
+            builder.AppendLine("namespace MiniCore.HotUpdate");
+            builder.AppendLine("{");
+            builder.AppendLine("    /// <summary>");
+            builder.AppendLine("    /// 自动生成的 HotUpdate Handler 直接注册表。");
+            builder.AppendLine("    /// </summary>");
+            builder.AppendLine("    public static class HotUpdateHandlerRegistry");
+            builder.AppendLine("    {");
+            builder.AppendLine("        /// <summary>");
+            builder.AppendLine("        /// 将当前 HotUpdate 程序集中的 Handler 注册到网络组件。");
+            builder.AppendLine("        /// </summary>");
+            builder.AppendLine("        /// <param name=\"network\">目标网络消息组件。</param>");
+            builder.AppendLine("        public static void Register(NetworkMessageComponent network)");
+            builder.AppendLine("        {");
+            builder.AppendLine("            if (network == null)");
+            builder.AppendLine("            {");
+            builder.AppendLine("                throw new System.ArgumentNullException(nameof(network));");
+            builder.AppendLine("            }");
+
+            foreach (HandlerBinding binding in bindings.OrderBy(item => item.Opcode))
+            {
+                builder.AppendLine($"            network.RegisterHandler(new global::{binding.HandlerType.FullName}());");
+            }
+
+            builder.AppendLine("        }");
+            builder.AppendLine("    }");
+            builder.AppendLine("}");
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// 生成不引用任何具体 Handler 类型的临时注册表，用于保证 HotUpdate 源码变更时的首轮编译可通过。
+        /// </summary>
+        /// <returns>可安全参与首轮编译的空 Handler 注册表源代码。</returns>
+        private static string BuildEmptyHandlerRegistryContent()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("// Auto-generated by OpcodeRegistryGenerator. Do not modify by hand.");
+            builder.AppendLine("using MiniCore.Core;");
+            builder.AppendLine();
+            builder.AppendLine("namespace MiniCore.HotUpdate");
+            builder.AppendLine("{");
+            builder.AppendLine("    /// <summary>");
+            builder.AppendLine("    /// HotUpdate 源码变更期间使用的临时空 Handler 注册表。");
+            builder.AppendLine("    /// 脚本编译完成后会由 OpcodeRegistryGenerator 自动替换为直接注册表。");
+            builder.AppendLine("    /// </summary>");
+            builder.AppendLine("    public static class HotUpdateHandlerRegistry");
+            builder.AppendLine("    {");
+            builder.AppendLine("        /// <summary>");
+            builder.AppendLine("        /// 在首轮编译期间保持调用约定，实际 Handler 会在自动同步后的下一轮编译中注册。");
+            builder.AppendLine("        /// </summary>");
+            builder.AppendLine("        /// <param name=\"network\">目标网络消息组件。</param>");
+            builder.AppendLine("        public static void Register(NetworkMessageComponent network)");
+            builder.AppendLine("        {");
+            builder.AppendLine("            if (network == null)");
+            builder.AppendLine("            {");
+            builder.AppendLine("                throw new System.ArgumentNullException(nameof(network));");
+            builder.AppendLine("            }");
             builder.AppendLine("        }");
             builder.AppendLine("    }");
             builder.AppendLine("}");

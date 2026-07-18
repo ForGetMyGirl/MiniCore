@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.code-philosophy.hybridclr": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.5.0",
     "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
     "com.tuyoogame.yooasset": "2.3.18",
     "com.unity.2d.sprite": "1.0.0",

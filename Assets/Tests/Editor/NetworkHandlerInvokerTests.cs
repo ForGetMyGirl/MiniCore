@@ -25,14 +25,14 @@ namespace MiniCore.EditorTests
         {
             var handler = new TestRpcHandler();
             var request = new TestRequest { RpcId = 9 };
-            IResponse response = ((INetworkRpcHandlerInvoker)handler).CreateResponse();
+            IRpcResponse response = ((INetworkRpcHandlerInvoker)handler).CreateResponse();
 
             ((INetworkRpcHandlerInvoker)handler).HandleAsync(null, request, response).GetAwaiter().GetResult();
 
             Assert.IsInstanceOf<TestResponse>(response);
             Assert.AreSame(request, handler.ReceivedRequest);
             Assert.AreEqual(9, response.RpcId);
-            Assert.AreEqual("handled", response.Message);
+            Assert.AreEqual("handled", response.Msg);
         }
 
         private sealed class TestMessageHandler : AMHandler<TestMessage>
@@ -58,42 +58,36 @@ namespace MiniCore.EditorTests
             {
                 ReceivedRequest = request;
                 response.RpcId = request.RpcId;
-                response.Message = "handled";
+                response.Msg = "handled";
                 return UniTask.CompletedTask;
             }
         }
 
-        private sealed class TestMessage : IProtocol
+        private sealed class TestMessage : INormalMessage
         {
-            /// <summary>测试普通消息的协议号。</summary>
-            public uint Opcode => 1;
             /// <summary>用于断言派发结果的测试值。</summary>
             public int Value { get; set; }
         }
 
-        private sealed class TestRequest : IRequest
+        private sealed class TestRequest : IRpcRequest
         {
-            /// <summary>测试 RPC 请求的协议号。</summary>
-            public uint Opcode => 2;
             /// <summary>测试 RPC 请求标识。</summary>
             public long RpcId { get; set; }
         }
 
-        private sealed class TestResponse : IResponse
+        private sealed class TestResponse : IRpcResponse
         {
             /// <summary>创建满足 RPC Handler 构造约束的测试响应。</summary>
             public TestResponse()
             {
             }
 
-            /// <summary>测试 RPC 响应的协议号。</summary>
-            public uint Opcode => 3;
             /// <summary>与测试请求对应的标识。</summary>
             public long RpcId { get; set; }
             /// <summary>测试业务错误码。</summary>
-            public int ErrorCode { get; set; }
+            public int Code { get; set; }
             /// <summary>测试业务结果文本。</summary>
-            public string Message { get; set; }
+            public string Msg { get; set; }
         }
     }
 }

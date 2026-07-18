@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 
 namespace MiniCore.HotUpdate
 {
@@ -25,14 +26,14 @@ namespace MiniCore.HotUpdate
             LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
 
-            NetworkMessageComponent networkMessageComponent = Global.Com.Get<NetworkMessageComponent>(this);
+            NetworkMessageComponent networkMessageComponent = Global.Get<NetworkMessageComponent>(this);
             try
             {
                 networkMessageComponent.DisconnectSession(session.SessionId);
             }
             finally
             {
-                Global.Com.Remove<NetworkMessageComponent>(this);
+                Global.Remove<NetworkMessageComponent>(this);
             }
 
             return UniTask.CompletedTask;

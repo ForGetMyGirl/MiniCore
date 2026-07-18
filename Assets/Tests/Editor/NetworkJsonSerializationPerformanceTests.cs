@@ -1,5 +1,6 @@
 using MiniCore.HotUpdate;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 using NUnit.Framework;
 using Unity.PerformanceTesting;
 
@@ -37,7 +38,6 @@ namespace MiniCore.EditorTests
             message = new TestNetworkData
             {
                 Id = 1001,
-                RpcId = 9000001,
                 Content = MediumContent
             };
             serializedPayload = serializer.Serialize(message);
@@ -77,7 +77,6 @@ namespace MiniCore.EditorTests
 
             Assert.IsNotNull(lastDeserializedMessage, "性能测试未实际执行反序列化，结果无效。");
             Assert.AreEqual(message.Id, lastDeserializedMessage.Id, "反序列化后的消息标识不正确。");
-            Assert.AreEqual(message.RpcId, lastDeserializedMessage.RpcId, "反序列化后的 RPC 标识不正确。");
             Assert.AreEqual(message.Content, lastDeserializedMessage.Content, "反序列化后的消息正文不正确。");
         }
 

@@ -65,13 +65,8 @@ namespace MiniCore.EditorTests
         /// <summary>
         /// 用于性能基线的普通协议对象。
         /// </summary>
-        private sealed class BenchmarkMessage : IProtocol
+        private sealed class BenchmarkMessage : INormalMessage
         {
-            /// <summary>
-            /// 基准测试使用的普通消息协议号。
-            /// </summary>
-            public uint Opcode => 100001;
-
             /// <summary>
             /// 用于确保 Handler 实际执行的测试值。
             /// </summary>

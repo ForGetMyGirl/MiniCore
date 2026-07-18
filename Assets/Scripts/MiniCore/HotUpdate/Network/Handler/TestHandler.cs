@@ -1,6 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 using MiniCore.Core;
 
 namespace MiniCore.HotUpdate

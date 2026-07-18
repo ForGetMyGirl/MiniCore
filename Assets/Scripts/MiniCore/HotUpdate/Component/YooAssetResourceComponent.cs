@@ -10,6 +10,7 @@ namespace MiniCore.HotUpdate
     /// 基于 YooAsset 的资源加载组件。
     /// 组件创建后绑定一个资源包，并缓存主动预加载的资源句柄。
     /// </summary>
+    [MiniCoreStartupModule("YooAsset 资源")]
     public class YooAssetResourceComponent : AComponent<YooAssetResourceComponentInitArgs>, IResourcesComponent
     {
         #region Private 私有成员
@@ -124,7 +125,16 @@ namespace MiniCore.HotUpdate
         /// <param name="args">包含资源包名称的初始化参数。</param>
         protected override void Awake(YooAssetResourceComponentInitArgs args)
         {
+            if (string.IsNullOrWhiteSpace(args.PackageName))
+            {
+                throw new System.ArgumentException("YooAsset 资源包名称不能为空。", nameof(args));
+            }
+
             package = YooAssets.GetPackage(args.PackageName);
+            if (package == null)
+            {
+                throw new System.InvalidOperationException($"未找到 YooAsset 资源包：{args.PackageName}。");
+            }
         }
 
         #endregion

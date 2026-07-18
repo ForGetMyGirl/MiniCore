@@ -11,11 +11,24 @@
 
 ## 已确认优化记录
 
+### 2026-07-15：关闭日志时的网络热路径跳过字符串构造
+
+| 项目 | 记录 |
+| --- | --- |
+| 优化范围 | `LogSwitch` 默认开关策略，以及 `NetworkMessageComponent` 的收包、普通发送、RPC 请求和 RPC 响应日志路径；仅调整日志关闭时的热路径，不改变网络包处理语义。 |
+| 原始问题 | 旧路径在 `LogSwitch.EnableLog = false` 时仍会先格式化时间、构造插值日志字符串，再进入已关闭的 `LogSwitch.Info`。日志输出被抑制，但每包字符串与时间格式化成本已经发生。 |
+| 基线与归因证据 | `NetworkIncomingLogPerformanceTests.cs` 使用相同日志文本对比旧写法与候选写法，均在日志关闭状态下每组执行 `10,000` 次。旧路径 `IncomingLog_BuildsStrings_WhenLoggingDisabled` 三次中位值为 `22.116 / 22.168 / 22.318 ms`，每次 `GC() = 10.0005`；优化路径 `IncomingLog_SkipsStrings_WhenLoggingDisabled` 三次中位值为 `0.034 / 0.036 / 0.036 ms`，每次 `GC() = 0`。 |
+| 实施方案 | `LogSwitch` 在 Editor/Development 默认开启、正式非开发构建默认关闭；`NetworkMessageComponent` 的收包、普通发送、RPC 请求和 RPC 响应日志均先判断 `EnableLog`，再格式化时间和字符串；Payload 日志同时要求 `EnableLog && EnablePayloadLog`。 |
+| 前后性能数据 | 关闭日志时的收包日志热路径从旧路径中位数约 `22.168 ms / 10,000 次` 降至优化路径约 `0.036 ms / 10,000 次`，约减少 `99.84%`；`GC.Alloc` 采样从稳定 `10.0005` 归零。 |
+| 测试状态 | 框架阶段性能验证已确认；尚未做真实业务网络冒烟验证。 |
+| 残余风险 | 日志开启时仍会保留诊断字符串构造成本；正式包默认关闭日志可避免热路径分配，但需要确认外部调试流程不会依赖正式非开发构建默认输出网络日志。 |
+| 下一步 | 在真实 TCP/UDP/KCP 收发场景做一次业务网络冒烟验证，并继续观察 Payload 日志只在显式开启时转换正文。 |
+
 ### 2026-07-15：收包缓冲池稳定 GC 消除
 
 | 项目 | 记录 |
 | --- | --- |
-| 优化范围 | `Model/Network/Entity/Common/ByteBufferPool.cs`，不改变 TCP、UDP、KCP 和网络组件对 `Rent/Return` 的调用方式。 |
+| 优化范围 | `Network/Transport/Entity/Common/ByteBufferPool.cs`，不改变 TCP、UDP、KCP 和网络组件对 `Rent/Return` 的调用方式。 |
 | 原始问题 | 旧实现使用 `ConcurrentStack<byte[]>` 保存空闲数组。数组本身被复用，但每次 `Push` 会产生短命的并发容器内部节点。 |
 | 归因证据 | 10,000 次、512 B 的 `Buffer.BlockCopy` 为 `0.156 ms / GC() = 5`；`ConcurrentQueue` 入出队为 `0.464 ms / GC() = 5`；旧缓冲池仅 `Rent/Return` 为 `1.506 ms / GC() = 10005`。因此稳定分配来自缓冲池容器，而非复制或收包队列。 |
 | 实施方案 | 每个大小桶替换为内部加锁的 `byte[][]` 槽位栈；稳定阶段只读写已有数组引用，不创建并发栈节点。外部调用方不需要加锁。 |
@@ -127,23 +140,23 @@
 - 异常、断线、反序列化失败和丢包路径均能归还缓冲区。
 - Pool 命中率、分配次数和大包行为可观测。
 
-## 阶段 4：序列化分层与协议演进
+## 阶段 4：Protobuf 协议演进与 JSON 对比基线
 
 ### 问题
 
-JSON 调试友好，但在高频状态同步中会带来字符串、对象图和 CPU 开销。
+当前正式网络路径使用 Protobuf。JSON 仍适合迁移验证、调试或低频兼容场景，但会带来字符串、对象图和 CPU 开销；不能再被视为网络默认实现。
 
 ### 推荐策略
 
-1. 保留 JSON 作为管理协议、测试协议和低频 RPC 的默认实现。
-2. 只将经压测确认的高频消息迁移为 MessagePack、Protobuf、MemoryPack 或项目选定的二进制方案。
-3. 保持外层包格式和 opcode 语义稳定，逐步增加协议版本或 serializer 标识，而不是一次性替换全部消息。
-4. 为同一消息建立 JSON 与二进制版本的包大小、序列化耗时、反序列化耗时和 GC 对比。
+1. 以 `ProtobufSerializer`、Proto 角色生成和 Parser Registry 作为正式协议链路。
+2. 保留 `NewtonsoftJsonSerializer` 与 JSON 性能测试作为迁移对比，不将其重新设为默认 serializer。
+3. 保持 12 字节外层包格式、Opcode 语义和 `RpcId` 头字段稳定；业务字段只在 Proto Body 中演进。
+4. 为同一消息持续记录 JSON 与 Protobuf 的包大小、序列化耗时、反序列化耗时、完整入站包和 RPC 的 GC 对比。
 
 ### 验收标准
 
-- 高频协议在目标设备上有明确的 CPU、GC 或带宽收益。
-- 新旧协议可灰度共存，并具备回退路径。
+- Protobuf 正式路径在目标设备上有可重复的 CPU、GC 与带宽基线。
+- JSON 对比实现不会影响 Player 默认网络路径，也不会破坏现有 Proto/Opcode 兼容性。
 - 业务层不需要感知 Transport 差异。
 
 ## 阶段 5：UDP/KCP 服务端韧性
@@ -161,24 +174,22 @@ JSON 调试友好，但在高频状态同步中会带来字符串、对象图和
 - 异常 UDP 流量不会导致 Session 表或内存无上限增长。
 - KCP 在预期丢包率下的 P99 延迟、重传率和 CPU 使用有基线数据。
 
-## 阶段 6：生成式网络绑定（二期，可选）
+## 阶段 6：生成式 Handler 绑定（已完成，持续监控）
 
-### 前提
+当前实现已在 Editor 编译后扫描 `MiniCore.HotUpdate` 的 `AMHandler<T>` 与 `ARpcHandler<TRequest,TResponse>`，生成 `HotUpdateHandlerRegistry.Generated.cs` 与 `OpcodeRegistry.Generated.cs`。运行时直接构造并注册 Handler，不扫描 AppDomain，不以字符串或 `Activator` 创建 Handler。
 
-只有阶段 0 的数据证明启动扫描、字典查询、`Type` 反序列化或类型转换占比较高时才实施。本阶段不是当前性能优化的前置条件。
+### 持续项
 
-### 实施项
-
-- 在 HotUpdate 生成 `GeneratedNetworkBindings.Register()`。
-- 生成 Handler 实例化、opcode 注册、请求类型、响应工厂和直连委托。
-- 保留当前反射扫描作为 Editor 调试或生成缺失时的明确失败路径。
-- 评估 IL2CPP/AOT、热更新程序集和生成文件版本控制兼容性。
+- 保持删除/改名 Handler 的首轮安全空表与二次自动生成流程可用。
+- 保持 Manifest、Opcode Registry、Handler Registry 的构建前一致性校验。
+- 若压测表明字典查询、运行时 Type 反序列化或类型转换成为瓶颈，再评估更细粒度的生成式 Parser/派发绑定。
+- 每次调整生成器时验证 IL2CPP/AOT、HotUpdate DLL 与 YooAsset 资源同步。
 
 ### 验收标准
 
-- 每包处理路径不出现 `MethodInfo.Invoke`、`DynamicInvoke` 或运行时表达式编译。
-- 启动耗时和派发微基准有可量化收益。
-- 生成内容可重复、可审查且构建前校验失败信息明确。
+- 每包处理路径不出现 `MethodInfo.Invoke`、`DynamicInvoke`、运行时 Handler 扫描或运行时表达式编译。
+- 生成内容可重复、可审查，删除 Handler 后不会阻断脚本编译。
+- 构建前校验对 Proto、Manifest 和生成注册表给出明确失败信息。
 
 ## 阶段 7：Global 生命周期诊断
 
@@ -216,7 +227,7 @@ JSON 调试友好，但在高频状态同步中会带来字符串、对象图和
 | 2 | 阶段 1 | 控制积压是网络稳定性的基础。 |
 | 3 | 阶段 2、3 | 处理高并发时的生命周期、内存和超时压力。 |
 | 4 | 阶段 4、5 | 根据实际业务决定协议升级和公网韧性投入。 |
-| 5 | 阶段 6 | 仅在派发本身被证明是瓶颈时实施。 |
+| 5 | 阶段 6 | 持续验证已完成的生成式绑定，不在无数据时继续过度优化。 |
 | 6 | 阶段 7、8 | 持续提升可维护性和异步资源正确性。 |
 
 ## 每次优化的提交检查单
