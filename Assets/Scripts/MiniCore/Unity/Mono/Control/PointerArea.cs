@@ -1,36 +1,12 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
-
 
 namespace MiniCore.Model
 {
-    public class PointerArea : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
-{
-
-    public void OnPointerEnter(PointerEventData eventData)
+    /// <summary>
+    /// 指针区域的场景标记组件。
+    /// 当前没有实际订阅者，旧字符串事件广播已移除；后续 UI 需求应改由窗口或场景的 ScopedEventBus 建模。
+    /// </summary>
+    public class PointerArea : MonoBehaviour
     {
-        EventCenter.Broadcast(GameEvent.OnPointerEnter, transform);
     }
-
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        EventCenter.Broadcast(GameEvent.OnPointerExit, transform);
-    }
-
-    //public GameObject GetOverUI(GameObject canvas)
-    //{
-    //    PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
-    //    pointerEventData.position = Input.mousePosition;
-    //    GraphicRaycaster gr = canvas.GetComponent<GraphicRaycaster>();
-    //    List<RaycastResult> results = new List<RaycastResult>();
-    //    gr.Raycast(pointerEventData, results);
-    //    if (results.Count != 0)
-    //    {
-    //        return results[0].gameObject;
-    //    }
-    //    return null;
-    //}
-
-}
-
 }

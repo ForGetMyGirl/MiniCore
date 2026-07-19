@@ -14,7 +14,7 @@
 
 | 程序集 | 路径 | 是否引用 Unity | 作用 | 可以依赖 |
 | --- | --- | --- | --- | --- |
-| `MiniCore.Runtime` | `Assets/Scripts/MiniCore/Runtime` | 否 | `Global`、组件基类、Timer、事件、日志门面、时间接口、热更入口契约 | 无 Unity；最底层公共模型 |
+| `MiniCore.Runtime` | `Assets/Scripts/MiniCore/Runtime` | 否 | `Global`、组件基类、Timer、强类型事件、日志门面、时间接口、热更入口契约 | 无 Unity；最底层公共模型 |
 | `MiniCore.Serialization` | `Assets/Scripts/MiniCore/Serialization` | 否 | `INetworkSerializer`、Protobuf 默认实现、Newtonsoft Json 对比实现 | Runtime、Protocol、第三方序列化库 |
 | `MiniCore.Protocol` | `Assets/Scripts/MiniCore/Protocol` | 否 | 消息角色接口、`OpcodeRegistry`、Proto 生成消息、Parser 注册表 | Runtime、Google.Protobuf |
 | `MiniCore.Network` | `Assets/Scripts/MiniCore/Network` | 否 | 收发、会话、RPC、心跳、Handler 基类、TCP/UDP/KCP | Runtime、Protocol、Serialization |
@@ -119,6 +119,14 @@ Runtime 公开异步 API 统一使用 `MTask` / `MTask<T>`。`AComponent`、AppS
 父方法退出会取消并等待未完成子任务的 `finally`；只有显式 `.Forget()` 的任务会转移到最近 Owner 监督域。普通 MTask 只能消费一次，需要多方等待时显式 `.Share()`。`MTaskExecutors.Unity`、模块自行持有的 `MTaskExecutors.CreateDedicated(name)` 与 `MTaskExecutors.ThreadPool` 可通过 `MTask.SwitchTo` 切换；切换只投递到既有执行器，不会按调用次数创建线程。BCL 确实要求 Token 时，只在外部适配边界使用 `MTaskExternal.GetCancellationToken()`。
 
 `MiniCore.Runtime` 的 MTask 核心是纯 C#，不直接依赖 UniTask、Burst 或 Cecil。Unity 2021.3 的 Owner 自动注入以 Editor-only 的 `MiniCore.MTask.CodeGen.dll` 随仓库交付，仅使用编辑器内置的 ILPostProcessor/Cecil API；它不进入 Player，也不要求导入项目额外安装包。完整用法、构建工具与限制见 [MTask 结构化异步](MTask.md)。
+
+### 强类型事件频道
+
+事件使用 `IEvent` 标记的不可变事件对象，不再使用字符串或整数作为事件名。`ISyncEvent` 只能通过 `Publish` 派发并由 `IEventHandler<T>` / `Action<T>` 同步处理；`IAsyncEvent` 只能通过 `PublishAsync` 派发并由 `IAsyncEventHandler<T>` / `Func<T, MTask>` 顺序等待。一个类型不能同时实现两种标记。
+
+`IApplicationEventBus` 是按需取得的 AppModule，用于跨模块、低频通知；房间、对局、窗口等局部范围使用放入 `GlobalScope` 或 `ComponentGroup` 的 `ScopedEventBus`，分组销毁时会自动解除订阅并取消等待。两种频道均支持 `WaitNextAsync<TEvent>`，它只等待调用后的下一次事件，不缓存或重放历史状态。订阅会返回值类型 `EventSubscription`，调用方必须在自身释放前 `Dispose`。
+
+事件标记、应用级与局部频道的选型、完整生命周期范例、异步派发和编辑器诊断见 [强类型事件中心](Eventing.md)。
 
 ### Unity 与非 Unity 宿主
 

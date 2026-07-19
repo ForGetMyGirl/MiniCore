@@ -1,6 +1,7 @@
 using MiniCore.Threading;
 using MiniCore;
 using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
@@ -25,6 +26,8 @@ namespace MiniCore.HotUpdate
         private readonly ConcurrentQueue<string> pendingLogs = new ConcurrentQueue<string>();
 
         private INetworkService net;
+        private IApplicationEventBus eventBus;
+        private EventSubscription networkMessageSubscription;
 
         private string host = "127.0.0.1";
         private string message = "hello";
@@ -58,9 +61,9 @@ namespace MiniCore.HotUpdate
                 net.OnServerSessionClosed += HandleServerSessionClosed;
             }
 
-            EventCenter.AddListener<string>(HotEvent.KcpTestMessage, OnNetworkMessage);
-            EventCenter.AddListener<string>(GameEvent.LogInfo, OnInfoMessage);
-            EventCenter.AddListener<string>(GameEvent.LogWarning, OnWarningMessage);
+            eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
+            networkMessageSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(OnNetworkMessage);
+            Application.logMessageReceivedThreaded += OnUnityLogMessage;
 
             AddLog("Multi-protocol test panel ready.");
         }
@@ -73,9 +76,9 @@ namespace MiniCore.HotUpdate
                 net.OnServerSessionClosed -= HandleServerSessionClosed;
             }
 
-            EventCenter.RemoveListener<string>(HotEvent.KcpTestMessage, OnNetworkMessage);
-            EventCenter.RemoveListener<string>(GameEvent.LogInfo, OnInfoMessage);
-            EventCenter.RemoveListener<string>(GameEvent.LogWarning, OnWarningMessage);
+            networkMessageSubscription.Dispose();
+            eventBus = null;
+            Application.logMessageReceivedThreaded -= OnUnityLogMessage;
             Global.ReleaseAll(this);
             base.OnDestroy();
         }
@@ -517,28 +520,29 @@ namespace MiniCore.HotUpdate
             AddLog($"Server session closed: {sessionId}");
         }
 
-        private void OnNetworkMessage(string messageText)
+        /// <summary>
+        /// 将强类型示例网络事件写入测试面板日志。
+        /// </summary>
+        /// <param name="@event">来自网络 Handler 的示例消息事件。</param>
+        private void OnNetworkMessage(DemoMessageReceivedEvent @event)
         {
-            AddLog($"[Server Msg] {messageText}");
+            AddLog($"[Server Msg] {@event.Message}");
         }
 
-        private void OnInfoMessage(string messageText)
+        /// <summary>
+        /// 接收 Unity Console 的线程安全日志回调，并保留普通与警告文本。
+        /// </summary>
+        /// <param name="condition">Console 输出的正文。</param>
+        /// <param name="stackTrace">Console 输出的堆栈文本。</param>
+        /// <param name="type">当前日志等级。</param>
+        private void OnUnityLogMessage(string condition, string stackTrace, LogType type)
         {
-            if (string.IsNullOrEmpty(messageText))
+            if (string.IsNullOrEmpty(condition) || (type != LogType.Log && type != LogType.Warning))
             {
                 return;
             }
-            AddLog($"[Info] {messageText}");
-        }
 
-        private void OnWarningMessage(string messageText)
-        {
-            if (string.IsNullOrEmpty(messageText))
-            {
-                return;
-            }
-
-            AddLog($"[Warn] {messageText}");
+            AddLog(type == LogType.Warning ? $"[Warn] {condition}" : $"[Info] {condition}");
         }
 
         private void AddLog(string text)

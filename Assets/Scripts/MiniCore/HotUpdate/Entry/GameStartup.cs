@@ -1,6 +1,7 @@
 using System;
 using MiniCore.Threading;
 using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Service;
 using UnityEngine;
@@ -39,6 +40,7 @@ namespace MiniCore.HotUpdate
         #region Private 私有成员
 
         private const string DedicatedServerSmokeTestArgument = "-dedicatedServerSmokeTest"; // Dedicated Server 冒烟模式的命令行参数。
+        private EventSubscription dedicatedServerSmokeSubscription; // Dedicated Server 冒烟日志监听的订阅 token。
 
         /// <summary>
         /// 创建当前示例场景使用的多协议测试面板。
@@ -98,24 +100,25 @@ namespace MiniCore.HotUpdate
         /// <summary>
         /// 在 Dedicated Server 冒烟模式下订阅业务事件并输出服务端就绪日志。
         /// </summary>
-        private static void ConfigureDedicatedServerSmokeTestIfRequested()
+        private void ConfigureDedicatedServerSmokeTestIfRequested()
         {
             if (!NetworkSmokeTestRunner.HasCommandLineArgument(DedicatedServerSmokeTestArgument))
             {
                 return;
             }
 
-            EventCenter.AddListener<string>(HotEvent.KcpTestMessage, LogDedicatedServerSmokeEvent);
+            IApplicationEventBus eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
+            dedicatedServerSmokeSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(LogDedicatedServerSmokeEvent);
             Debug.Log($"DEDICATED_SERVER_SMOKE: READY entry:{nameof(MiniCoreStartup)} port:{ReadServerPort()}");
         }
 
         /// <summary>
         /// 将业务 Handler 广播的消息镜像为 Dedicated Server 冒烟日志。
         /// </summary>
-        /// <param name="message">Handler 广播的业务消息文本。</param>
-        private static void LogDedicatedServerSmokeEvent(string message)
+        /// <param name="@event">Handler 广播的强类型业务事件。</param>
+        private static void LogDedicatedServerSmokeEvent(DemoMessageReceivedEvent @event)
         {
-            Debug.Log($"DEDICATED_SERVER_SMOKE: event:{message}");
+            Debug.Log($"DEDICATED_SERVER_SMOKE: event:{@event.Message}");
         }
 
         /// <summary>
@@ -134,6 +137,19 @@ namespace MiniCore.HotUpdate
             }
 
             return 20000;
+        }
+
+        #endregion
+
+        #region Override 重写实现
+
+        /// <summary>
+        /// 解除 Dedicated Server 冒烟事件订阅。
+        /// </summary>
+        protected override void OnDispose()
+        {
+            dedicatedServerSmokeSubscription.Dispose();
+            base.OnDispose();
         }
 
         #endregion

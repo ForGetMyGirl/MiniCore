@@ -16,6 +16,7 @@ namespace MiniCore.HotUpdate
         /// <returns>项目启动完成任务。</returns>
         public static async MTask StartAsync()
         {
+            Global.RegisterAppModule<global::MiniCore.Eventing.IApplicationEventBus, global::MiniCore.Eventing.ApplicationEventBusModule>("");
             if (Application.isBatchMode)
             {
                 await StartServerAsync();

@@ -1,5 +1,6 @@
 using MiniCore.Threading;
 using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
@@ -25,7 +26,15 @@ namespace MiniCore.HotUpdate
                 : $"对端请求断开，会话:{session.SessionId}{reason}";
 
             LogSwitch.Info(text);
-            EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
+            IApplicationEventBus eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
+            try
+            {
+                eventBus.Publish(new DemoMessageReceivedEvent(session.SessionId, text));
+            }
+            finally
+            {
+                Global.ReleaseAll(this);
+            }
 
             INetworkService networkMessageComponent = Global.GetService<INetworkService>(this);
             try

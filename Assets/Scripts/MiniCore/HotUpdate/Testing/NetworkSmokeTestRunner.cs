@@ -1,6 +1,7 @@
 using System;
 using MiniCore.Threading;
 using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
@@ -28,6 +29,8 @@ namespace MiniCore.HotUpdate
 
         private readonly MTaskCompletionSource<bool> completionSource = new MTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
         private INetworkService network; // 已由客户端入口初始化并注册 Handler 的网络服务。
+        private IApplicationEventBus eventBus; // 强类型应用事件频道。
+        private EventSubscription networkMessageSubscription; // 业务网络消息订阅 token。
         private GUIStyle statusStyle; // Player 屏幕状态文本样式缓存。
         private bool heldNetworkReference; // 当前对象是否持有网络组件引用。
         private bool subscribedToNetworkEvents; // 是否已订阅业务网络事件。
@@ -168,7 +171,8 @@ namespace MiniCore.HotUpdate
                 network.OnServerSessionCreated += HandleServerSessionCreated;
                 network.OnServerSessionClosed += HandleServerSessionClosed;
                 subscribedToSessionEvents = true;
-                EventCenter.AddListener<string>(HotEvent.KcpTestMessage, HandleNetworkEvent);
+                eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
+                networkMessageSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(HandleNetworkEvent);
                 subscribedToNetworkEvents = true;
 
                 await RunTcpAsync();
@@ -345,10 +349,10 @@ namespace MiniCore.HotUpdate
         /// <summary>
         /// 保存业务 Handler 广播的最近一条网络事件文本。
         /// </summary>
-        /// <param name="message">业务 Handler 广播的事件内容。</param>
-        private void HandleNetworkEvent(string message)
+        /// <param name="@event">业务 Handler 广播的强类型事件。</param>
+        private void HandleNetworkEvent(DemoMessageReceivedEvent @event)
         {
-            lastNetworkEvent = message;
+            lastNetworkEvent = @event.Message;
         }
 
         /// <summary>
@@ -395,7 +399,7 @@ namespace MiniCore.HotUpdate
 
                 if (subscribedToNetworkEvents)
                 {
-                    EventCenter.RemoveListener<string>(HotEvent.KcpTestMessage, HandleNetworkEvent);
+                    networkMessageSubscription.Dispose();
                     subscribedToNetworkEvents = false;
                 }
 
@@ -414,6 +418,7 @@ namespace MiniCore.HotUpdate
             }
 
             network = null;
+            eventBus = null;
         }
 
         #endregion

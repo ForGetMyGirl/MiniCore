@@ -61,7 +61,6 @@ namespace MiniCore.Model
                 return;
             }
 
-            EventCenter.Broadcast(GameEvent.LogInfo, message);
             sink?.Info(message);
         }
 
@@ -77,7 +76,6 @@ namespace MiniCore.Model
                 return;
             }
 
-            EventCenter.Broadcast(GameEvent.LogWarning, message);
             sink?.Warning(message);
         }
 
@@ -93,7 +91,6 @@ namespace MiniCore.Model
                 return;
             }
 
-            EventCenter.Broadcast(GameEvent.LogError, message);
             sink?.Error(message);
         }
 

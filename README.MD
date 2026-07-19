@@ -125,6 +125,7 @@ HotUpdateScene
 | --- | --- |
 | AppService、参数配置、能力目录、`GameStartup` 如何编写 | [项目启动与服务配置](Docs/StartupModules.md) |
 | `MTask`、自动取消、Owner 任务域、执行器与快速退出 | [MTask 结构化异步](Docs/MTask.md) |
+| 强类型事件、应用/局部频道、订阅生命周期与编辑器诊断 | [强类型事件中心](Docs/Eventing.md) |
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |

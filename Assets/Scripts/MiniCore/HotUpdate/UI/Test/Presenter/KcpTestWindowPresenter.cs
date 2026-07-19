@@ -2,6 +2,7 @@
 using MiniCore.Threading;
 using MiniCore;
 using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
@@ -20,12 +21,15 @@ namespace MiniCore.HotUpdate
         private bool serverRunning;
         private bool localJoined;
         private INetworkService net;
+        private IApplicationEventBus eventBus;
         private Action clientDisconnectedHandler;
+        private EventSubscription messageSubscription;
 
         protected override void OnBind()
         {
             net = Global.GetService<INetworkService>(this);
-            EventCenter.AddListener<string>(HotEvent.KcpTestMessage, OnKcpTestMessage);
+            eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
+            messageSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(OnDemoMessageReceived);
             View.OnStartServerClicked += StartServer;
             View.OnStopServerClicked += () => StopServerAsync().Forget();
             View.OnConnectClientClicked += ConnectClient;
@@ -42,7 +46,8 @@ namespace MiniCore.HotUpdate
 
         public override void UnbindView()
         {
-            EventCenter.RemoveListener<string>(HotEvent.KcpTestMessage, OnKcpTestMessage);
+            messageSubscription.Dispose();
+            eventBus = null;
 
             if (net != null)
             {
@@ -63,6 +68,15 @@ namespace MiniCore.HotUpdate
         private void StartServer()
         {
             StartServerAsync().Forget();
+        }
+
+        /// <summary>
+        /// 将强类型示例网络事件转发为窗口既有的文本展示逻辑。
+        /// </summary>
+        /// <param name="@event">包含格式化网络文本的业务事件。</param>
+        private void OnDemoMessageReceived(DemoMessageReceivedEvent @event)
+        {
+            OnKcpTestMessage(@event.Message);
         }
 
         private async MTask StartServerAsync()

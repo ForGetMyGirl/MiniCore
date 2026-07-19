@@ -1,6 +1,9 @@
 using MiniCore.Threading;
+using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
+using MiniCore.Service;
 
 namespace MiniCore.HotUpdate
 {
@@ -20,7 +23,15 @@ namespace MiniCore.HotUpdate
         {
             string text = $"收到RPC请求，会话:{session.SessionId} 内容:{request.Payload}";
             LogSwitch.Info(text);
-            EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
+            IApplicationEventBus eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
+            try
+            {
+                eventBus.Publish(new DemoMessageReceivedEvent(session.SessionId, text));
+            }
+            finally
+            {
+                Global.ReleaseAll(this);
+            }
 
             response.Code = 0;
             response.Msg = "RPC响应成功";

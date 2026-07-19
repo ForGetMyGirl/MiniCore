@@ -127,7 +127,7 @@ public class UpdateMainWindow : AMTaskBehaviour
         if (versionOpeartion.Status == EOperationStatus.Succeed)
         {
             string remoteVersion = versionOpeartion.PackageVersion;
-            EventCenter.Broadcast(GameEvent.LogInfo, $"获取最新包版本成功：{remoteVersion}");
+            LogSwitch.Info($"获取最新包版本成功：{remoteVersion}");
             // 更新清单
             await UpdatePackageManifestAsync(remoteVersion);
         }
@@ -148,7 +148,7 @@ public class UpdateMainWindow : AMTaskBehaviour
         await updateOperation.ToMTask();
         if (updateOperation.Status == EOperationStatus.Succeed)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "更新清单成功");
+            LogSwitch.Info("更新清单成功");
         }
         else
         {
@@ -165,7 +165,7 @@ public class UpdateMainWindow : AMTaskBehaviour
         var downloader = package.CreateResourceDownloader(downloadMaxNum, failedTryAgain);
         if (downloader.TotalDownloadCount == 0)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "已是最新版本，无需下载。");
+            LogSwitch.Info("已是最新版本，无需下载。");
             return;
         }
 
@@ -181,7 +181,7 @@ public class UpdateMainWindow : AMTaskBehaviour
 
         if (downloader.Status == EOperationStatus.Succeed)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "资源下载完成");
+            LogSwitch.Info("资源下载完成");
         }
         else
         {
@@ -204,7 +204,7 @@ public class UpdateMainWindow : AMTaskBehaviour
     /// <param name="data">当前下载进度信息。</param>
     private void OnDownloadUpdate(DownloadUpdateData data)
     {
-        EventCenter.Broadcast(GameEvent.LogInfo, $"下载进度 {data.CurrentDownloadBytes}/{totalBytes}");
+        LogSwitch.Info($"下载进度 {data.CurrentDownloadBytes}/{totalBytes}");
         SetPromptInfo($"正在下载资源...({data.CurrentDownloadBytes}/{totalBytes} bytes)");
     }
 
@@ -269,7 +269,7 @@ public class UpdateMainWindow : AMTaskBehaviour
         await initOperation.ToMTask();
         if (initOperation.Status == EOperationStatus.Succeed)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
+            LogSwitch.Info("初始化成功");
         }
         else
         {
@@ -292,7 +292,7 @@ public class UpdateMainWindow : AMTaskBehaviour
         await initOperation.ToMTask();
         if (initOperation.Status == EOperationStatus.Succeed)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
+            LogSwitch.Info("初始化成功");
         }
         else
         {
@@ -319,7 +319,7 @@ public class UpdateMainWindow : AMTaskBehaviour
 
         if (initOperation.Status == EOperationStatus.Succeed)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
+            LogSwitch.Info("初始化成功");
         }
         else
         {
@@ -345,7 +345,7 @@ public class UpdateMainWindow : AMTaskBehaviour
         await initOperation.ToMTask();
         if (initOperation.Status == EOperationStatus.Succeed)
         {
-            EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
+            LogSwitch.Info("初始化成功");
         }
         else
         {
