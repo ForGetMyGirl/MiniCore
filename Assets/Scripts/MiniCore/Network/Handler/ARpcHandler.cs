@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 
 namespace MiniCore.Model
@@ -33,7 +33,7 @@ namespace MiniCore.Model
         /// <param name="request">执行该方法所需的 request 参数。</param>
         /// <param name="response">执行该方法所需的 response 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public abstract UniTask HandleAsync(NetworkSession session, TRequest request, TResponse response);
+        public abstract MTask HandleAsync(NetworkSession session, TRequest request, TResponse response);
 
         Type INetworkRpcHandlerInvoker.RequestType => typeof(TRequest);
 
@@ -44,7 +44,7 @@ namespace MiniCore.Model
             return new TResponse();
         }
 
-        UniTask INetworkRpcHandlerInvoker.HandleAsync(NetworkSession session, IRpcRequest request, IRpcResponse response)
+        MTask INetworkRpcHandlerInvoker.HandleAsync(NetworkSession session, IRpcRequest request, IRpcResponse response)
         {
             if (!(request is TRequest typedRequest))
             {

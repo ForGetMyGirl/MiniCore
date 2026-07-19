@@ -17,6 +17,8 @@ namespace MiniCore.Core
         private readonly object rootOwner = new object(); // 常驻组件的内部 owner。
         private readonly Dictionary<Type, ComponentEntry> entries = new Dictionary<Type, ComponentEntry>(); // 按组件类型保存的生命周期条目。
         private readonly Dictionary<ComponentKey, ComponentEntry> groupEntries = new Dictionary<ComponentKey, ComponentEntry>(); // 按类型和分组保存的多实例组件条目。
+        private readonly Dictionary<Type, ComponentEntry> disposingEntries = new Dictionary<Type, ComponentEntry>(); // 仍在等待异步退场的默认组件墓碑。
+        private readonly Dictionary<ComponentKey, ComponentEntry> disposingGroupEntries = new Dictionary<ComponentKey, ComponentEntry>(); // 仍在等待异步退场的分组组件墓碑。
         private readonly List<ComponentKey> releaseGroupKeys = new List<ComponentKey>(); // 分组组件释放时复用的键快照。
         private readonly List<ComponentKey> destroyGroupKeys = new List<ComponentKey>(); // 销毁指定分组时复用的键快照。
         private readonly List<Type> releaseTypes = new List<Type>(); // ReleaseAll 的复用快照。
@@ -178,8 +180,7 @@ namespace MiniCore.Core
                         LogSwitch.Warning($"销毁组件分组时仍存在 owner 引用：{key.ComponentType.FullName} group:{groupId} owners:{entry.DescribeOwners(rootOwner)}");
                     }
 #endif
-                    groupEntries.Remove(key);
-                    DisposeEntry(entry);
+                    BeginGroupDisposal(key, entry);
                 }
             }
 
@@ -259,7 +260,11 @@ namespace MiniCore.Core
         internal void ReleaseAll(object owner)
         {
             EnsureThread();
-            ValidateOwner(owner);
+            if (owner == null)
+            {
+                throw new ArgumentNullException(nameof(owner));
+            }
+
             releaseTypes.Clear();
             releaseGroupKeys.Clear();
             foreach (KeyValuePair<Type, ComponentEntry> pair in entries)
@@ -295,8 +300,7 @@ namespace MiniCore.Core
                     entry.RemoveAllReferences(owner);
                     if (entry.ReferenceCount <= 0)
                     {
-                        groupEntries.Remove(key);
-                        DisposeEntry(entry);
+                        BeginGroupDisposal(key, entry);
                     }
                 }
             }
@@ -318,8 +322,7 @@ namespace MiniCore.Core
                 return;
             }
 
-            entries.Remove(componentType);
-            DisposeEntry(entry);
+            BeginDefaultDisposal(componentType, entry);
         }
 
         /// <summary>
@@ -404,6 +407,11 @@ namespace MiniCore.Core
             EnsureAvailable();
             ValidateOwner(owner);
             Type componentType = typeof(T);
+            if (disposingEntries.ContainsKey(componentType))
+            {
+                throw new InvalidOperationException($"组件 {componentType.FullName} 正在等待异步任务退场，暂不能创建替代实例。");
+            }
+
             if (entries.TryGetValue(componentType, out ComponentEntry entry))
             {
                 T existing = entry.Component as T;
@@ -415,11 +423,11 @@ namespace MiniCore.Core
             T component = new T();
             if (args == null)
             {
-                component.Awake();
+                component.InvokeAwake();
             }
             else
             {
-                component.Awake(args);
+                component.InvokeAwake(args);
             }
 
             if (component.IsDisposed)
@@ -452,6 +460,11 @@ namespace MiniCore.Core
             EnsureAvailable();
             ValidateOwner(owner);
             ComponentKey key = new ComponentKey(typeof(T), groupId);
+            if (disposingGroupEntries.ContainsKey(key))
+            {
+                throw new InvalidOperationException($"分组组件 {typeof(T).FullName} group:{groupId} 正在等待异步任务退场。");
+            }
+
             if (groupEntries.TryGetValue(key, out ComponentEntry entry))
             {
                 T existing = entry.Component as T;
@@ -464,11 +477,11 @@ namespace MiniCore.Core
             component.SetGroupId(groupId);
             if (args == null)
             {
-                component.Awake();
+                component.InvokeAwake();
             }
             else
             {
-                component.Awake(args);
+                component.InvokeAwake(args);
             }
 
             if (component.IsDisposed)
@@ -522,10 +535,65 @@ namespace MiniCore.Core
 
             if (entries.TryGetValue(componentType, out ComponentEntry current) && ReferenceEquals(current, entry))
             {
+                BeginDefaultDisposal(componentType, entry);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// 将默认组件从可用表转入释放墓碑，并启动两阶段释放。
+        /// </summary>
+        /// <param name="componentType">组件具体类型。</param>
+        /// <param name="entry">组件生命周期条目。</param>
+        private void BeginDefaultDisposal(Type componentType, ComponentEntry entry)
+        {
+            if (entries.TryGetValue(componentType, out ComponentEntry current) && ReferenceEquals(current, entry))
+            {
                 entries.Remove(componentType);
             }
 
+            disposingEntries[componentType] = entry;
+            entry.BeginDisposal(this, componentType);
             DisposeEntry(entry);
+        }
+
+        /// <summary>
+        /// 将分组组件从可用表转入释放墓碑，并启动两阶段释放。
+        /// </summary>
+        /// <param name="key">分组组件键。</param>
+        /// <param name="entry">组件生命周期条目。</param>
+        private void BeginGroupDisposal(ComponentKey key, ComponentEntry entry)
+        {
+            if (groupEntries.TryGetValue(key, out ComponentEntry current) && ReferenceEquals(current, entry))
+            {
+                groupEntries.Remove(key);
+            }
+
+            disposingGroupEntries[key] = entry;
+            entry.BeginDisposal(this, key);
+            DisposeEntry(entry);
+        }
+
+        /// <summary>
+        /// 在组件完成两阶段释放后移除对应墓碑。
+        /// </summary>
+        /// <param name="entry">已完成释放的条目。</param>
+        private void CompleteDisposal(ComponentEntry entry)
+        {
+            if (entry.IsGrouped)
+            {
+                if (disposingGroupEntries.TryGetValue(entry.DisposalKey, out ComponentEntry current) && ReferenceEquals(current, entry))
+                {
+                    disposingGroupEntries.Remove(entry.DisposalKey);
+                }
+
+                return;
+            }
+
+            if (disposingEntries.TryGetValue(entry.DisposalType, out ComponentEntry defaultCurrent) && ReferenceEquals(defaultCurrent, entry))
+            {
+                disposingEntries.Remove(entry.DisposalType);
+            }
         }
 
         /// <summary>
@@ -564,7 +632,7 @@ namespace MiniCore.Core
                 throw new ArgumentNullException(nameof(owner), "Global 组件引用必须提供 owner。");
             }
 
-            if (owner is AComponent component && component.IsDisposed)
+            if (owner is AComponent component && (component.IsDisposed || component.IsDisposing))
             {
                 throw new ObjectDisposedException(owner.GetType().FullName, "已释放组件不能继续持有 Global 组件。");
             }
@@ -577,7 +645,7 @@ namespace MiniCore.Core
         /// <param name="component">组件实例。</param>
         private static void EnsureUsable(Type componentType, AComponent component)
         {
-            if (component == null || component.IsDisposed || !component.IsActive)
+            if (component == null || component.IsDisposed || component.IsDisposing || !component.IsActive)
             {
                 throw new InvalidOperationException($"全局组件 {componentType.FullName} 已失效。");
             }
@@ -678,6 +746,8 @@ namespace MiniCore.Core
             #region Private 私有成员
 
             private readonly Dictionary<object, int> ownerReferences = new Dictionary<object, int>(OwnerComparer); // owner 到引用次数的映射。
+            private Action disposalCompletedAction; // 组件完成两阶段释放后的稳定回调。
+            private GlobalRuntime disposalRuntime; // 当前释放墓碑所属运行时。
 
             #endregion
 
@@ -694,12 +764,57 @@ namespace MiniCore.Core
             public int ReferenceCount { get; private set; }
 
             /// <summary>
+            /// 获取当前释放墓碑是否属于非默认分组。
+            /// </summary>
+            public bool IsGrouped { get; private set; }
+
+            /// <summary>
+            /// 获取默认组件释放墓碑的具体类型。
+            /// </summary>
+            public Type DisposalType { get; private set; }
+
+            /// <summary>
+            /// 获取分组组件释放墓碑的组合键。
+            /// </summary>
+            public ComponentKey DisposalKey { get; private set; }
+
+            /// <summary>
             /// 使用组件创建生命周期条目。
             /// </summary>
             /// <param name="component">要管理的组件。</param>
             public ComponentEntry(AComponent component)
             {
                 Component = component;
+            }
+
+            /// <summary>
+            /// 将条目标记为默认组件释放墓碑并注册完成通知。
+            /// </summary>
+            /// <param name="runtime">管理当前条目的 Global 运行时。</param>
+            /// <param name="componentType">组件具体类型。</param>
+            public void BeginDisposal(GlobalRuntime runtime, Type componentType)
+            {
+                disposalRuntime = runtime;
+                DisposalType = componentType;
+                DisposalKey = default;
+                IsGrouped = false;
+                disposalCompletedAction ??= OnDisposalCompleted;
+                Component.RegisterDisposed(disposalCompletedAction);
+            }
+
+            /// <summary>
+            /// 将条目标记为分组组件释放墓碑并注册完成通知。
+            /// </summary>
+            /// <param name="runtime">管理当前条目的 Global 运行时。</param>
+            /// <param name="key">分组组件键。</param>
+            public void BeginDisposal(GlobalRuntime runtime, ComponentKey key)
+            {
+                disposalRuntime = runtime;
+                DisposalType = null;
+                DisposalKey = key;
+                IsGrouped = true;
+                disposalCompletedAction ??= OnDisposalCompleted;
+                Component.RegisterDisposed(disposalCompletedAction);
             }
 
             /// <summary>
@@ -789,6 +904,20 @@ namespace MiniCore.Core
             {
                 ownerReferences.Clear();
                 ReferenceCount = 0;
+            }
+
+            #endregion
+
+            #region Private 私有成员
+
+            /// <summary>
+            /// 通知 GlobalRuntime 移除已经完成释放的墓碑。
+            /// </summary>
+            private void OnDisposalCompleted()
+            {
+                GlobalRuntime runtime = disposalRuntime;
+                disposalRuntime = null;
+                runtime?.CompleteDisposal(this);
             }
 
             #endregion

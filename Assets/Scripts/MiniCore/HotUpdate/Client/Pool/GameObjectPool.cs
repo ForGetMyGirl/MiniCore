@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using MiniCore.Model;
 using MiniCore.Service;
 using System;
@@ -63,7 +63,7 @@ namespace MiniCore.Core
         /// <param name="path">对象加载的路径</param>
         /// <param name="parent">新对象的父节点。</param>
         /// <returns>已初始化并进入使用中列表的池对象。</returns>
-        public async UniTask<IPoolObject> CreateObjectAsync(string path, Transform parent = null)
+        public async MTask<IPoolObject> CreateObjectAsync(string path, Transform parent = null)
         {
             IAssetService assetService = Global.GetService<IAssetService>(this);
             try

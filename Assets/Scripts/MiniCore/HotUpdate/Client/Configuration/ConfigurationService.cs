@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using Google.Protobuf;
 using MiniCore.Model;
 using Newtonsoft.Json;
@@ -37,7 +37,7 @@ namespace MiniCore.Service
         /// <param name="storageKey">逻辑存储键，用于格式互斥校验。</param>
         /// <param name="resourcePath">Resources 下的 TextAsset 路径。</param>
         /// <returns>反序列化后的配置对象。</returns>
-        UniTask<T> LoadJsonAsync<T>(string storageKey, string resourcePath);
+        MTask<T> LoadJsonAsync<T>(string storageKey, string resourcePath);
 
         /// <summary>
         /// 从 Resources 加载并反序列化 Protobuf 配置。
@@ -47,7 +47,7 @@ namespace MiniCore.Service
         /// <param name="resourcePath">Resources 下的 TextAsset 路径。</param>
         /// <param name="parser">目标消息解析器。</param>
         /// <returns>反序列化后的 Protobuf 消息。</returns>
-        UniTask<T> LoadProtobufAsync<T>(string storageKey, string resourcePath, MessageParser<T> parser) where T : IMessage<T>;
+        MTask<T> LoadProtobufAsync<T>(string storageKey, string resourcePath, MessageParser<T> parser) where T : IMessage<T>;
 
         /// <summary>
         /// 清除一个逻辑存储键的格式占用与缓存约束。
@@ -78,11 +78,11 @@ namespace MiniCore.Service
         /// <param name="storageKey">逻辑存储键。</param>
         /// <param name="resourcePath">Resources 文本资源路径。</param>
         /// <returns>反序列化后的配置对象。</returns>
-        public UniTask<T> LoadJsonAsync<T>(string storageKey, string resourcePath)
+        public MTask<T> LoadJsonAsync<T>(string storageKey, string resourcePath)
         {
             EnsureFormat(storageKey, ConfigurationFormat.Json);
             TextAsset asset = LoadAsset(resourcePath);
-            return UniTask.FromResult(JsonConvert.DeserializeObject<T>(asset.text));
+            return MTask.FromResult(JsonConvert.DeserializeObject<T>(asset.text));
         }
 
         /// <summary>
@@ -93,7 +93,7 @@ namespace MiniCore.Service
         /// <param name="resourcePath">Resources 二进制文本资源路径。</param>
         /// <param name="parser">目标消息解析器。</param>
         /// <returns>反序列化后的 Protobuf 消息。</returns>
-        public UniTask<T> LoadProtobufAsync<T>(string storageKey, string resourcePath, MessageParser<T> parser) where T : IMessage<T>
+        public MTask<T> LoadProtobufAsync<T>(string storageKey, string resourcePath, MessageParser<T> parser) where T : IMessage<T>
         {
             if (parser == null)
             {
@@ -102,7 +102,7 @@ namespace MiniCore.Service
 
             EnsureFormat(storageKey, ConfigurationFormat.Protobuf);
             TextAsset asset = LoadAsset(resourcePath);
-            return UniTask.FromResult(parser.ParseFrom(asset.bytes));
+            return MTask.FromResult(parser.ParseFrom(asset.bytes));
         }
 
         /// <summary>
@@ -124,10 +124,9 @@ namespace MiniCore.Service
         /// <summary>
         /// 清理全部运行期格式锁定。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             formats.Clear();
-            base.Dispose();
         }
 
         #endregion

@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using MiniCore.Model;
 using MiniCore.Service;
 using System;
@@ -55,7 +55,7 @@ namespace MiniCore.Core
         /// <typeparam name="T">Csv对应的字段类型组成的类</typeparam>
         /// <param name="path">配置文件所在的Addressable路径</param>
         /// <returns>返回CsvTable<T>类型的对象</returns>
-        public static async UniTask<CsvTable<T>> LoadCsvFileAsync<T>(string path) where T : ICsvTable, new()
+        public static async MTask<CsvTable<T>> LoadCsvFileAsync<T>(string path) where T : ICsvTable, new()
         {
             IAssetService assetService = Global.GetService<IAssetService>(assetsOwner);
             try

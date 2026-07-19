@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Model;
 using NUnit.Framework;
 
@@ -41,10 +41,10 @@ namespace MiniCore.EditorTests
             public TestMessage ReceivedMessage { get; private set; }
 
             /// <summary>记录测试消息以验证无反射派发结果。</summary>
-            public override UniTask HandleAsync(NetworkSession session, TestMessage message)
+            public override MTask HandleAsync(NetworkSession session, TestMessage message)
             {
                 ReceivedMessage = message;
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
         }
 
@@ -54,12 +54,12 @@ namespace MiniCore.EditorTests
             public TestRequest ReceivedRequest { get; private set; }
 
             /// <summary>记录请求并填充测试响应。</summary>
-            public override UniTask HandleAsync(NetworkSession session, TestRequest request, TestResponse response)
+            public override MTask HandleAsync(NetworkSession session, TestRequest request, TestResponse response)
             {
                 ReceivedRequest = request;
                 response.RpcId = request.RpcId;
                 response.Msg = "handled";
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
         }
 

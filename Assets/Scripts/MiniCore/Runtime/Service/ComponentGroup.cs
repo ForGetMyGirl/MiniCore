@@ -1,6 +1,7 @@
 using System;
 using MiniCore.Core;
 using MiniCore.Service;
+using MiniCore.Threading;
 
 namespace MiniCore.Model
 {
@@ -108,11 +109,12 @@ namespace MiniCore.Model
     /// 一组具有共同业务身份的 Global 组件。
     /// 销毁分组会强制释放组内全部组件，用于房间、副本和对局等明确边界。
     /// </summary>
-    public sealed class ComponentGroup : IDisposable
+    public sealed class ComponentGroup : IDisposable, IMTaskOwner
     {
         #region Private 私有成员
 
         private bool disposed; // 当前分组是否已经销毁。
+        private MTaskDomain mTaskDomain; // 首次绑定异步入口时惰性创建的任务域。
 
         #endregion
 
@@ -184,7 +186,18 @@ namespace MiniCore.Model
             }
 
             disposed = true;
+            mTaskDomain?.Dispose();
             Global.DestroyGroup(Id, Name);
+        }
+
+        /// <summary>
+        /// 获取当前组件分组惰性创建的 MTask 生命周期域。
+        /// </summary>
+        /// <returns>与当前分组一同释放的任务域。</returns>
+        public MTaskDomain GetMTaskDomain()
+        {
+            ThrowIfDisposed();
+            return mTaskDomain ??= new MTaskDomain($"ComponentGroup:{Name}:{Id}", MTaskRuntime.CurrentExecutor ?? MTaskExecutors.Unity);
         }
 
         #endregion

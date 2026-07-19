@@ -31,7 +31,6 @@ namespace MiniCore.Bootstrap
             "MiniCore.Unity.dll",
             "Newtonsoft.Json.dll",
             "System.Core.dll",
-            "UniTask.dll",
             "UnityEngine.CoreModule.dll",
             "YooAsset.dll",
             "mscorlib.dll",

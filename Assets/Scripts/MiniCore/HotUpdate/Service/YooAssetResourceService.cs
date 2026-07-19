@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Model;
+using MiniCore.Unity;
 using UnityEngine;
 using YooAsset;
 
@@ -29,7 +30,7 @@ namespace MiniCore.Service
         /// <param name="key">资源地址或资源键。</param>
         /// <param name="parent">实例化对象的父节点。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        public async UniTask<GameObject> InstantiateAsync(string key, Transform parent = null)
+        public async MTask<GameObject> InstantiateAsync(string key, Transform parent = null)
         {
             if (!loadedAssets.ContainsKey(key))
             {
@@ -46,10 +47,10 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>加载完成的资源对象。</returns>
-        public async UniTask<T> LoadAssetAsync<T>(string key) where T : Object
+        public async MTask<T> LoadAssetAsync<T>(string key) where T : Object
         {
             AssetHandle handle = package.LoadAssetAsync<T>(key);
-            await handle.Task;
+            await handle.ToMTask();
             return handle.AssetObject as T;
         }
 
@@ -60,12 +61,12 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>预加载完成的资源对象。</returns>
-        public async UniTask<T> PreloadAssetAsync<T>(string key) where T : Object
+        public async MTask<T> PreloadAssetAsync<T>(string key) where T : Object
         {
             if (!loadedAssets.TryGetValue(key, out AssetHandle handle))
             {
                 handle = package.LoadAssetAsync<T>(key);
-                await handle.Task;
+                await handle.ToMTask();
                 loadedAssets.Add(key, handle);
             }
 
@@ -108,7 +109,7 @@ namespace MiniCore.Service
         /// 释放服务缓存的预加载资源句柄。
         /// 该方法由租约归零或 Global 销毁触发，避免资源服务卸载后残留句柄。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             foreach (AssetHandle handle in loadedAssets.Values)
             {
@@ -116,7 +117,6 @@ namespace MiniCore.Service
             }
 
             loadedAssets.Clear();
-            base.Dispose();
         }
 
         /// <summary>

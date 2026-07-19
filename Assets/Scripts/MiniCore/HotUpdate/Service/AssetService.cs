@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 using UnityEngine;
@@ -39,11 +39,9 @@ namespace MiniCore.Service
         /// <summary>
         /// 释放当前服务持有的全局服务引用与预加载缓存。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             preloadAssets.Clear();
-            Global.ReleaseAll(this);
-            base.Dispose();
         }
 
         #endregion
@@ -56,7 +54,7 @@ namespace MiniCore.Service
         /// <param name="key">资源地址或资源键。</param>
         /// <param name="parent">实例化对象的父节点。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        public UniTask<GameObject> InstantiateAsync(string key, Transform parent = null)
+        public MTask<GameObject> InstantiateAsync(string key, Transform parent = null)
         {
             return ResourceService.InstantiateAsync(key, parent);
         }
@@ -67,14 +65,14 @@ namespace MiniCore.Service
         /// <param name="key">预加载资源键。</param>
         /// <param name="parent">实例化对象的父节点。</param>
         /// <returns>资源已预加载时返回实例化对象；否则返回 null。</returns>
-        public UniTask<GameObject> InstantiatePreloadAssetAsync(string key, Transform parent)
+        public MTask<GameObject> InstantiatePreloadAssetAsync(string key, Transform parent)
         {
             if (preloadAssets.TryGetValue(key, out Object _))
             {
                 return ResourceService.InstantiateAsync(key, parent);
             }
 
-            return UniTask.FromResult<GameObject>(null);
+            return MTask.FromResult<GameObject>(null);
         }
 
         /// <summary>
@@ -83,7 +81,7 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>预加载完成的资源对象。</returns>
-        public async UniTask<T> PreloadAssetAsync<T>(string key) where T : Object
+        public async MTask<T> PreloadAssetAsync<T>(string key) where T : Object
         {
             T asset = await ResourceService.PreloadAssetAsync<T>(key);
             preloadAssets[key] = asset;
@@ -95,7 +93,7 @@ namespace MiniCore.Service
         /// </summary>
         /// <param name="key">UI 资源地址或资源键。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        public UniTask<GameObject> InstantiateTopUIAsync(string key)
+        public MTask<GameObject> InstantiateTopUIAsync(string key)
         {
             return ResourceService.InstantiateAsync(key, SceneBindings.TopCanvas);
         }
@@ -106,7 +104,7 @@ namespace MiniCore.Service
         /// </summary>
         /// <param name="key">UI 资源地址或资源键。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        public UniTask<GameObject> InstantiateMainUIAsync(string key)
+        public MTask<GameObject> InstantiateMainUIAsync(string key)
         {
             return ResourceService.InstantiateAsync(key, SceneBindings.MainCanvas);
         }
@@ -116,7 +114,7 @@ namespace MiniCore.Service
         /// </summary>
         /// <param name="key">UI 资源地址或资源键。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        public UniTask<GameObject> InstantiateBottomUIAsync(string key)
+        public MTask<GameObject> InstantiateBottomUIAsync(string key)
         {
             return ResourceService.InstantiateAsync(key, SceneBindings.BottomCanvas);
         }
@@ -126,7 +124,7 @@ namespace MiniCore.Service
         /// </summary>
         /// <param name="key">图集资源地址或资源键。</param>
         /// <returns>加载完成的图集。</returns>
-        public UniTask<SpriteAtlas> LoadSpriteAtlasAsync(string key)
+        public MTask<SpriteAtlas> LoadSpriteAtlasAsync(string key)
         {
             return ResourceService.LoadAssetAsync<SpriteAtlas>(key);
         }
@@ -137,7 +135,7 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>加载完成的资源对象。</returns>
-        public UniTask<T> LoadAssetAsync<T>(string key) where T : Object
+        public MTask<T> LoadAssetAsync<T>(string key) where T : Object
         {
             return ResourceService.LoadAssetAsync<T>(key);
         }

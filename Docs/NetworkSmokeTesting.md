@@ -47,3 +47,9 @@
 ```
 
 通过时 Client 输出 `DEDICATED_CLIENT_SMOKE: PASS protocol:KCP` 并以退出码 `0` 结束；Server 输出 READY，且事件日志包含 `[dedicated-smoke] normal`、`[dedicated-smoke] rpc` 与 `[dedicated-smoke] close`。结束服务端时在终端 A 按 `Ctrl+C`。
+
+## 退出与清理检查
+
+运行期正常关闭网络服务时，`OnDisposing()` 应先关闭监听器、Socket 与会话，随后由 MTask 取消并等待 finally 退场；这是检测资源没有遗留的路径。关闭 Player、按 `Ctrl+C` 结束 Dedicated Server 或停止 Editor Play Mode 则采用 MTask 快速退出：主线程不会等待网络专用线程 Join，也不保证未完成收发全部执行完。
+
+Development/Editor 退出日志可能记录当时仍在退场的任务和计时器数量；这是非阻塞退出的诊断快照，不会单独造成运行期泄露。若同一网络流程在正常服务释放后仍持续出现活动任务/计时器，才应检查 Socket 是否在 `OnDisposing()` 关闭、任务是否遗漏 `.Forget()` 监督或外部回调是否未解绑。

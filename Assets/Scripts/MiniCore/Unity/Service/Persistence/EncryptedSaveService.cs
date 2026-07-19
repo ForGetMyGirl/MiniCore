@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 using Newtonsoft.Json;
@@ -70,9 +71,8 @@ namespace MiniCore.Service
         /// <summary>
         /// 释放当前服务持有的引用并清除内存中的主密钥。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
-            Global.ReleaseAll(this);
             if (masterKey != null)
             {
                 Array.Clear(masterKey, 0, masterKey.Length);
@@ -81,7 +81,6 @@ namespace MiniCore.Service
 
             storagePathService = null;
             telemetry = null;
-            base.Dispose();
         }
 
         #endregion
@@ -94,10 +93,10 @@ namespace MiniCore.Service
         /// <typeparam name="T">待保存对象类型。</typeparam>
         /// <param name="slotName">逻辑存档槽位名称。</param>
         /// <param name="data">待保存对象。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>保存完成任务。</returns>
-        public async Task SaveAsync<T>(string slotName, T data, CancellationToken token = default)
+        public async MTask SaveAsync<T>(string slotName, T data)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             token.ThrowIfCancellationRequested();
             string path = GetSlotPath(slotName);
             byte[] payload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
@@ -121,10 +120,10 @@ namespace MiniCore.Service
         /// </summary>
         /// <typeparam name="T">目标对象类型。</typeparam>
         /// <param name="slotName">逻辑存档槽位名称。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>槽位不存在时返回空；否则返回存档对象。</returns>
-        public async Task<T> LoadAsync<T>(string slotName, CancellationToken token = default) where T : class
+        public async MTask<T> LoadAsync<T>(string slotName) where T : class
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             string path = GetSlotPath(slotName);
             if (!File.Exists(path))
             {

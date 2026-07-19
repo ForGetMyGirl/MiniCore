@@ -1,5 +1,5 @@
 using System;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -97,15 +97,15 @@ namespace MiniCore.HotUpdate
             return string.IsNullOrWhiteSpace(text) ? fallback : text.Trim();
         }
 
-        public override UniTask OpenAsync()
+        protected override MTask OnOpenAsync()
         {
             gameObject.SetActive(true);
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
 
-        public override UniTask CloseAsync()
+        protected override MTask OnCloseAsync()
         {
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
     }
 }

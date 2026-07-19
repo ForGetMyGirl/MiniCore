@@ -88,6 +88,14 @@ BenchmarkPerformance/History/20260714_224500_123/
 
 历史窗口支持“删除此记录”“删除当前筛选结果”和“清空全部历史”，每种删除都需要二次确认。它们只删除 `BenchmarkPerformance/History` 内的自动归档目录，不会删除 `BenchmarkPerformance` 根目录的手动 CSV 文件。
 
+## MTask 稳态分配与执行器基线
+
+MTask 的功能回归测试位于 `Assets/Tests/Editor/MTaskTests.cs`，覆盖单次消费、共享等待、父子取消、`.Forget()` 监督、组件两阶段释放、执行器切换及快速退出。它验证语义，不替代 Unity Profiler 的分配验收。
+
+新增或修改 MTask、执行器、Owner 注入或网络线程交接时，应在预热后分别测量 `CompletedTask`、同步 `await`、`Yield`、`Delay`、`MTaskCompletionSource`、父子挂接、主线程投递和 Unity → 专用执行器 → Unity 往返。成功路径的目标是 `0 B GC Alloc`；跨线程场景必须同时查看创建线程与执行器线程，不能把分配隐藏到后台线程。
+
+首次遇到某个 async 状态机类型、对象池扩容、异常、`.Share()` 共享状态，以及 BCL/第三方内部 `Task` 的分配必须单独记录，不可混入稳态成功路径。压测、场景反复进入退出和网络重连后，使用 `MTaskDiagnostics.Capture()` 对比 `ActiveNodes`、`ActiveTimers`、池命中、扩容和回收失败计数是否回到基线。应用快速退出只记录快照而不等待收敛；泄露判断应以运行期正常 Owner 释放后的稳定计数为准。
+
 ## 第二项测试：Protobuf 正式路径与 JSON 对比基线
 
 `NetworkService` 在未显式设置 serializer 时默认使用 `ProtobufSerializer`，这是当前正式网络路径。`NewtonsoftJsonSerializer` 仅保留为迁移和性能对比实现；JSON 测试不代表当前客户端或 Dedicated Server 的默认配置。

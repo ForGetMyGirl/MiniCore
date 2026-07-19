@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using MiniCore.Core;
+using MiniCore.Threading;
 
 namespace MiniCore.Model
 {
@@ -7,12 +9,19 @@ namespace MiniCore.Model
     /// 非 Unity 组件的基础实现。
     /// 负责管理子组件生命周期，并为 Global 等容器提供统一的初始化和更新入口。
     /// </summary>
-    public abstract class AComponent : IDisposable
+    public abstract class AComponent : IDisposable, IMTaskOwner
     {
         #region Private 私有成员
 
         private Dictionary<Type, AComponent> components; // 按具体类型索引的子组件集合。
         private List<AComponent> componentSnapshot; // 遍历期间使用的子组件快照缓存。
+        private Action childDisposedAction; // 子组件完成两阶段释放后的复用回调。
+        private Action domainDrainedAction; // 当前任务域退场后的复用回调。
+        private Action disposedCallbacks; // 等待当前组件最终释放的内部回调。
+        private MTaskDomain mTaskDomain; // 首次启动 MTask 时延迟创建的生命周期域。
+        private int pendingChildDisposals; // 仍在两阶段释放中的直接子组件数量。
+        private bool domainDrained = true; // 当前任务域是否已经全部退场。
+        private bool isDisposing; // 组件是否已进入两阶段释放。
         private bool isDisposed; // 组件是否已完成释放。
         private ComponentGroupId groupId; // 当前组件所属的 Global 分组身份。
 
@@ -31,6 +40,11 @@ namespace MiniCore.Model
         /// 已释放组件不可再次注册或参与更新，应通过 Global 重新获取新实例。
         /// </summary>
         public bool IsDisposed => isDisposed;
+
+        /// <summary>
+        /// 获取组件是否已经开始释放但仍在等待异步任务退场。
+        /// </summary>
+        public bool IsDisposing => isDisposing;
 
         /// <summary>
         /// 获取当前组件所属的 Global 分组身份。
@@ -74,7 +88,7 @@ namespace MiniCore.Model
                 return;
             }
 
-            component.Awake();
+            component.InvokeAwake();
             components.Add(type, component);
             component.IsActive = true;
         }
@@ -146,7 +160,7 @@ namespace MiniCore.Model
             }
 
             T component = new T();
-            component.Awake();
+            component.InvokeAwake();
             components.Add(type, component);
             component.IsActive = true;
             return component;
@@ -198,7 +212,7 @@ namespace MiniCore.Model
             }
 
             T component = new T();
-            component.Awake(args);
+            component.InvokeAwake(args);
             components.Add(type, component);
             component.IsActive = true;
             return component;
@@ -208,30 +222,56 @@ namespace MiniCore.Model
         /// 释放当前组件及其所有子组件。
         /// 释放过程中使用快照，允许子组件释放逻辑修改组件集合。
         /// </summary>
-        public virtual void Dispose()
+        public void Dispose()
         {
-            if (isDisposed)
+            if (isDisposed || isDisposing)
             {
                 return;
             }
 
-            isDisposed = true;
+            isDisposing = true;
             IsActive = false;
+            using (MTaskRuntime.EnterOwner(this))
+            {
+                OnDisposing();
+            }
+
             if (components != null)
             {
                 int snapshotCount = RefreshSnapshot();
                 if (snapshotCount > 0)
                 {
+                    childDisposedAction ??= OnChildDisposed;
+                    pendingChildDisposals = componentSnapshot.Count;
                     for (int i = 0; i < componentSnapshot.Count; i++)
                     {
-                        componentSnapshot[i]?.Dispose();
+                        AComponent component = componentSnapshot[i];
+                        if (component == null || component.IsDisposed)
+                        {
+                            pendingChildDisposals--;
+                            continue;
+                        }
+
+                        component.RegisterDisposed(childDisposedAction);
+                        component.Dispose();
                     }
                 }
-
-                componentSnapshot?.Clear();
-                components.Clear();
             }
 
+            if (mTaskDomain == null)
+            {
+                domainDrained = true;
+            }
+            else
+            {
+                MTaskDomain domain = mTaskDomain;
+                domainDrained = false;
+                domainDrainedAction ??= OnDomainDrained;
+                domain.OnDrained(domainDrainedAction);
+                domain.Dispose();
+            }
+
+            TryFinalizeDispose();
         }
 
         /// <summary>
@@ -245,19 +285,22 @@ namespace MiniCore.Model
                 return;
             }
 
-            if (components != null)
+            using (MTaskRuntime.EnterOwner(this))
             {
-                int snapshotCount = RefreshSnapshot();
-                if (snapshotCount > 0)
+                if (components != null)
                 {
-                    for (int i = 0; i < componentSnapshot.Count; i++)
+                    int snapshotCount = RefreshSnapshot();
+                    if (snapshotCount > 0)
                     {
-                        componentSnapshot[i]?.MonoUpdate();
+                        for (int i = 0; i < componentSnapshot.Count; i++)
+                        {
+                            componentSnapshot[i]?.MonoUpdate();
+                        }
                     }
                 }
-            }
 
-            Update();
+                Update();
+            }
         }
 
         #endregion
@@ -270,10 +313,26 @@ namespace MiniCore.Model
         /// </summary>
         protected void ThrowIfDisposed()
         {
-            if (isDisposed)
+            if (isDisposed || isDisposing)
             {
-                throw new ObjectDisposedException(GetType().FullName, "组件已释放，不能继续管理子组件。");
+                throw new ObjectDisposedException(GetType().FullName, "组件已开始释放，不能继续管理子组件。");
             }
+        }
+
+        /// <summary>
+        /// 在组件开始释放且任务域取消前执行同步停机操作。
+        /// 子类应在此处关闭 Socket、停止外部 I/O 或解除会阻塞任务退出的资源。
+        /// </summary>
+        protected virtual void OnDisposing()
+        {
+        }
+
+        /// <summary>
+        /// 在当前组件及其子组件的异步任务全部退场后执行最终资源清理。
+        /// 子类应重写此方法，不应重写 Dispose。
+        /// </summary>
+        protected virtual void OnDispose()
+        {
         }
 
         /// <summary>
@@ -318,6 +377,126 @@ namespace MiniCore.Model
             componentSnapshot.Clear();
             componentSnapshot.AddRange(components.Values);
             return componentSnapshot.Count;
+        }
+
+        /// <summary>
+        /// 在当前组件 Owner 上下文中调用无参 Awake。
+        /// </summary>
+        internal void InvokeAwake()
+        {
+            using (MTaskRuntime.EnterOwner(this))
+            {
+                Awake();
+            }
+        }
+
+        /// <summary>
+        /// 在当前组件 Owner 上下文中调用带参数 Awake。
+        /// </summary>
+        /// <param name="args">组件初始化参数。</param>
+        internal void InvokeAwake(ComponentInitArgs args)
+        {
+            using (MTaskRuntime.EnterOwner(this))
+            {
+                Awake(args);
+            }
+        }
+
+        /// <summary>
+        /// 注册组件最终完成释放后的内部通知。
+        /// </summary>
+        /// <param name="callback">组件完成释放后执行的回调。</param>
+        internal void RegisterDisposed(Action callback)
+        {
+            if (callback == null)
+            {
+                throw new ArgumentNullException(nameof(callback));
+            }
+
+            if (isDisposed)
+            {
+                callback();
+                return;
+            }
+
+            disposedCallbacks += callback;
+        }
+
+        /// <summary>
+        /// 处理一个直接子组件完成两阶段释放。
+        /// </summary>
+        private void OnChildDisposed()
+        {
+            if (pendingChildDisposals > 0)
+            {
+                pendingChildDisposals--;
+            }
+
+            TryFinalizeDispose();
+        }
+
+        /// <summary>
+        /// 处理当前组件任务域全部退场。
+        /// </summary>
+        private void OnDomainDrained()
+        {
+            domainDrained = true;
+            TryFinalizeDispose();
+        }
+
+        /// <summary>
+        /// 在子组件和任务域均退场后执行最终资源清理。
+        /// </summary>
+        private void TryFinalizeDispose()
+        {
+            if (!isDisposing || isDisposed || !domainDrained || pendingChildDisposals != 0)
+            {
+                return;
+            }
+
+            using (MTaskRuntime.EnterOwner(this))
+            {
+                OnDispose();
+            }
+
+            Global.ReleaseAllIfInitialized(this);
+
+            componentSnapshot?.Clear();
+            components?.Clear();
+            mTaskDomain?.Dispose();
+            mTaskDomain = null;
+            isDisposed = true;
+            Action callbacks = disposedCallbacks;
+            disposedCallbacks = null;
+            callbacks?.Invoke();
+        }
+
+        #endregion
+
+        #region Interface 接口实现
+
+        /// <summary>
+        /// 获取当前组件延迟创建的 MTask 生命周期域。
+        /// </summary>
+        /// <returns>绑定当前组件生命周期的任务域。</returns>
+        public MTaskDomain GetMTaskDomain()
+        {
+            if (isDisposed)
+            {
+                throw new ObjectDisposedException(GetType().FullName, "组件已完成释放，不能创建任务域。");
+            }
+
+            if (mTaskDomain == null)
+            {
+                if (isDisposing)
+                {
+                    throw new ObjectDisposedException(GetType().FullName, "组件正在释放，不能创建新的任务域。");
+                }
+
+                mTaskDomain = new MTaskDomain(GetType().FullName, MTaskRuntime.CurrentExecutor ?? MTaskExecutors.Unity);
+            }
+
+            return mTaskDomain;
         }
 
         #endregion

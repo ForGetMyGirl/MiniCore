@@ -70,7 +70,7 @@ namespace MiniCore.Service
         /// <summary>
         /// 解除设置订阅、释放全局服务引用并销毁 Unity 音频根对象。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             if (settingsService != null)
             {
@@ -83,10 +83,8 @@ namespace MiniCore.Service
             }
 
             sfxPool.Clear();
-            Global.ReleaseAll(this);
             settingsService = null;
             telemetry = null;
-            base.Dispose();
         }
 
         #endregion

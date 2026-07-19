@@ -329,6 +329,15 @@ namespace MiniCore.Core
         }
 
         /// <summary>
+        /// 在 Global 已初始化时归还指定 owner 的全部组件引用，关闭后不会重新创建运行时。
+        /// </summary>
+        /// <param name="owner">即将完成释放的组件 Owner。</param>
+        internal static void ReleaseAllIfInitialized(object owner)
+        {
+            runtime?.ReleaseAll(owner);
+        }
+
+        /// <summary>
         /// 调度所有激活的全局组件。
         /// </summary>
         public static void Tick()

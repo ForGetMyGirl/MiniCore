@@ -1,9 +1,10 @@
 using System;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
+using MiniCore.Unity;
 using UnityEngine;
 
 namespace MiniCore.HotUpdate
@@ -11,7 +12,7 @@ namespace MiniCore.HotUpdate
     /// <summary>
     /// 在 Editor 测试和 Player 中复用的本机网络冒烟执行器，验证 HotUpdate Handler、Protobuf 与三种传输的完整业务链路。
     /// </summary>
-    public sealed class NetworkSmokeTestRunner : MonoBehaviour
+    public sealed class NetworkSmokeTestRunner : AMTaskBehaviour
     {
         #region Private 私有成员
 
@@ -25,7 +26,7 @@ namespace MiniCore.HotUpdate
         private const uint KcpConv = 1001; // 本机 KCP 冒烟连接标识。
         private static readonly TimeSpan StageTimeout = TimeSpan.FromSeconds(5); // 单个验证阶段的最长等待时长。
 
-        private readonly UniTaskCompletionSource<bool> completionSource = new UniTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
+        private readonly MTaskCompletionSource<bool> completionSource = new MTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
         private INetworkService network; // 已由客户端入口初始化并注册 Handler 的网络服务。
         private GUIStyle statusStyle; // Player 屏幕状态文本样式缓存。
         private bool heldNetworkReference; // 当前对象是否持有网络组件引用。
@@ -103,7 +104,7 @@ namespace MiniCore.HotUpdate
         /// 运行一次 TCP、KCP、UDP 本机回环业务验证；重复调用会返回同一轮运行结果。
         /// </summary>
         /// <returns>三种协议均通过时返回 true，否则返回 false。</returns>
-        public UniTask<bool> RunAsync()
+        public MTask<bool> RunAsync()
         {
             if (!isRunning)
             {
@@ -158,7 +159,7 @@ namespace MiniCore.HotUpdate
         /// <summary>
         /// 执行完整冒烟流程并将成功或失败写入统一结果。
         /// </summary>
-        private async UniTaskVoid RunInternalAsync()
+        private async MTask RunInternalAsync()
         {
             try
             {
@@ -202,7 +203,7 @@ namespace MiniCore.HotUpdate
         /// 启动并验证 TCP 本机回环。
         /// </summary>
         /// <returns>TCP 验证完成任务。</returns>
-        private UniTask RunTcpAsync()
+        private MTask RunTcpAsync()
         {
             return RunTransportAsync(
                 "TCP",
@@ -216,7 +217,7 @@ namespace MiniCore.HotUpdate
         /// 启动并验证 KCP 本机回环。
         /// </summary>
         /// <returns>KCP 验证完成任务。</returns>
-        private UniTask RunKcpAsync()
+        private MTask RunKcpAsync()
         {
             return RunTransportAsync(
                 "KCP",
@@ -230,7 +231,7 @@ namespace MiniCore.HotUpdate
         /// 启动并验证 UDP 本机回环。
         /// </summary>
         /// <returns>UDP 验证完成任务。</returns>
-        private UniTask RunUdpAsync()
+        private MTask RunUdpAsync()
         {
             return RunTransportAsync(
                 "UDP",
@@ -249,7 +250,7 @@ namespace MiniCore.HotUpdate
         /// <param name="connectClient">建立并探测客户端会话的方法。</param>
         /// <param name="stopServer">停止本地服务端的方法。</param>
         /// <returns>当前传输验证完成任务。</returns>
-        private async UniTask RunTransportAsync(string protocol, string sessionId, Func<UniTask> startServer, Func<UniTask<bool>> connectClient, Action stopServer)
+        private async MTask RunTransportAsync(string protocol, string sessionId, Func<MTask> startServer, Func<MTask<bool>> connectClient, Action stopServer)
         {
             int createdBeforeConnect = serverSessionCreatedCount;
             ReportStage(protocol, "start-server", sessionId);
@@ -294,7 +295,7 @@ namespace MiniCore.HotUpdate
         /// <param name="stage">当前验证阶段。</param>
         /// <param name="sessionId">当前客户端会话标识。</param>
         /// <returns>条件成立后的完成任务。</returns>
-        private async UniTask WaitForConditionAsync(Func<bool> condition, string protocol, string stage, string sessionId)
+        private async MTask WaitForConditionAsync(Func<bool> condition, string protocol, string stage, string sessionId)
         {
             DateTime deadline = DateTime.UtcNow + StageTimeout;
             while (!condition())
@@ -304,7 +305,7 @@ namespace MiniCore.HotUpdate
                     throw new TimeoutException($"protocol:{protocol} stage:{stage} sessionId:{sessionId} 超时 {StageTimeout.TotalSeconds:0} 秒。");
                 }
 
-                await UniTask.Yield(PlayerLoopTiming.Update);
+                await MTask.Yield();
             }
         }
 

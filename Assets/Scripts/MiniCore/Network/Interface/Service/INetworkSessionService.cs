@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Model;
 using System;
 using System.Collections.Generic;
@@ -23,28 +23,28 @@ namespace MiniCore.Core
         /// <summary>
         /// 创建 TCP 客户端逻辑会话。
         /// </summary>
-        UniTask<NetworkSession> CreateTcpSessionAsync(string sessionId, string host, int port, CancellationToken token = default);
+        MTask<NetworkSession> CreateTcpSessionAsync(string sessionId, string host, int port);
         /// <summary>
         /// 创建 KCP 客户端逻辑会话。
         /// </summary>
-        UniTask<NetworkSession> CreateKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default);
+        MTask<NetworkSession> CreateKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null);
         /// <summary>
         /// 创建 UDP 客户端逻辑会话。
         /// </summary>
-        UniTask<NetworkSession> CreateUdpSessionAsync(string sessionId, string host, int port, CancellationToken token = default);
+        MTask<NetworkSession> CreateUdpSessionAsync(string sessionId, string host, int port);
 
         /// <summary>
         /// 启动 KCP 服务端监听。
         /// </summary>
-        UniTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null, CancellationToken token = default);
+        MTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null);
         /// <summary>
         /// 启动 TCP 服务端监听。
         /// </summary>
-        UniTask StartTcpServerAsync(string host, int port, CancellationToken token = default);
+        MTask StartTcpServerAsync(string host, int port);
         /// <summary>
         /// 启动 UDP 服务端监听。
         /// </summary>
-        UniTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null, CancellationToken token = default);
+        MTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null);
 
         /// <summary>
         /// 停止 KCP 服务端监听。

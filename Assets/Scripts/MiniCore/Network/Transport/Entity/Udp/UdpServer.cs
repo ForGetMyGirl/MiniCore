@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -42,7 +42,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 接收到 UDP 业务数据报时触发。
         /// </summary>
-        public event Func<IServerSession, ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        public event Func<IServerSession, ReadOnlyMemory<byte>, MTask> OnDataReceived;
 
         /// <summary>
         /// 使用指定配置创建 UDP 服务端。
@@ -59,10 +59,10 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask StartAsync(string host, int port, CancellationToken token = default)
+        public MTask StartAsync(string host, int port)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             if (running)
             {
                 throw new InvalidOperationException("UdpServer already running.");
@@ -73,8 +73,8 @@ namespace MiniCore.Model
             socket.Bind(new IPEndPoint(ParseAddress(host), port));
 
             receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            _ = ReceiveLoopAsync(receiveCts.Token);
-            return UniTask.CompletedTask;
+            ReceiveLoopAsync(receiveCts.Token).Forget();
+            return MTask.CompletedTask;
         }
 
         /// <summary>
@@ -155,14 +155,13 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 ReceiveLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask ReceiveLoopAsync(CancellationToken token)
+        private async MTask ReceiveLoopAsync(CancellationToken token)
         {
             var buffer = ByteBufferPool.Shared.Rent(config.MaxDatagramSize);
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                 while (!token.IsCancellationRequested && running)
                 {

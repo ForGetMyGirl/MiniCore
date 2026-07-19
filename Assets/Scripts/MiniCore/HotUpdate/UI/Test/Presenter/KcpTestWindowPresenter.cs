@@ -1,5 +1,5 @@
 ﻿using System;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
@@ -65,7 +65,7 @@ namespace MiniCore.HotUpdate
             StartServerAsync().Forget();
         }
 
-        private async UniTaskVoid StartServerAsync()
+        private async MTask StartServerAsync()
         {
             if (net == null)
             {
@@ -101,7 +101,7 @@ namespace MiniCore.HotUpdate
             ConnectClientAsync().Forget();
         }
 
-        private async UniTaskVoid ConnectClientAsync()
+        private async MTask ConnectClientAsync()
         {
             if (net == null)
             {
@@ -176,18 +176,7 @@ namespace MiniCore.HotUpdate
 
                     clientDisconnectedHandler = () =>
                     {
-                        UniTask.Void(async () =>
-                        {
-                            await UniTask.SwitchToMainThread();
-                            if (!clientConnected)
-                            {
-                                return;
-                            }
-
-                            clientConnected = false;
-                            localJoined = false;
-                            View.UpdatePrompt("Client disconnected.");
-                        });
+                        HandleClientDisconnectedAsync().Forget();
                     };
 
                     session.Transport.OnDisconnected += clientDisconnectedHandler;
@@ -202,7 +191,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid DisconnectClientAsync()
+        private async MTask DisconnectClientAsync()
         {
             if (!clientConnected)
             {
@@ -231,7 +220,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid StopServerAsync()
+        private async MTask StopServerAsync()
         {
             if (net == null)
             {
@@ -263,10 +252,27 @@ namespace MiniCore.HotUpdate
                 LogSwitch.Warning($"Server stop notice failed: {ex.Message}");
             }
 
-            await UniTask.Delay(200);
+            await MTask.Delay(200);
             net.StopKcpServer();
             serverRunning = false;
             View.UpdatePrompt("Server stopped.");
+        }
+
+        /// <summary>
+        /// 将传输层断开通知切回 Unity 主线程并更新窗口状态。
+        /// </summary>
+        /// <returns>断开状态更新任务。</returns>
+        private async MTask HandleClientDisconnectedAsync()
+        {
+            await MTask.SwitchTo(MTaskExecutors.Unity);
+            if (!clientConnected)
+            {
+                return;
+            }
+
+            clientConnected = false;
+            localJoined = false;
+            View.UpdatePrompt("Client disconnected.");
         }
 
         private void SendNormal()
@@ -279,7 +285,7 @@ namespace MiniCore.HotUpdate
             SendRpcAsync().Forget();
         }
 
-        private async UniTaskVoid SendNormalAsync()
+        private async MTask SendNormalAsync()
         {
             var currentSession = net?.GetSession(ClientSessionId);
             if (clientConnected && (currentSession == null || !currentSession.IsConnected))
@@ -317,7 +323,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid SendRpcAsync()
+        private async MTask SendRpcAsync()
         {
             if (clientConnected)
             {

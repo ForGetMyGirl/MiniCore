@@ -298,10 +298,9 @@ namespace MiniCore.EditorTests
             /// <summary>
             /// 记录释放次数并执行基类资源释放。
             /// </summary>
-            public override void Dispose()
+            protected override void OnDispose()
             {
                 DisposeCount++;
-                base.Dispose();
             }
 
             #endregion
@@ -416,10 +415,9 @@ namespace MiniCore.EditorTests
             /// <summary>
             /// 记录组件释放。
             /// </summary>
-            public override void Dispose()
+            protected override void OnDispose()
             {
                 DisposeCount++;
-                base.Dispose();
             }
 
             #endregion

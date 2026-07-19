@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using MiniCore.Model;
 using System;
 using System.Collections.Generic;
@@ -7,6 +7,7 @@ using UnityEngine;
 namespace MiniCore.Core
 {
 
+    [MTaskOwner]
     public class GameObjectPoolMgr : MonoSingleton<GameObjectPoolMgr>
     {
         private const string DefaultGroupName = "DefaultGroup";
@@ -22,7 +23,7 @@ namespace MiniCore.Core
             poolObjAndGroupDic = new Dictionary<IPoolObject, string>();
         }
 
-        public async UniTask<T> GeneratePoolObject<T>(string path, string group = DefaultGroupName, Transform parent = null) where T : MonoBehaviour, IPoolObject, new()
+        public async MTask<T> GeneratePoolObject<T>(string path, string group = DefaultGroupName, Transform parent = null) where T : MonoBehaviour, IPoolObject, new()
         {
             Type type = typeof(T);
             T poolObj;

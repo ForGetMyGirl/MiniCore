@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 
 namespace MiniCore.Model
@@ -16,7 +16,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 将已反序列化的普通协议派发给具体处理器。
         /// </summary>
-        UniTask HandleAsync(NetworkSession session, INormalMessage message);
+        MTask HandleAsync(NetworkSession session, INormalMessage message);
     }
 
     /// <summary>
@@ -42,6 +42,6 @@ namespace MiniCore.Model
         /// <summary>
         /// 将已反序列化的 RPC 请求和响应派发给具体处理器。
         /// </summary>
-        UniTask HandleAsync(NetworkSession session, IRpcRequest request, IRpcResponse response);
+        MTask HandleAsync(NetworkSession session, IRpcRequest request, IRpcResponse response);
     }
 }

@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using System;
 using System.Threading;
 
@@ -17,12 +17,12 @@ namespace MiniCore.Model
         /// <summary>
         /// 连接到指定远端地址。
         /// </summary>
-        UniTask ConnectAsync(string host, int port, CancellationToken token = default);
+        MTask ConnectAsync(string host, int port);
 
         /// <summary>
         /// 发送一个完整的业务数据包。
         /// </summary>
-        UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default);
+        MTask SendAsync(ArraySegment<byte> data);
 
         /// <summary>
         /// 主动断开传输层连接。
@@ -32,7 +32,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 接收到完整业务数据包时触发。
         /// </summary>
-        event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        event Func<ReadOnlyMemory<byte>, MTask> OnDataReceived;
         /// <summary>
         /// 传输层断开时触发。
         /// </summary>

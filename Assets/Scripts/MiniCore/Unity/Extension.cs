@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Collections.Generic;
 using System.Text;
-using System.Threading.Tasks;
+using MiniCore.Threading;
 using UnityEngine;
 
 namespace MiniCore.Model
@@ -222,12 +222,16 @@ namespace MiniCore.Model
             return resultIndex;
         }
 
-        public static async Task WaitingForNextFrameAsync()
+        /// <summary>
+        /// 等待 Unity 进入下一帧。
+        /// </summary>
+        /// <returns>下一帧开始后完成的 MTask。</returns>
+        public static async MTask WaitingForNextFrameAsync()
         {
             int currentFrame = Time.frameCount;
             while (currentFrame == Time.frameCount)
             {
-                await Task.Yield();
+                await MTask.Yield();
             }
         }
 

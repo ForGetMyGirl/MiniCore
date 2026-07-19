@@ -1,6 +1,6 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 
@@ -47,12 +47,10 @@ namespace MiniCore.Service
         /// <summary>
         /// 释放存档服务引用及事件订阅者。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             Changed = null;
-            Global.ReleaseAll(this);
             saveService = null;
-            base.Dispose();
         }
 
         #endregion
@@ -62,21 +60,19 @@ namespace MiniCore.Service
         /// <summary>
         /// 供启动流程在依赖服务完成后加载设置。
         /// </summary>
-        /// <param name="token">启动取消令牌。</param>
         /// <returns>加载完成任务。</returns>
-        public Task InitializeAsync(CancellationToken token = default)
+        public MTask InitializeAsync()
         {
-            return LoadAsync(token);
+            return LoadAsync();
         }
 
         /// <summary>
         /// 从独立设置槽位加载设置；首次运行保持默认设置。
         /// </summary>
-        /// <param name="token">取消令牌。</param>
         /// <returns>加载完成任务。</returns>
-        public async Task LoadAsync(CancellationToken token = default)
+        public async MTask LoadAsync()
         {
-            ClientSettings loaded = await saveService.LoadAsync<ClientSettings>(SettingsSlot, token);
+            ClientSettings loaded = await saveService.LoadAsync<ClientSettings>(SettingsSlot);
             current = loaded ?? new ClientSettings();
             Changed?.Invoke(current);
         }
@@ -85,12 +81,11 @@ namespace MiniCore.Service
         /// 替换当前设置并持久化到独立加密槽位。
         /// </summary>
         /// <param name="settings">待保存设置。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>保存完成任务。</returns>
-        public async Task SaveAsync(ClientSettings settings, CancellationToken token = default)
+        public async MTask SaveAsync(ClientSettings settings)
         {
             current = settings ?? throw new ArgumentNullException(nameof(settings));
-            await saveService.SaveAsync(SettingsSlot, current, token);
+            await saveService.SaveAsync(SettingsSlot, current);
             Changed?.Invoke(current);
         }
 

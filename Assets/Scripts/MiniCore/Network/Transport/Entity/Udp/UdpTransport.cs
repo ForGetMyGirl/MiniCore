@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -27,7 +27,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 接收到一个完整 UDP 数据报时触发。
         /// </summary>
-        public event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        public event Func<ReadOnlyMemory<byte>, MTask> OnDataReceived;
         /// <summary>
         /// 传输关闭时触发。
         /// </summary>
@@ -38,17 +38,17 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask ConnectAsync(string host, int port, CancellationToken token = default)
+        public async MTask ConnectAsync(string host, int port)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             Disconnect();
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
-            UniTask resolveTask = ResolveRemoteEndPointAsync(host, port);
-            int winner = await UniTask.WhenAny(
+            MTask resolveTask = ResolveRemoteEndPointAsync(host, port);
+            int winner = await MTask.WhenAny(
                 resolveTask,
-                UniTask.Delay(DefaultInitTimeout, cancellationToken: token));
+                MTask.Delay(DefaultInitTimeout));
 
             if (winner != 0)
             {
@@ -56,19 +56,17 @@ namespace MiniCore.Model
                 throw new TimeoutException($"UDP init timeout to {host}:{port}");
             }
 
-            await resolveTask;
             disconnected = 0;
             receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            _ = ReceiveLoopAsync(receiveCts.Token);
+            ReceiveLoopAsync(receiveCts.Token).Forget();
         }
 
         /// <summary>
         /// 向远端发送一个完整 UDP 数据报。
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
+        public async MTask SendAsync(ArraySegment<byte> data)
         {
             if (!IsConnected)
             {
@@ -86,13 +84,12 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 ReceiveLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask ReceiveLoopAsync(CancellationToken token)
+        private async MTask ReceiveLoopAsync(CancellationToken token)
         {
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 while (!token.IsCancellationRequested && IsConnected)
                 {
                     byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
@@ -218,7 +215,7 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
+        private async MTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }
@@ -229,7 +226,7 @@ namespace MiniCore.Model
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask ResolveRemoteEndPointAsync(string host, int port)
+        private async MTask ResolveRemoteEndPointAsync(string host, int port)
         {
             if (string.IsNullOrWhiteSpace(host))
             {

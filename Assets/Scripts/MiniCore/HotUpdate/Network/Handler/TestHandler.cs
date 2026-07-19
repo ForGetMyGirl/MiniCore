@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using UnityEngine;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
@@ -18,10 +18,10 @@ namespace MiniCore.HotUpdate
         /// <param name="session">执行该方法所需的 session 参数。</param>
         /// <param name="message">执行该方法所需的 message 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public override async UniTask HandleAsync(NetworkSession session, TestNetworkData message)
+        public override async MTask HandleAsync(NetworkSession session, TestNetworkData message)
         {
             LogSwitch.Info($"[TestHandler] 收到消息 -> Id:{message.Id}, Content:{message.Content}");
-            await UniTask.CompletedTask;
+            await MTask.CompletedTask;
         }
     }
 }

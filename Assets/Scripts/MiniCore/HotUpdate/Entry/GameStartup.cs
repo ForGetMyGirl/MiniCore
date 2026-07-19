@@ -1,6 +1,5 @@
 using System;
-using System.Threading.Tasks;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Service;
@@ -21,7 +20,7 @@ namespace MiniCore.HotUpdate
         /// 客户端创建测试面板；Dedicated Server 启动 KCP 监听。新项目可直接替换为自己的业务逻辑。
         /// </summary>
         /// <returns>项目启动完成任务。</returns>
-        public override async Task StartAsync()
+        public override async MTask StartAsync()
         {
             if (Application.isBatchMode)
             {
@@ -90,10 +89,10 @@ namespace MiniCore.HotUpdate
         /// 为 Dedicated Server 启动命令行指定端口上的 KCP 监听。
         /// </summary>
         /// <returns>KCP 监听完成启动的任务。</returns>
-        private async Task StartDedicatedServerAsync()
+        private async MTask StartDedicatedServerAsync()
         {
             INetworkService network = Global.GetService<INetworkService>(this);
-            await network.StartKcpServerAsync("0.0.0.0", ReadServerPort()).AsTask();
+            await network.StartKcpServerAsync("0.0.0.0", ReadServerPort());
         }
 
         /// <summary>

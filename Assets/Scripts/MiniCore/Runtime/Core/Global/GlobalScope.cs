@@ -1,16 +1,18 @@
 using System;
 using MiniCore.Model;
+using MiniCore.Threading;
 
 namespace MiniCore.Core
 {
     /// <summary>
     /// 一组全局组件引用的 owner，释放时自动归还该作用域获取的全部组件。
     /// </summary>
-    public sealed class GlobalScope : IDisposable
+    public sealed class GlobalScope : IDisposable, IMTaskOwner
     {
         #region Private 私有成员
 
         private bool disposed; // 是否已经完成作用域释放。
+        private MTaskDomain mTaskDomain; // 首次绑定异步入口时惰性创建的任务域。
 
         #endregion
 
@@ -75,7 +77,18 @@ namespace MiniCore.Core
             }
 
             disposed = true;
+            mTaskDomain?.Dispose();
             Global.ReleaseAll(this);
+        }
+
+        /// <summary>
+        /// 获取当前 GlobalScope 惰性创建的 MTask 生命周期域。
+        /// </summary>
+        /// <returns>与当前 Scope 一同释放的任务域。</returns>
+        public MTaskDomain GetMTaskDomain()
+        {
+            ThrowIfDisposed();
+            return mTaskDomain ??= new MTaskDomain($"GlobalScope:{Name}", MTaskRuntime.CurrentExecutor ?? MTaskExecutors.Unity);
         }
 
         #endregion

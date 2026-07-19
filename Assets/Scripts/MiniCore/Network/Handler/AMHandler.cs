@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 
 namespace MiniCore.Model
@@ -30,11 +30,11 @@ namespace MiniCore.Model
         /// <param name="session">执行该方法所需的 session 参数。</param>
         /// <param name="message">执行该方法所需的 message 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public abstract UniTask HandleAsync(NetworkSession session, TMessage message);
+        public abstract MTask HandleAsync(NetworkSession session, TMessage message);
 
         Type INetworkMessageHandlerInvoker.MessageType => typeof(TMessage);
 
-        UniTask INetworkMessageHandlerInvoker.HandleAsync(NetworkSession session, INormalMessage message)
+        MTask INetworkMessageHandlerInvoker.HandleAsync(NetworkSession session, INormalMessage message)
         {
             if (!(message is TMessage typedMessage))
             {

@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using MiniCore.Model;
 using System;
 using System.Collections.Generic;
@@ -53,11 +53,10 @@ namespace MiniCore.Core
         }
 
         /// <summary>
-        /// 停止全部服务端并释放已保存的会话。
+        /// 在任务域取消前停止全部服务端并释放会话，从而同步解除 Socket I/O 等待。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDisposing()
         {
-            base.Dispose();
             StopKcpServer();
             StopTcpServer();
             StopUdpServer();
@@ -90,19 +89,17 @@ namespace MiniCore.Core
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask<NetworkSession> CreateTcpSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
+        public async MTask<NetworkSession> CreateTcpSessionAsync(string sessionId, string host, int port)
         {
             return await CreateClientSessionAsync(
                 sessionId,
-                async ct =>
+                async () =>
                 {
                     var transport = new TcpTransport();
-                    await transport.ConnectAsync(host, port, ct);
+                    await transport.ConnectAsync(host, port);
                     return transport;
-                },
-                token);
+                });
         }
 
         /// <summary>
@@ -113,19 +110,17 @@ namespace MiniCore.Core
         /// <param name="port">执行该方法所需的 port 参数。</param>
         /// <param name="conv">执行该方法所需的 conv 参数。</param>
         /// <param name="config">执行该方法所需的 config 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask<NetworkSession> CreateKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null, CancellationToken token = default)
+        public async MTask<NetworkSession> CreateKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null)
         {
             return await CreateClientSessionAsync(
                 sessionId,
-                async ct =>
+                async () =>
                 {
                     var transport = new KcpTransport(conv, config);
-                    await transport.ConnectAsync(host, port, ct);
+                    await transport.ConnectAsync(host, port);
                     return transport;
-                },
-                token);
+                });
         }
 
         /// <summary>
@@ -134,19 +129,17 @@ namespace MiniCore.Core
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask<NetworkSession> CreateUdpSessionAsync(string sessionId, string host, int port, CancellationToken token = default)
+        public async MTask<NetworkSession> CreateUdpSessionAsync(string sessionId, string host, int port)
         {
             return await CreateClientSessionAsync(
                 sessionId,
-                async ct =>
+                async () =>
                 {
                     var transport = new UdpTransport();
-                    await transport.ConnectAsync(host, port, ct);
+                    await transport.ConnectAsync(host, port);
                     return transport;
-                },
-                token);
+                });
         }
 
         /// <summary>
@@ -155,9 +148,8 @@ namespace MiniCore.Core
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
         /// <param name="config">执行该方法所需的 config 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null, CancellationToken token = default)
+        public async MTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null)
         {
             if (kcpServer != null)
             {
@@ -168,7 +160,7 @@ namespace MiniCore.Core
             kcpServer.OnSessionCreated += HandleKcpServerSessionCreated;
             kcpServer.OnSessionClosed += HandleKcpServerSessionClosed;
             kcpServer.OnDataReceived += HandleKcpServerDataReceived;
-            await kcpServer.StartAsync(host, port, token);
+            await kcpServer.StartAsync(host, port);
         }
 
         /// <summary>
@@ -176,9 +168,8 @@ namespace MiniCore.Core
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask StartTcpServerAsync(string host, int port, CancellationToken token = default)
+        public async MTask StartTcpServerAsync(string host, int port)
         {
             if (tcpServer != null)
             {
@@ -187,7 +178,7 @@ namespace MiniCore.Core
 
             tcpServer = new TcpServer();
             tcpServer.OnClientAccepted += HandleTcpClientAccepted;
-            await tcpServer.StartAsync(host, port, token);
+            await tcpServer.StartAsync(host, port);
         }
 
         /// <summary>
@@ -196,9 +187,8 @@ namespace MiniCore.Core
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
         /// <param name="config">执行该方法所需的 config 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null, CancellationToken token = default)
+        public async MTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null)
         {
             if (udpServer != null)
             {
@@ -209,7 +199,7 @@ namespace MiniCore.Core
             udpServer.OnSessionCreated += HandleUdpServerSessionCreated;
             udpServer.OnSessionClosed += HandleUdpServerSessionClosed;
             udpServer.OnDataReceived += HandleUdpServerDataReceived;
-            await udpServer.StartAsync(host, port, token);
+            await udpServer.StartAsync(host, port);
         }
 
         /// <summary>
@@ -484,11 +474,11 @@ namespace MiniCore.Core
         /// <param name="serverSession">执行该方法所需的 serverSession 参数。</param>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private UniTask HandleKcpServerDataReceived(IServerSession serverSession, ReadOnlyMemory<byte> data)
+        private MTask HandleKcpServerDataReceived(IServerSession serverSession, ReadOnlyMemory<byte> data)
         {
             if (serverSession == null || data.IsEmpty)
             {
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
 
             KcpServerTransport transport;
@@ -502,7 +492,7 @@ namespace MiniCore.Core
                 return transport.PushReceivedAsync(data);
             }
 
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
 
         /// <summary>
@@ -547,11 +537,11 @@ namespace MiniCore.Core
         /// <param name="serverSession">执行该方法所需的 serverSession 参数。</param>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private UniTask HandleUdpServerDataReceived(IServerSession serverSession, ReadOnlyMemory<byte> data)
+        private MTask HandleUdpServerDataReceived(IServerSession serverSession, ReadOnlyMemory<byte> data)
         {
             if (serverSession == null || data.IsEmpty)
             {
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
 
             UdpServerTransport transport;
@@ -565,7 +555,7 @@ namespace MiniCore.Core
                 return transport.PushReceivedAsync(data);
             }
 
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
 
         /// <summary>
@@ -598,12 +588,10 @@ namespace MiniCore.Core
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         /// <param name="connectFactory">执行该方法所需的 connectFactory 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask<NetworkSession> CreateClientSessionAsync(
+        private async MTask<NetworkSession> CreateClientSessionAsync(
             string sessionId,
-            Func<CancellationToken, UniTask<INetworkTransport>> connectFactory,
-            CancellationToken token = default)
+            Func<MTask<INetworkTransport>> connectFactory)
         {
             lock (sessionLock)
             {
@@ -613,7 +601,7 @@ namespace MiniCore.Core
                 }
             }
 
-            var transport = await connectFactory(token);
+            var transport = await connectFactory();
             var session = new NetworkSession(sessionId, transport);
             lock (sessionLock)
             {

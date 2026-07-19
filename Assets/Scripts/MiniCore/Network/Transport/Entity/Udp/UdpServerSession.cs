@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -48,9 +48,8 @@ namespace MiniCore.Model
         /// 向该会话远端发送一个 UDP 数据报。
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
+        public MTask SendAsync(ArraySegment<byte> data)
         {
             if (closed)
             {
@@ -63,7 +62,7 @@ namespace MiniCore.Model
             }
 
             socket.SendTo(data.Array, data.Offset, data.Count, SocketFlags.None, RemoteEndPoint);
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
 
         /// <summary>

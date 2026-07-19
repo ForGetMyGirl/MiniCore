@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 
@@ -16,7 +16,7 @@ namespace MiniCore.HotUpdate
         /// <param name="request">执行该方法所需的 request 参数。</param>
         /// <param name="response">执行该方法所需的 response 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public override UniTask HandleAsync(NetworkSession session, DemoRpcRequest request, DemoRpcResponse response)
+        public override MTask HandleAsync(NetworkSession session, DemoRpcRequest request, DemoRpcResponse response)
         {
             string text = $"收到RPC请求，会话:{session.SessionId} 内容:{request.Payload}";
             LogSwitch.Info(text);
@@ -25,7 +25,7 @@ namespace MiniCore.HotUpdate
             response.Code = 0;
             response.Msg = "RPC响应成功";
             response.Echo = request.Payload;
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
     }
 }

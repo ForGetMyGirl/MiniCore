@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Threading;
 
@@ -31,7 +31,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 服务端收到数据报并转发时触发。
         /// </summary>
-        public event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        public event Func<ReadOnlyMemory<byte>, MTask> OnDataReceived;
         /// <summary>
         /// 服务端会话或传输断开时触发。
         /// </summary>
@@ -42,9 +42,8 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask ConnectAsync(string host, int port, CancellationToken token = default)
+        public MTask ConnectAsync(string host, int port)
         {
             throw new InvalidOperationException("Server-side transport does not support ConnectAsync.");
         }
@@ -53,11 +52,10 @@ namespace MiniCore.Model
         /// 通过关联的服务端会话发送数据报。
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
+        public MTask SendAsync(ArraySegment<byte> data)
         {
-            return session.SendAsync(data, token);
+            return session.SendAsync(data);
         }
 
         /// <summary>
@@ -87,7 +85,7 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask PushReceivedAsync(ReadOnlyMemory<byte> data)
+        public MTask PushReceivedAsync(ReadOnlyMemory<byte> data)
         {
             return TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }

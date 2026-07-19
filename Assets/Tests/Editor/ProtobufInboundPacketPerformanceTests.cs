@@ -1,5 +1,5 @@
 using System;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Serialization;
@@ -117,10 +117,10 @@ namespace MiniCore.EditorTests
             /// <param name="session">关联会话。</param>
             /// <param name="message">已解析消息。</param>
             /// <returns>同步完成任务。</returns>
-            public override UniTask HandleAsync(NetworkSession session, TestNetworkData message)
+            public override MTask HandleAsync(NetworkSession session, TestNetworkData message)
             {
                 HandledCount += message.Id;
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
 
             #endregion

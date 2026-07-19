@@ -1,7 +1,7 @@
 {
   "name": "MiniCore.Unity",
   "rootNamespace": "",
-  "references": ["MiniCore.Runtime", "MiniCore.Serialization", "GUID:f51ebe6a0ceec4240a699833d6309b23"],
+  "references": ["MiniCore.Runtime", "MiniCore.Serialization", "GUID:e34a5702dd353724aa315fb8011f08c3"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

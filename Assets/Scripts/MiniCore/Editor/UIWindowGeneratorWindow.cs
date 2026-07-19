@@ -121,7 +121,7 @@ namespace MiniCore.EditorTools
             string content = TryLoadTemplate(viewTemplatePath);
             if (string.IsNullOrEmpty(content))
             {
-                content = "using Cysharp.Threading.Tasks;\\nusing MiniCore.Model;\\nusing UnityEngine;\\n\\n[UIWindow(typeof({PRESENTER_CLASS}))]\\npublic class {VIEW_CLASS} : AUIBase\\n{\\n    public override UniTask OpenAsync()\\n    {\\n        return UniTask.CompletedTask;\\n    }\\n\\n    public override UniTask CloseAsync()\\n    {\\n        return UniTask.CompletedTask;\\n    }\\n}\\n";
+                content = "using MiniCore.Threading;\\nusing MiniCore.Model;\\nusing UnityEngine;\\n\\n[UIWindow(typeof({PRESENTER_CLASS}))]\\npublic class {VIEW_CLASS} : AUIBase\\n{\\n    protected override MTask OnOpenAsync()\\n    {\\n        return MTask.CompletedTask;\\n    }\\n\\n    protected override MTask OnCloseAsync()\\n    {\\n        return MTask.CompletedTask;\\n    }\\n}\\n";
             }
             return ApplyTokens(content, viewClass, presenterClass);
         }

@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -26,10 +26,10 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async UniTask StartAsync(string host, int port, CancellationToken token = default)
+        public MTask StartAsync(string host, int port)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             if (listener != null)
             {
                 throw new InvalidOperationException("TcpServer already started.");
@@ -42,7 +42,8 @@ namespace MiniCore.Model
             LogSwitch.Info($"[GM TCP] Listening on {ip}:{port}");
 
             cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            _ = AcceptLoopAsync(cts.Token);
+            AcceptLoopAsync(cts.Token).Forget();
+            return MTask.CompletedTask;
         }
 
         /// <summary>
@@ -78,13 +79,12 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 AcceptLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask AcceptLoopAsync(CancellationToken token)
+        private async MTask AcceptLoopAsync(CancellationToken token)
         {
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 while (!token.IsCancellationRequested && listener != null)
                 {
                     Socket client = await Task<Socket>.Factory.FromAsync(listener.BeginAccept, listener.EndAccept, null);

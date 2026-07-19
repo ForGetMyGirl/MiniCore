@@ -8,7 +8,6 @@
     "MiniCore.Network",
     "MiniCore.Unity",
     "MiniCore.HotUpdate",
-    "GUID:f51ebe6a0ceec4240a699833d6309b23",
     "Unity.PerformanceTesting"
   ],
   "includePlatforms": [

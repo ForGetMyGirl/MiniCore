@@ -1,9 +1,10 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
+using MiniCore.Unity;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ using UnityEngine;
 
 namespace MiniCore.HotUpdate
 {
-    public class MultiProtocolTestPanel : MonoBehaviour
+    public class MultiProtocolTestPanel : AMTaskBehaviour
     {
         private const float DesignWidth = 1920f;
         private const float DesignHeight = 1080f;
@@ -64,7 +65,7 @@ namespace MiniCore.HotUpdate
             AddLog("Multi-protocol test panel ready.");
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
             if (net != null)
             {
@@ -76,6 +77,7 @@ namespace MiniCore.HotUpdate
             EventCenter.RemoveListener<string>(GameEvent.LogInfo, OnInfoMessage);
             EventCenter.RemoveListener<string>(GameEvent.LogWarning, OnWarningMessage);
             Global.ReleaseAll(this);
+            base.OnDestroy();
         }
 
         private void OnGUI()
@@ -293,7 +295,7 @@ namespace MiniCore.HotUpdate
             };
         }
 
-        private async UniTaskVoid StartTcpServerAsync()
+        private async MTask StartTcpServerAsync()
         {
             if (net == null || tcpServerRunning)
             {
@@ -312,7 +314,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid StartKcpServerAsync()
+        private async MTask StartKcpServerAsync()
         {
             if (net == null || kcpServerRunning)
             {
@@ -331,7 +333,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid StartUdpServerAsync()
+        private async MTask StartUdpServerAsync()
         {
             if (net == null || udpServerRunning)
             {
@@ -386,7 +388,7 @@ namespace MiniCore.HotUpdate
             AddLog("UDP server stopped");
         }
 
-        private async UniTaskVoid ConnectTcpAsync()
+        private async MTask ConnectTcpAsync()
         {
             if (net == null)
             {
@@ -396,8 +398,7 @@ namespace MiniCore.HotUpdate
             AddLog($"TCP client connecting to {host}:{tcpPort}...");
             try
             {
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(8));
-                bool ok = await net.ConnectTcpSessionAsync(TcpClientSessionId, host, tcpPort, TimeSpan.FromSeconds(5), cts.Token);
+                bool ok = await net.ConnectTcpSessionAsync(TcpClientSessionId, host, tcpPort, TimeSpan.FromSeconds(5));
                 tcpClientConnected = ok;
                 AddLog(ok ? "TCP client connected" : "TCP client connect failed");
             }
@@ -407,7 +408,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid ConnectKcpAsync()
+        private async MTask ConnectKcpAsync()
         {
             if (net == null)
             {
@@ -417,8 +418,7 @@ namespace MiniCore.HotUpdate
             AddLog($"KCP client connecting to {host}:{kcpPort} conv:{kcpConv}...");
             try
             {
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(8));
-                bool ok = await net.ConnectKcpSessionAsync(KcpClientSessionId, host, kcpPort, kcpConv, TimeSpan.FromSeconds(5), null, cts.Token);
+                bool ok = await net.ConnectKcpSessionAsync(KcpClientSessionId, host, kcpPort, kcpConv, TimeSpan.FromSeconds(5));
                 kcpClientConnected = ok;
                 AddLog(ok ? "KCP client connected" : "KCP client connect failed");
             }
@@ -428,7 +428,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid ConnectUdpAsync()
+        private async MTask ConnectUdpAsync()
         {
             if (net == null)
             {
@@ -438,8 +438,7 @@ namespace MiniCore.HotUpdate
             AddLog($"UDP client connecting to {host}:{udpPort}...");
             try
             {
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(8));
-                bool ok = await net.ConnectUdpSessionAsync(UdpClientSessionId, host, udpPort, TimeSpan.FromSeconds(5), cts.Token);
+                bool ok = await net.ConnectUdpSessionAsync(UdpClientSessionId, host, udpPort, TimeSpan.FromSeconds(5));
                 udpClientConnected = ok;
                 AddLog(ok ? "UDP client connected" : "UDP client connect failed (probe timeout)");
             }
@@ -461,7 +460,7 @@ namespace MiniCore.HotUpdate
             AddLog($"{sessionId} disconnected");
         }
 
-        private async UniTaskVoid SendNormalAsync(string sessionId, string protocol)
+        private async MTask SendNormalAsync(string sessionId, string protocol)
         {
             if (net == null)
             {
@@ -484,7 +483,7 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        private async UniTaskVoid SendRpcAsync(string sessionId, string protocol)
+        private async MTask SendRpcAsync(string sessionId, string protocol)
         {
             if (net == null)
             {

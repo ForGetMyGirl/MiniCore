@@ -9,6 +9,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 - **小而可组合**：系统级能力使用可替换的 AppService，普通 `AComponent` 负责局部业务能力。
 - **边界清晰**：Runtime、Protocol、Serialization 和 Network 保持纯 C#；Unity API 集中在适配层与业务层。
 - **启动简单**：编辑器为 Client/Server 选择 AppService Provider，自动按依赖顺序生成初始化代码；项目只维护一个 `GameStartup`。
+- **异步结构化**：业务统一使用零第三方依赖的 `MTask`；任务自动继承父链与 Owner 生命周期，通常无需逐层传递取消令牌。
 - **业务可热更新**：Bootstrap 通过 YooAsset 和 HybridCLR 加载 `MiniCore.HotUpdate.dll`，Player 与业务程序集解耦。
 - **网络可验证**：内置 TCP、KCP、UDP、RPC、Protobuf、Handler 生成和本机/跨进程网络冒烟测试。
 
@@ -16,7 +17,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 
 | 模块 | 能力 |
 | --- | --- |
-| `MiniCore.Runtime` | `Global` 组件容器、owner 生命周期、AppService/AppModule 契约、Timer、事件、日志、时间抽象 |
+| `MiniCore.Runtime` | `Global` 组件容器、Owner 生命周期、MTask/任务域/执行器、AppService/AppModule 契约、Timer、事件、日志、时间抽象 |
 | `MiniCore.Protocol` | Protobuf 消息、网络角色接口、Opcode 与 Parser 注册表 |
 | `MiniCore.Serialization` | Protobuf 序列化和 JSON 对照实现 |
 | `MiniCore.Network` | TCP / KCP / UDP、Session、RPC、心跳、Handler 派发 |
@@ -49,12 +50,12 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 ```csharp
 public sealed class GameStartup : AGameStartup
 {
-    public override async Task StartAsync()
+    public override async MTask StartAsync()
     {
         if (Application.isBatchMode)
         {
             INetworkService network = Global.GetService<INetworkService>(this);
-            await network.StartKcpServerAsync("0.0.0.0", 20000).AsTask();
+            await network.StartKcpServerAsync("0.0.0.0", 20000);
             return;
         }
 
@@ -89,6 +90,22 @@ using (GlobalScope battle = Global.CreateScope("Battle"))
 3. 在 `Assets/Scripts/MiniCore/HotUpdate` 编写 `AMHandler<T>` 或 `ARpcHandler<TRequest, TResponse>`。
 4. 等待编译完成，Opcode 与 Handler 注册表会自动同步。
 
+### 6. 编写异步业务
+
+公开异步方法返回 `MTask`。普通类中的 MTask 会自动加入当前父任务；组件、服务、模块和 `AMTaskBehaviour` 则是自动取消边界。不要为业务链路传递 `CancellationToken`、创建启动 Handle 或每次切线程都新建线程。
+
+```csharp
+public async MTask RefreshAsync()
+{
+    await MTask.SwitchTo(MTaskExecutors.ThreadPool);
+    CalculateWithoutUnityAccess();
+    await MTask.SwitchTo(MTaskExecutors.Unity);
+    ApplyToView();
+}
+```
+
+运行期组件释放会先调用 `OnDisposing()` 关闭 Socket 等阻塞 I/O，再等待任务 finally 并调用 `OnDispose()`。关闭 Player 或停止 Play Mode 使用快速退出，不阻塞主线程等待后台任务；详细语义见下方 MTask 文档。
+
 ## 典型启动链
 
 ```text
@@ -107,6 +124,7 @@ HotUpdateScene
 | 想了解什么 | 阅读文档 |
 | --- | --- |
 | AppService、参数配置、能力目录、`GameStartup` 如何编写 | [项目启动与服务配置](Docs/StartupModules.md) |
+| `MTask`、自动取消、Owner 任务域、执行器与快速退出 | [MTask 结构化异步](Docs/MTask.md) |
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
@@ -122,6 +140,6 @@ HotUpdateScene
 - Unity `2021.3.45f2c1`
 - HybridCLR `v8.5.0`
 - YooAsset `2.3.18`
-- UniTask
+- MiniCore MTask（核心无 UniTask、Burst、Cecil 依赖；Unity 2021.3 Owner 注入为 Editor-only 随附插件）
 - Google.Protobuf `3.29.5`
 - Newtonsoft Json

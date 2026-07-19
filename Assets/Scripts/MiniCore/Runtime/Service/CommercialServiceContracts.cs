@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
+using MiniCore.Threading;
 
 namespace MiniCore.Service
 {
@@ -68,18 +68,16 @@ namespace MiniCore.Service
         /// <typeparam name="T">待保存数据类型。</typeparam>
         /// <param name="slotName">逻辑槽位名称。</param>
         /// <param name="data">待保存数据。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>保存完成任务。</returns>
-        Task SaveAsync<T>(string slotName, T data, CancellationToken token = default);
+        MTask SaveAsync<T>(string slotName, T data);
 
         /// <summary>
         /// 异步读取一个逻辑槽位的数据。
         /// </summary>
         /// <typeparam name="T">目标数据类型。</typeparam>
         /// <param name="slotName">逻辑槽位名称。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>槽位不存在时返回空；否则返回反序列化数据。</returns>
-        Task<T> LoadAsync<T>(string slotName, CancellationToken token = default) where T : class;
+        MTask<T> LoadAsync<T>(string slotName) where T : class;
     }
 
     /// <summary>
@@ -100,17 +98,15 @@ namespace MiniCore.Service
         /// <summary>
         /// 异步加载设置。
         /// </summary>
-        /// <param name="token">取消令牌。</param>
         /// <returns>加载完成任务。</returns>
-        Task LoadAsync(CancellationToken token = default);
+        MTask LoadAsync();
 
         /// <summary>
         /// 替换设置并持久化。
         /// </summary>
         /// <param name="settings">待保存设置。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>保存完成任务。</returns>
-        Task SaveAsync(ClientSettings settings, CancellationToken token = default);
+        MTask SaveAsync(ClientSettings settings);
     }
 
     /// <summary>
@@ -223,9 +219,8 @@ namespace MiniCore.Service
         /// 将鉴权信息追加到本次请求头集合。
         /// </summary>
         /// <param name="headers">可修改的请求头集合。</param>
-        /// <param name="token">请求取消令牌。</param>
         /// <returns>鉴权信息准备完成任务。</returns>
-        Task ApplyAsync(IDictionary<string, string> headers, CancellationToken token = default);
+        MTask ApplyAsync(IDictionary<string, string> headers);
     }
 
     /// <summary>
@@ -309,9 +304,8 @@ namespace MiniCore.Service
         /// 发送原始 HTTP 请求。
         /// </summary>
         /// <param name="request">请求描述。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>原始 HTTP 响应。</returns>
-        Task<HttpResponse> SendAsync(HttpRequest request, CancellationToken token = default);
+        MTask<HttpResponse> SendAsync(HttpRequest request);
 
         /// <summary>
         /// 发送 JSON 请求并反序列化 JSON 响应。
@@ -321,9 +315,8 @@ namespace MiniCore.Service
         /// <param name="url">HTTP 或 HTTPS 的绝对请求地址。</param>
         /// <param name="request">请求对象。</param>
         /// <param name="method">HTTP 方法。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>反序列化后的响应对象。</returns>
-        Task<TResponse> SendJsonAsync<TRequest, TResponse>(string url, TRequest request, string method = "POST", CancellationToken token = default);
+        MTask<TResponse> SendJsonAsync<TRequest, TResponse>(string url, TRequest request, string method = "POST");
 
         /// <summary>
         /// 发送 Protobuf 二进制请求并将响应反序列化为指定消息类型。
@@ -333,9 +326,8 @@ namespace MiniCore.Service
         /// <param name="requestBody">请求消息序列化后的二进制正文。</param>
         /// <param name="responseParser">将原始响应正文转换为目标消息的函数。</param>
         /// <param name="method">HTTP 方法。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>响应消息。</returns>
-        Task<TResponse> SendProtobufAsync<TResponse>(string url, byte[] requestBody, Func<byte[], TResponse> responseParser, string method = "POST", CancellationToken token = default);
+        MTask<TResponse> SendProtobufAsync<TResponse>(string url, byte[] requestBody, Func<byte[], TResponse> responseParser, string method = "POST");
     }
 
     /// <summary>

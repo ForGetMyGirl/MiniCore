@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Net.Sockets;
 using System.Threading;
@@ -44,9 +44,8 @@ namespace MiniCore.Model
         /// 通过已连接套接字发送数据。
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
+        public MTask SendAsync(ArraySegment<byte> data)
         {
             if (closed)
             {
@@ -59,7 +58,7 @@ namespace MiniCore.Model
             }
 
             socket.Send(data.Array, data.Offset, data.Count, SocketFlags.None);
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
 
         /// <summary>

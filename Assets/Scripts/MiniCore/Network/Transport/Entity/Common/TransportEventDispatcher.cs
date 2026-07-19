@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 
 namespace MiniCore.Model
@@ -14,7 +14,7 @@ namespace MiniCore.Model
         /// <param name="handler">执行该方法所需的 handler 参数。</param>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public static async UniTask DispatchAsync(Func<ReadOnlyMemory<byte>, UniTask> handler, ReadOnlyMemory<byte> data)
+        public static async MTask DispatchAsync(Func<ReadOnlyMemory<byte>, MTask> handler, ReadOnlyMemory<byte> data)
         {
             if (handler == null)
             {
@@ -23,7 +23,7 @@ namespace MiniCore.Model
 
             foreach (var del in handler.GetInvocationList())
             {
-                var callback = (Func<ReadOnlyMemory<byte>, UniTask>)del;
+                var callback = (Func<ReadOnlyMemory<byte>, MTask>)del;
                 await callback(data);
             }
         }
@@ -35,7 +35,7 @@ namespace MiniCore.Model
         /// <param name="sender">执行该方法所需的 sender 参数。</param>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public static async UniTask DispatchAsync<TSender>(Func<TSender, ReadOnlyMemory<byte>, UniTask> handler, TSender sender, ReadOnlyMemory<byte> data)
+        public static async MTask DispatchAsync<TSender>(Func<TSender, ReadOnlyMemory<byte>, MTask> handler, TSender sender, ReadOnlyMemory<byte> data)
         {
             if (handler == null)
             {
@@ -44,7 +44,7 @@ namespace MiniCore.Model
 
             foreach (var del in handler.GetInvocationList())
             {
-                var callback = (Func<TSender, ReadOnlyMemory<byte>, UniTask>)del;
+                var callback = (Func<TSender, ReadOnlyMemory<byte>, MTask>)del;
                 await callback(sender, data);
             }
         }

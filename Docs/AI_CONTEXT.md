@@ -33,6 +33,18 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 - `IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`ISceneBindingService` / `SceneBindingService`、`IUIService` / `UIService` 已替换并删除旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`UIFactoryComponent`；不得重新引入这些旧类型或兼容包装。
 - 普通 `AComponent` 不在启动配置左侧登记。需要让开发者发现时使用 `[ComponentCatalog("名称", Description = "具体职责")]`；不要把框架内部装配组件标为目录能力。
 
+## MTask 规则
+
+- 业务层和公开服务契约统一返回 `MTask` / `MTask<T>`；System Task 和 `CancellationToken` 只能出现在 BCL/第三方适配边界。
+- `AComponent`、AppService、AppModule 和 `AMTaskBehaviour` 自动拥有任务域。不要新增 Start Handle、Task Scope 或在业务方法间传递 Token。
+- 普通 MTask 只等待一次；多个消费者必须显式 `.Share()`。不等待的长寿命任务必须 `.Forget()`，使它转移到 Owner 监督域。
+- 长 CPU 循环无法被安全强杀，必须周期调用 `MTask.ThrowIfCancellationRequested()` 或 `await MTask.Yield()`。
+- 任务池、Runner、执行器队列和计时器使用有上限池化；可通过 `MTaskDiagnostics.Capture()` 检查命中、扩容、回收失败、活动 Node 和 Timer。
+- `AComponent.OnDisposing()` 发生在任务域取消前，只放立即解除阻塞的同步操作，例如关闭 Socket、监听器和外部 I/O；`OnDispose()` 只在任务 finally 退场后做最终清理。
+- `MTaskExecutors.Unity` 只代表主线程队列；专用线程必须由模块用 `CreateDedicated(name)` 创建、持有和释放，短时无亲和性计算用 `ThreadPool`。`SwitchTo` 只切换到已有执行器，绝不隐式创建线程。
+- Runtime 的 MTask 核心不依赖 UniTask、Burst 或 Cecil。Owner 自动注入是随项目交付的 Unity 2021.3 Editor-only 插件，不进入 Player，也不增加外部 UPM 依赖。
+- 应用退出/停止 Play Mode 使用快速退出：只取消任务并抽取一次主线程队列，不等待 finally 或专用线程 Join。开发环境的未退场任务、计时器诊断是退出快照，不代表运行中的泄露；运行期正常释放仍必须收敛这些数量。
+
 ## 网络与协议规则
 
 - Proto 根目录是 `Proto/`；业务文件按领域组织，不按 ClientToServer/ServerToClient 拆分。

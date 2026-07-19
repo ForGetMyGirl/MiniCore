@@ -59,12 +59,10 @@ namespace MiniCore.Service
         /// <summary>
         /// 退出时尝试写完尚未落盘的记录。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             Flush();
-            Global.ReleaseAll(this);
             storagePathService = null;
-            base.Dispose();
         }
 
         #endregion

@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 using UnityEngine;
@@ -17,7 +17,7 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>加载完成的资源对象。</returns>
-        UniTask<T> LoadAssetAsync<T>(string key) where T : Object;
+        MTask<T> LoadAssetAsync<T>(string key) where T : Object;
 
         /// <summary>
         /// 异步实例化资源对象。
@@ -25,7 +25,7 @@ namespace MiniCore.Service
         /// <param name="key">资源地址或资源键。</param>
         /// <param name="parent">实例化对象的父节点。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        UniTask<GameObject> InstantiateAsync(string key, Transform parent = null);
+        MTask<GameObject> InstantiateAsync(string key, Transform parent = null);
 
         /// <summary>
         /// 异步预加载资源并缓存句柄。
@@ -33,7 +33,7 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>预加载完成的资源对象。</returns>
-        UniTask<T> PreloadAssetAsync<T>(string key) where T : Object;
+        MTask<T> PreloadAssetAsync<T>(string key) where T : Object;
 
         /// <summary>
         /// 释放指定预加载资源的句柄。
@@ -102,7 +102,7 @@ namespace MiniCore.Service
         /// <param name="key">资源地址或资源键。</param>
         /// <param name="parent">实例化对象的父节点。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        UniTask<GameObject> InstantiateAsync(string key, Transform parent = null);
+        MTask<GameObject> InstantiateAsync(string key, Transform parent = null);
 
         /// <summary>
         /// 异步实例化已经预加载的对象。
@@ -110,7 +110,7 @@ namespace MiniCore.Service
         /// <param name="key">预加载资源键。</param>
         /// <param name="parent">实例化对象的父节点。</param>
         /// <returns>资源已预加载时返回实例化对象；否则返回 null。</returns>
-        UniTask<GameObject> InstantiatePreloadAssetAsync(string key, Transform parent);
+        MTask<GameObject> InstantiatePreloadAssetAsync(string key, Transform parent);
 
         /// <summary>
         /// 异步预加载资源。
@@ -118,35 +118,35 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>预加载完成的资源对象。</returns>
-        UniTask<T> PreloadAssetAsync<T>(string key) where T : Object;
+        MTask<T> PreloadAssetAsync<T>(string key) where T : Object;
 
         /// <summary>
         /// 异步实例化顶层 UI。
         /// </summary>
         /// <param name="key">UI 资源地址或资源键。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        UniTask<GameObject> InstantiateTopUIAsync(string key);
+        MTask<GameObject> InstantiateTopUIAsync(string key);
 
         /// <summary>
         /// 异步实例化主 UI。
         /// </summary>
         /// <param name="key">UI 资源地址或资源键。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        UniTask<GameObject> InstantiateMainUIAsync(string key);
+        MTask<GameObject> InstantiateMainUIAsync(string key);
 
         /// <summary>
         /// 异步实例化底层 UI。
         /// </summary>
         /// <param name="key">UI 资源地址或资源键。</param>
         /// <returns>实例化完成的游戏对象。</returns>
-        UniTask<GameObject> InstantiateBottomUIAsync(string key);
+        MTask<GameObject> InstantiateBottomUIAsync(string key);
 
         /// <summary>
         /// 异步加载图集。
         /// </summary>
         /// <param name="key">图集资源地址或资源键。</param>
         /// <returns>加载完成的图集。</returns>
-        UniTask<SpriteAtlas> LoadSpriteAtlasAsync(string key);
+        MTask<SpriteAtlas> LoadSpriteAtlasAsync(string key);
 
         /// <summary>
         /// 异步加载资源。
@@ -154,7 +154,7 @@ namespace MiniCore.Service
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>加载完成的资源对象。</returns>
-        UniTask<T> LoadAssetAsync<T>(string key) where T : Object;
+        MTask<T> LoadAssetAsync<T>(string key) where T : Object;
 
         /// <summary>
         /// 销毁指定游戏对象。
@@ -185,7 +185,7 @@ namespace MiniCore.Service
         /// <param name="layer">窗口显示层级。</param>
         /// <param name="count">预加载数量。</param>
         /// <returns>预加载完成任务。</returns>
-        UniTask PreloadAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer, int count = 1)
+        MTask PreloadAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer, int count = 1)
             where TView : AUIBase
             where TPresenter : IPresenter, new();
 
@@ -197,7 +197,7 @@ namespace MiniCore.Service
         /// <param name="assetPath">窗口资源地址。</param>
         /// <param name="layer">窗口显示层级。</param>
         /// <returns>打开后的 View 与 Presenter。</returns>
-        UniTask<(TView View, TPresenter Presenter)> OpenAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer)
+        MTask<(TView View, TPresenter Presenter)> OpenAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer)
             where TView : AUIBase
             where TPresenter : IPresenter, new();
 
@@ -208,6 +208,6 @@ namespace MiniCore.Service
         /// <param name="view">要关闭的窗口 View。</param>
         /// <param name="cache">是否放入缓存池。</param>
         /// <returns>关闭完成任务。</returns>
-        UniTask CloseAsync<TView>(TView view, bool cache = true) where TView : AUIBase;
+        MTask CloseAsync<TView>(TView view, bool cache = true) where TView : AUIBase;
     }
 }

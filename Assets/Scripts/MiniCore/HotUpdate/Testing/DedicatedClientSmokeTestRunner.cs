@@ -1,8 +1,9 @@
 using System;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
+using MiniCore.Unity;
 using UnityEngine;
 
 namespace MiniCore.HotUpdate
@@ -10,7 +11,7 @@ namespace MiniCore.HotUpdate
     /// <summary>
     /// 连接独立 Dedicated Server 的 KCP 客户端冒烟执行器，验证客户端入口、热更新 Handler 与跨进程业务链路。
     /// </summary>
-    public sealed class DedicatedClientSmokeTestRunner : MonoBehaviour
+    public sealed class DedicatedClientSmokeTestRunner : AMTaskBehaviour
     {
         #region Private 私有成员
 
@@ -23,7 +24,7 @@ namespace MiniCore.HotUpdate
         private const uint KcpConv = 1001; // Dedicated Server 冒烟连接标识。
         private static readonly TimeSpan StageTimeout = TimeSpan.FromSeconds(5); // 单个验证阶段的最长等待时长。
 
-        private readonly UniTaskCompletionSource<bool> completionSource = new UniTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
+        private readonly MTaskCompletionSource<bool> completionSource = new MTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
         private INetworkService network; // 已由客户端入口初始化并注册 Handler 的网络服务。
         private GUIStyle statusStyle; // Player 屏幕状态文本样式缓存。
         private bool heldNetworkReference; // 当前对象是否持有网络组件引用。
@@ -89,7 +90,7 @@ namespace MiniCore.HotUpdate
         /// 运行一次独立 Dedicated Server 的 KCP 业务验证；重复调用会返回同一轮运行结果。
         /// </summary>
         /// <returns>KCP 连接、普通消息、RPC 与断连均通过时返回 true。</returns>
-        public UniTask<bool> RunAsync()
+        public MTask<bool> RunAsync()
         {
             if (!isRunning)
             {
@@ -144,7 +145,7 @@ namespace MiniCore.HotUpdate
         /// <summary>
         /// 执行独立 Dedicated Server 的完整 KCP 冒烟流程并将成功或失败写入统一结果。
         /// </summary>
-        private async UniTaskVoid RunInternalAsync()
+        private async MTask RunInternalAsync()
         {
             try
             {
@@ -172,7 +173,7 @@ namespace MiniCore.HotUpdate
                     IsServerShutdown = false,
                     Reason = $"{SmokePrefix}close"
                 });
-                await UniTask.Delay(200);
+                await MTask.Delay(200);
 
                 isPassed = true;
                 statusMessage = "DEDICATED_CLIENT_SMOKE: PASS protocol:KCP";

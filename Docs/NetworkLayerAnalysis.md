@@ -86,14 +86,14 @@ Opcode 表示一条消息已经接入当前网络处理链，而不是单纯存�
 public sealed class EnterBattleHandler
     : ARpcHandler<EnterBattleRequest, EnterBattleResponse>
 {
-    public override UniTask HandleAsync(
+    public override MTask HandleAsync(
         NetworkSession session,
         EnterBattleRequest request,
         EnterBattleResponse response)
     {
         response.Code = 0;
         response.Msg = string.Empty;
-        return UniTask.CompletedTask;
+        return MTask.CompletedTask;
     }
 }
 ```
@@ -149,6 +149,12 @@ public sealed class EnterBattleHandler
 | KCP | UDP 承载 KCP 分片，KCP 重组后向上交付完整业务 packet |
 
 `NetworkService` 缓存 Type 到 Opcode 的结果、使用入站并发队列接收数据，并在主线程 Tick 中完成反序列化和业务 Handler 派发。网络线程不调用 Unity API，也不直接执行业务 Handler。
+
+### 执行器与退出
+
+`NetworkService` 在启动时创建并持有自己的网络专用执行器；它不是全局按名称临时开线程的入口。收发、协议拆包和线程安全数据阶段在该执行器上运行，业务 Handler 始终回到 Unity 主线程队列。序列化、AI 或数据库等其他模块若需要线程亲和性，也应分别创建、持有和释放各自的 `MDedicatedThreadExecutor`；短时后台计算则使用共享的 `MTaskExecutors.ThreadPool`。
+
+运行期释放网络组件时，`NetworkSessionComponent.OnDisposing()` 会先关闭监听器、Socket 和会话，解除阻塞 I/O；随后任务域取消，`OnDispose()` 才进行最终回收并正常等待网络线程退出。应用退出或停止 Play Mode 属于快速退出：只发出取消和执行器停止信号，不在 Unity 主线程 Join 网络线程，也不保证未完成收发或 finally 全部完成。
 
 ## 5. 调用方式
 

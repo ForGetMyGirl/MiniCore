@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
@@ -17,7 +17,7 @@ namespace MiniCore.HotUpdate
         /// <param name="session">执行该方法所需的 session 参数。</param>
         /// <param name="message">执行该方法所需的 message 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public override UniTask HandleAsync(NetworkSession session, DisconnectNotice message)
+        public override MTask HandleAsync(NetworkSession session, DisconnectNotice message)
         {
             string reason = string.IsNullOrWhiteSpace(message.Reason) ? string.Empty : $" 原因:{message.Reason}";
             string text = message.IsServerShutdown
@@ -37,7 +37,7 @@ namespace MiniCore.HotUpdate
                 Global.ReleaseAll(this);
             }
 
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
     }
 }

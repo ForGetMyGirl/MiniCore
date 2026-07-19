@@ -1,5 +1,3 @@
-using System.Threading;
-
 namespace MiniCore.Core
 {
     /// <summary>
@@ -7,10 +5,7 @@ namespace MiniCore.Core
     /// </summary>
     public sealed class NetworkHeartbeatState
     {
-        /// <summary>
-        /// 取消该会话心跳循环的令牌源。
-        /// </summary>
-        public CancellationTokenSource Cts;
+        internal int Stopped; // 会话心跳是否已被停止，使用 Volatile 读写。
         /// <summary>
         /// 最近一次收到 Pong 的 Unix 毫秒时间戳。
         /// </summary>

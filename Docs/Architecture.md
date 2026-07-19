@@ -71,6 +71,8 @@ flowchart BT
 
 同一 owner 每获取一次就对应持有一份引用。组件在最后一份 owner 引用释放时执行 `Dispose` 并从容器移除。`Pin` 使用 Global 内部 root owner，重复 Pin 不会叠加常驻引用。
 
+`AComponent.Dispose()` 是不可重写的两阶段入口：先标记释放、停止 Tick，并调用 `protected OnDisposing()`；这个同步钩子用于立即关闭 Socket、监听器和外部 I/O。随后取消组件任务域，等子组件和异步 `finally` 全部退场后才调用 `protected OnDispose()` 做最终清理，最后由基类自动归还该组件持有的 Global 引用。派生类不应再手写 `Global.ReleaseAll(this)`。释放期间 Global 保留同类型墓碑，既不返回旧对象，也不创建替代实例。
+
 ```csharp
 public sealed class BattleFlow : IDisposable
 {
@@ -110,9 +112,17 @@ AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.G
 
 `ComponentGroup` 的键是 `(组件具体类型, GroupId)`。因此两个 MOBA 对局可各自拥有 `BattleComponent`、`RoomComponent` 与计时器实例；单位、子弹、怪物等高频对象仍应由 Battle 内部实体容器或对象池管理，而不应成为 Global 多实例组件。
 
+### MTask 结构化异步
+
+Runtime 公开异步 API 统一使用 `MTask` / `MTask<T>`。`AComponent`、AppService、AppModule、`GlobalScope`、`ComponentGroup` 与 Unity `AMTaskBehaviour` 都是任务 Owner；开发者不需要传递 `CancellationToken`、创建 Scope 或保存启动 Handle。Owner 入口由 IL 后处理器绑定，普通类中的 MTask 调用通过当前任务节点自动加入父子树；找不到父任务或 Owner 时才挂到应用根域，并在开发环境给出诊断。
+
+父方法退出会取消并等待未完成子任务的 `finally`；只有显式 `.Forget()` 的任务会转移到最近 Owner 监督域。普通 MTask 只能消费一次，需要多方等待时显式 `.Share()`。`MTaskExecutors.Unity`、模块自行持有的 `MTaskExecutors.CreateDedicated(name)` 与 `MTaskExecutors.ThreadPool` 可通过 `MTask.SwitchTo` 切换；切换只投递到既有执行器，不会按调用次数创建线程。BCL 确实要求 Token 时，只在外部适配边界使用 `MTaskExternal.GetCancellationToken()`。
+
+`MiniCore.Runtime` 的 MTask 核心是纯 C#，不直接依赖 UniTask、Burst 或 Cecil。Unity 2021.3 的 Owner 自动注入以 Editor-only 的 `MiniCore.MTask.CodeGen.dll` 随仓库交付，仅使用编辑器内置的 ILPostProcessor/Cecil API；它不进入 Player，也不要求导入项目额外安装包。完整用法、构建工具与限制见 [MTask 结构化异步](MTask.md)。
+
 ### Unity 与非 Unity 宿主
 
-- Unity：`UnityGlobalDriver` 的 `Awake` 调用 `Global.Initialize(new UnityTimeProvider())`，`Update` 调用 `Global.Tick()`，退出时调用 `Global.Shutdown()`。Tick 使用内部快照复用，不创建每帧 Context。
+- Unity：`UnityGlobalDriver` 的 `Awake` 初始化 Unity 执行器、应用根任务域和 `Global`，`Update` 抽取 MTask 主线程队列后调用 `Global.Tick()`。应用退出或停止 Play Mode 时先进入 MTask 快速退出：取消任务、只抽取一次主线程队列且不等待专用线程 Join，再关闭 Global；运行期组件释放仍保持等待 finally 的完整语义。Tick 使用内部快照复用，不创建每帧 Context。
 - 非 Unity：宿主自行调用 `Global.Initialize(customTimeProvider)`，在自己的循环中调用 `Global.Tick()`，进程退出时 `Global.Shutdown()`。Runtime、Protocol、Serialization、Network 不需要 UnityEngine。
 
 ## 4. 启动与热更新链
@@ -144,7 +154,7 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 
 ### AppService、GameStartup 与生成代码
 
-通过 `MiniCore > 项目启动配置` 为 AppService Provider 选择 Client、Server 或两者，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。同一目标没有异步服务时，生成普通 `Task` 方法，避免无意义的 `async` 与无效模式匹配。
+通过 `MiniCore > 项目启动配置` 为 AppService Provider 选择 Client、Server 或两者，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
 
 右侧只读能力目录按 Service、AppModule 和带 `ComponentCatalogAttribute` 的普通 `AComponent` 分组，可折叠显示描述、接口和完整命名空间。`Description` 是 `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 的统一元数据；它不参与启动逻辑。
 

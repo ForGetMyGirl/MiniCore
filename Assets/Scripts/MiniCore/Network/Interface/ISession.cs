@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Threading;
 
@@ -20,7 +20,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 发送一个完整业务数据包。
         /// </summary>
-        UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default);
+        MTask SendAsync(ArraySegment<byte> data);
         /// <summary>
         /// 关闭会话。
         /// </summary>

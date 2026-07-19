@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 
@@ -15,11 +15,12 @@ namespace MiniCore.HotUpdate
         /// <param name="session">执行该方法所需的 session 参数。</param>
         /// <param name="message">执行该方法所需的 message 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public override async UniTask HandleAsync(NetworkSession session, DemoNormalMessage message)
+        public override MTask HandleAsync(NetworkSession session, DemoNormalMessage message)
         {
             string text = $"收到普通消息，会话:{session.SessionId} 内容:{message.Content}";
             LogSwitch.Info(text);
             EventCenter.Broadcast(HotEvent.KcpTestMessage, text);
+            return MTask.CompletedTask;
         }
     }
 }

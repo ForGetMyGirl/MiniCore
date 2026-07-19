@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.Model;
 using NUnit.Framework;
 using Unity.PerformanceTesting;
@@ -90,11 +90,11 @@ namespace MiniCore.EditorTests
             /// </summary>
             /// <param name="session">本次消息关联的网络会话，基准测试中为空。</param>
             /// <param name="message">已完成反序列化的普通消息。</param>
-            /// <returns>同步完成的 UniTask。</returns>
-            public override UniTask HandleAsync(NetworkSession session, BenchmarkMessage message)
+            /// <returns>同步完成的 MTask。</returns>
+            public override MTask HandleAsync(NetworkSession session, BenchmarkMessage message)
             {
                 handledCount += message.Value;
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
         }
 

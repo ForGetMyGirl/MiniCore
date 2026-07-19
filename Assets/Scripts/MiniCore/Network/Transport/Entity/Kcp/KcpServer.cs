@@ -1,10 +1,9 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 
 namespace MiniCore.Model
@@ -96,7 +95,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 接收到 KCP 重组后的业务包时触发。
         /// </summary>
-        public event Func<IServerSession, ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        public event Func<IServerSession, ReadOnlyMemory<byte>, MTask> OnDataReceived;
 
         /// <summary>
         /// 使用指定配置创建 KCP 服务端。
@@ -113,10 +112,10 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask StartAsync(string host, int port, CancellationToken token = default)
+        public MTask StartAsync(string host, int port)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             if (running)
             {
                 throw new InvalidOperationException("KcpServer already running.");
@@ -129,9 +128,9 @@ namespace MiniCore.Model
 
             receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
             updateCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            _ = ReceiveLoopAsync(receiveCts.Token);
-            _ = UpdateLoopAsync(updateCts.Token);
-            return UniTask.CompletedTask;
+            ReceiveLoopAsync(receiveCts.Token).Forget();
+            UpdateLoopAsync(updateCts.Token).Forget();
+            return MTask.CompletedTask;
         }
 
         /// <summary>
@@ -205,14 +204,13 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 ReceiveLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask ReceiveLoopAsync(CancellationToken token)
+        private async MTask ReceiveLoopAsync(CancellationToken token)
         {
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                 while (!token.IsCancellationRequested && running)
                 {
@@ -298,13 +296,12 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 UpdateLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask UpdateLoopAsync(CancellationToken token)
+        private async MTask UpdateLoopAsync(CancellationToken token)
         {
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 while (!token.IsCancellationRequested && running)
                 {
                     uint now = CurrentMS();
@@ -323,7 +320,7 @@ namespace MiniCore.Model
                         }
                     }
 
-                    await Task.Delay(config.Interval, token).ConfigureAwait(false);
+                    await MTask.Delay(config.Interval);
                 }
             }
             catch (OperationCanceledException)
@@ -401,7 +398,7 @@ namespace MiniCore.Model
         /// <param name="session">执行该方法所需的 session 参数。</param>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask InvokeDataReceivedAsync(IServerSession session, ReadOnlyMemory<byte> data)
+        private async MTask InvokeDataReceivedAsync(IServerSession session, ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, session, data);
         }

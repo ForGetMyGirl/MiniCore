@@ -1,7 +1,6 @@
 using System;
-using System.Threading;
-using System.Threading.Tasks;
 using MiniCore.Model;
+using MiniCore.Threading;
 
 namespace MiniCore.Service
 {
@@ -30,9 +29,8 @@ namespace MiniCore.Service
         /// <summary>
         /// 异步初始化服务。
         /// </summary>
-        /// <param name="token">应用启动取消令牌。</param>
         /// <returns>初始化完成任务。</returns>
-        Task InitializeAsync(CancellationToken token = default);
+        MTask InitializeAsync();
     }
 
     /// <summary>

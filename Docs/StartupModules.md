@@ -7,8 +7,16 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 1. Bootstrap 场景的 `UpdateMainWindow` 初始化 YooAsset、HybridCLR 并加载 HotUpdate DLL。
 2. Bootstrap 根据 Player 模式调用客户端或 Dedicated Server 的稳定入口。
 3. `MiniCoreStartup.StartAsync()` 按 Player 模式为每个 AppService 接口选择一个 Provider，使用 `Global.RegisterAppService` 注册，并按依赖顺序启动。
-4. 仅实现 `IAsyncAppService` 的服务会在注册后调用并等待 `InitializeAsync()`；没有异步服务的目标生成普通 `Task` 方法，不会生成无效的接口判断。
+4. 仅实现 `IAsyncAppService` 的服务会在注册后调用并等待 `InitializeAsync()`；生成入口统一返回 `MTask`，不会生成无效的接口判断。
 5. 服务启动完成后，调用项目唯一的 `GameStartup.StartAsync()`。
+
+## MTask 生命周期与退出
+
+启动代码、AppService、AppModule 和业务公开异步 API 均使用 `MTask`，不在业务签名中传递 `CancellationToken`。Owner 域会自动管理入口任务及其普通类子调用；需要后台常驻的工作显式调用 `.Forget()`，由最近 Owner 监督，而不是保存 Handle 或手工创建 Task Scope。
+
+服务或组件释放时，把关闭 Socket、停止监听器、解除外部 I/O 等同步动作放进 `OnDisposing()`；把依赖任务 finally 已退出的资源回收放进 `OnDispose()`。应用退出和 Editor 停止 Play Mode 为快速退出，只请求取消和停止专用执行器，不等待后台任务或线程完整收尾；因此退出路径不能承担存盘、遥测上传等必须完成的业务。
+
+模块需要独占线程时用 `MTaskExecutors.CreateDedicated(name)` 创建并由模块持有，在正常 `OnDispose()` 中释放；`MTask.SwitchTo(executor)` 只切换到已有执行器。不要把“网络线程”当作唯一选项，也不要在每次调用时新建线程。
 
 ## 配置服务与能力目录
 
@@ -124,12 +132,12 @@ LoginResponse response = await http.SendJsonAsync<LoginRequest, LoginResponse>(
 ```csharp
 public sealed class GameStartup : AGameStartup
 {
-    public override async Task StartAsync()
+    public override async MTask StartAsync()
     {
         if (Application.isBatchMode)
         {
             INetworkService network = Global.GetService<INetworkService>(this);
-            await network.StartKcpServerAsync("0.0.0.0", 20000).AsTask();
+            await network.StartKcpServerAsync("0.0.0.0", 20000);
             return;
         }
 
@@ -148,10 +156,9 @@ public sealed class GameStartup : AGameStartup
     Description = "加载并维护排行榜业务数据。")]
 public sealed class RankingComponent : AComponent<RankingComponentInitArgs>
 {
-    public override void Dispose()
+    protected override void OnDispose()
     {
-        Global.ReleaseAll(this);
-        base.Dispose();
+        // 只清理组件自身资源；AComponent 会自动归还 Global 引用。
     }
 }
 

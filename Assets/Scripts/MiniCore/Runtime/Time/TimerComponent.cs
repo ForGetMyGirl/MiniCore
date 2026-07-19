@@ -95,12 +95,11 @@ namespace MiniCore.Service
         /// <summary>
         /// 清空计时任务并释放组件资源。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             tasks.Clear();
             pendingAdd.Clear();
             pendingRemove.Clear();
-            base.Dispose();
         }
 
         /// <summary>

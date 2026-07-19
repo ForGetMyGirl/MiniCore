@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Collections.Generic;
 using MiniCore.Core;
@@ -43,13 +43,11 @@ namespace MiniCore.Service
         /// <summary>
         /// 释放 UI 服务持有的全局服务引用和窗口缓存。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
             uiBaseAndPresenterMapping?.Clear();
             cachedWindows.Clear();
             activePresenters.Clear();
-            Global.ReleaseAll(this);
-            base.Dispose();
         }
 
         #endregion
@@ -65,7 +63,7 @@ namespace MiniCore.Service
         /// <param name="layer">窗口显示层级。</param>
         /// <param name="count">预加载数量。</param>
         /// <returns>预加载完成任务。</returns>
-        public async UniTask PreloadAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer, int count = 1)
+        public async MTask PreloadAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer, int count = 1)
             where TView : AUIBase
             where TPresenter : IPresenter, new()
         {
@@ -84,7 +82,7 @@ namespace MiniCore.Service
         /// <param name="assetPath">窗口资源地址。</param>
         /// <param name="layer">窗口显示层级。</param>
         /// <returns>打开后的 View 与 Presenter。</returns>
-        public async UniTask<(TView, TPresenter)> OpenAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer)
+        public async MTask<(TView, TPresenter)> OpenAsync<TView, TPresenter>(string assetPath, UICanvasLayer layer)
             where TView : AUIBase
             where TPresenter : IPresenter, new()
         {
@@ -115,7 +113,7 @@ namespace MiniCore.Service
         /// <param name="view">要关闭的窗口 View。</param>
         /// <param name="cache">是否放入缓存池。</param>
         /// <returns>关闭完成任务。</returns>
-        public async UniTask CloseAsync<TView>(TView view, bool cache = true) where TView : AUIBase
+        public async MTask CloseAsync<TView>(TView view, bool cache = true) where TView : AUIBase
         {
             if (view == null) return;
 
@@ -201,7 +199,7 @@ namespace MiniCore.Service
         /// <param name="layer">窗口显示层级。</param>
         /// <param name="setActive">实例化后是否立即激活。</param>
         /// <returns>实例化完成的窗口 View。</returns>
-        private async UniTask<AUIBase> CreateWindowInstanceAsync<TView>(string assetPath, UICanvasLayer layer, bool setActive)
+        private async MTask<AUIBase> CreateWindowInstanceAsync<TView>(string assetPath, UICanvasLayer layer, bool setActive)
             where TView : AUIBase
         {
             Transform parent = GetParentByLayer(layer);

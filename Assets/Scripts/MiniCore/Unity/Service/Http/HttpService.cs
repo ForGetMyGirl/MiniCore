@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Threading;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
 
@@ -78,12 +79,10 @@ namespace MiniCore.Service
         /// <summary>
         /// 释放可选服务引用。
         /// </summary>
-        public override void Dispose()
+        protected override void OnDispose()
         {
-            Global.ReleaseAll(this);
             authProvider = null;
             telemetry = null;
-            base.Dispose();
         }
 
         #endregion
@@ -94,9 +93,8 @@ namespace MiniCore.Service
         /// 发送原始 HTTP 请求，并仅对安全或显式幂等请求执行退避重试。
         /// </summary>
         /// <param name="request">请求描述。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>原始响应。</returns>
-        public async Task<HttpResponse> SendAsync(HttpRequest request, CancellationToken token = default)
+        public async MTask<HttpResponse> SendAsync(HttpRequest request)
         {
             if (request == null)
             {
@@ -108,8 +106,8 @@ namespace MiniCore.Service
             HttpResponse response = null;
             for (int attempt = 0; attempt < attempts; attempt++)
             {
-                token.ThrowIfCancellationRequested();
-                response = await SendOnceAsync(request, token);
+                MTask.ThrowIfCancellationRequested();
+                response = await SendOnceAsync(request);
                 if (response.IsSuccess || !ShouldRetry(response) || attempt == attempts - 1)
                 {
                     return response;
@@ -117,7 +115,7 @@ namespace MiniCore.Service
 
                 telemetry?.Increment("http.retry");
                 int delay = retryBackoffMilliseconds * (1 << Math.Min(attempt, 6));
-                await Task.Delay(delay, token);
+                await MTask.Delay(delay);
             }
 
             return response;
@@ -131,9 +129,8 @@ namespace MiniCore.Service
         /// <param name="url">HTTP 或 HTTPS 的绝对请求地址。</param>
         /// <param name="request">请求对象。</param>
         /// <param name="method">HTTP 方法。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>响应对象。</returns>
-        public async Task<TResponse> SendJsonAsync<TRequest, TResponse>(string url, TRequest request, string method = "POST", CancellationToken token = default)
+        public async MTask<TResponse> SendJsonAsync<TRequest, TResponse>(string url, TRequest request, string method = "POST")
         {
             HttpResponse response = await SendAsync(new HttpRequest
             {
@@ -141,7 +138,7 @@ namespace MiniCore.Service
                 Method = method,
                 ContentType = "application/json",
                 Body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(request))
-            }, token);
+            });
             EnsureSuccess(response);
             return JsonConvert.DeserializeObject<TResponse>(Encoding.UTF8.GetString(response.Body ?? Array.Empty<byte>()));
         }
@@ -154,9 +151,8 @@ namespace MiniCore.Service
         /// <param name="requestBody">序列化请求正文。</param>
         /// <param name="responseParser">响应解析函数。</param>
         /// <param name="method">HTTP 方法。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>响应消息。</returns>
-        public async Task<TResponse> SendProtobufAsync<TResponse>(string url, byte[] requestBody, Func<byte[], TResponse> responseParser, string method = "POST", CancellationToken token = default)
+        public async MTask<TResponse> SendProtobufAsync<TResponse>(string url, byte[] requestBody, Func<byte[], TResponse> responseParser, string method = "POST")
         {
             if (responseParser == null)
             {
@@ -169,7 +165,7 @@ namespace MiniCore.Service
                 Method = method,
                 ContentType = "application/x-protobuf",
                 Body = requestBody
-            }, token);
+            });
             EnsureSuccess(response);
             return responseParser(response.Body ?? Array.Empty<byte>());
         }
@@ -191,12 +187,12 @@ namespace MiniCore.Service
         /// 发送一次 UnityWebRequest 并转换为统一响应对象。
         /// </summary>
         /// <param name="request">请求描述。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>本次传输响应。</returns>
-        private async Task<HttpResponse> SendOnceAsync(HttpRequest request, CancellationToken token)
+        private async MTask<HttpResponse> SendOnceAsync(HttpRequest request)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             Dictionary<string, string> headers = new Dictionary<string, string>(request.Headers, StringComparer.OrdinalIgnoreCase);
-            await ApplyAuthenticationAsync(headers, token);
+            await ApplyAuthenticationAsync(headers);
             string url = ValidateAbsoluteUrl(request.Url);
             Stopwatch stopwatch = Stopwatch.StartNew();
             using UnityWebRequest unityRequest = new UnityWebRequest(url, request.Method ?? "GET")
@@ -249,7 +245,6 @@ namespace MiniCore.Service
         /// 等待 Unity 的异步操作完成，同时让取消令牌可立即中断等待。
         /// </summary>
         /// <param name="operation">Unity 网络异步操作。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>完成任务。</returns>
         private static Task WaitForCompletionAsync(UnityWebRequestAsyncOperation operation, CancellationToken token)
         {
@@ -272,7 +267,6 @@ namespace MiniCore.Service
         /// 将普通任务与取消令牌组合为单一等待任务。
         /// </summary>
         /// <param name="task">待等待任务。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>可取消的等待任务。</returns>
         private static async Task WaitWithCancellationAsync(Task task, CancellationToken token)
         {
@@ -288,11 +282,10 @@ namespace MiniCore.Service
         /// 对可选鉴权服务应用请求头。
         /// </summary>
         /// <param name="headers">待修改请求头。</param>
-        /// <param name="token">取消令牌。</param>
         /// <returns>鉴权完成任务。</returns>
-        private Task ApplyAuthenticationAsync(IDictionary<string, string> headers, CancellationToken token)
+        private MTask ApplyAuthenticationAsync(IDictionary<string, string> headers)
         {
-            return authProvider == null ? Task.CompletedTask : authProvider.ApplyAsync(headers, token);
+            return authProvider == null ? MTask.CompletedTask : authProvider.ApplyAsync(headers);
         }
 
         /// <summary>

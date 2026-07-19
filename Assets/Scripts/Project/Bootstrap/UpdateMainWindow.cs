@@ -1,15 +1,15 @@
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using System;
 using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 using UnityEngine;
 using YooAsset;
 using MiniCore.Bootstrap;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Unity;
 
-public class UpdateMainWindow : MonoBehaviour
+public class UpdateMainWindow : AMTaskBehaviour
 {
     #region Private 私有成员
 
@@ -68,7 +68,16 @@ public class UpdateMainWindow : MonoBehaviour
     /// <summary>
     /// 启动 YooAsset、加载热更新程序集并进入业务场景。
     /// </summary>
-    private async void Awake()
+    private void Awake()
+    {
+        LaunchWithErrorHandlingAsync().Forget();
+    }
+
+    /// <summary>
+    /// 执行启动流程并统一处理无法继续启动的异常。
+    /// </summary>
+    /// <returns>启动流程监督任务。</returns>
+    private async MTask LaunchWithErrorHandlingAsync()
     {
         try
         {
@@ -88,7 +97,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 按既定顺序执行启动流程。
     /// </summary>
     /// <returns>启动流程完成任务。</returns>
-    private async UniTask LaunchAsync()
+    private async MTask LaunchAsync()
     {
         await VersionCheckAsync();
         await DownloadAssetsAsync();
@@ -101,7 +110,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 初始化 YooAsset 并拉取当前资源包的最新清单。
     /// </summary>
     /// <returns>版本检查完成任务。</returns>
-    private async UniTask VersionCheckAsync()
+    private async MTask VersionCheckAsync()
     {
         // 初始化资源系统
         YooAssets.Initialize();
@@ -114,7 +123,7 @@ public class UpdateMainWindow : MonoBehaviour
 
         // 请求最新版本号
         var versionOpeartion = package.RequestPackageVersionAsync();
-        await versionOpeartion.Task;
+        await versionOpeartion.ToMTask();
         if (versionOpeartion.Status == EOperationStatus.Succeed)
         {
             string remoteVersion = versionOpeartion.PackageVersion;
@@ -133,10 +142,10 @@ public class UpdateMainWindow : MonoBehaviour
     /// </summary>
     /// <param name="packageVersion">需要加载的资源包版本号。</param>
     /// <returns>清单更新完成任务。</returns>
-    private async UniTask UpdatePackageManifestAsync(string packageVersion)
+    private async MTask UpdatePackageManifestAsync(string packageVersion)
     {
         var updateOperation = package.UpdatePackageManifestAsync(packageVersion);
-        await updateOperation.Task;
+        await updateOperation.ToMTask();
         if (updateOperation.Status == EOperationStatus.Succeed)
         {
             EventCenter.Broadcast(GameEvent.LogInfo, "更新清单成功");
@@ -151,7 +160,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 下载当前资源包中尚未缓存的资源文件。
     /// </summary>
     /// <returns>资源下载完成任务。</returns>
-    private async UniTask DownloadAssetsAsync()
+    private async MTask DownloadAssetsAsync()
     {
         var downloader = package.CreateResourceDownloader(downloadMaxNum, failedTryAgain);
         if (downloader.TotalDownloadCount == 0)
@@ -168,7 +177,7 @@ public class UpdateMainWindow : MonoBehaviour
         downloader.DownloadFileBeginCallback = OnDownloadFileBegin;
 
         downloader.BeginDownload();
-        await downloader.ToUniTask();
+        await downloader.ToMTask();
 
         if (downloader.Status == EOperationStatus.Succeed)
         {
@@ -221,7 +230,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 按 Inspector 配置初始化 YooAsset 资源包。
     /// </summary>
     /// <returns>资源包初始化完成任务。</returns>
-    private async UniTask InitPackageAsync()
+    private async MTask InitPackageAsync()
     {
         switch (bundlePackageMode)
         {
@@ -247,7 +256,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 使用编辑器模拟模式初始化资源包。
     /// </summary>
     /// <returns>资源包初始化完成任务。</returns>
-    private async UniTask InitPackageAsync_EditorSimulate()
+    private async MTask InitPackageAsync_EditorSimulate()
     {
         var buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
         var packageRoot = buildResult.PackageRootDirectory;
@@ -257,7 +266,7 @@ public class UpdateMainWindow : MonoBehaviour
         createParameters.EditorFileSystemParameters = fileSystemParameters;
 
         var initOperation = package.InitializeAsync(createParameters);
-        await initOperation.Task;
+        await initOperation.ToMTask();
         if (initOperation.Status == EOperationStatus.Succeed)
         {
             EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
@@ -272,7 +281,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 使用离线首包模式初始化资源包。
     /// </summary>
     /// <returns>资源包初始化完成任务。</returns>
-    private async UniTask InitPackageAsync_OfflinePlayMode()
+    private async MTask InitPackageAsync_OfflinePlayMode()
     {
         var fileSystemParameters = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
 
@@ -280,7 +289,7 @@ public class UpdateMainWindow : MonoBehaviour
         createParameters.BuildinFileSystemParameters = fileSystemParameters;
 
         var initOperation = package.InitializeAsync(createParameters);
-        await initOperation.Task;
+        await initOperation.ToMTask();
         if (initOperation.Status == EOperationStatus.Succeed)
         {
             EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
@@ -295,7 +304,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 使用 Host 模式初始化资源包。
     /// </summary>
     /// <returns>资源包初始化完成任务。</returns>
-    private async UniTask InitPackageAsync_HostPlayMode()
+    private async MTask InitPackageAsync_HostPlayMode()
     {
         IRemoteServices remoteServices = new RemoteServices(resourcesServerURL, fallbackServerURL);
         var cacheParameters = FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices);
@@ -306,7 +315,7 @@ public class UpdateMainWindow : MonoBehaviour
         createParameters.CacheFileSystemParameters = cacheParameters;
 
         var initOperation = package.InitializeAsync(createParameters);
-        await initOperation.Task;
+        await initOperation.ToMTask();
 
         if (initOperation.Status == EOperationStatus.Succeed)
         {
@@ -322,7 +331,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 使用 Web 模式初始化资源包。
     /// </summary>
     /// <returns>资源包初始化完成任务。</returns>
-    private async UniTask InitPackageAsync_WebPlayMode()
+    private async MTask InitPackageAsync_WebPlayMode()
     {
         IRemoteServices remoteServices = new RemoteServices(resourcesServerURL, fallbackServerURL);
         var webServerFileSystemParameters = FileSystemParameters.CreateDefaultWebServerFileSystemParameters();
@@ -333,7 +342,7 @@ public class UpdateMainWindow : MonoBehaviour
         createParameters.WebRemoteFileSystemParameters = webRemoteFileSystemParameters;
 
         var initOperation = package.InitializeAsync(createParameters);
-        await initOperation.Task;
+        await initOperation.ToMTask();
         if (initOperation.Status == EOperationStatus.Succeed)
         {
             EventCenter.Broadcast(GameEvent.LogInfo, "初始化成功");
@@ -348,10 +357,24 @@ public class UpdateMainWindow : MonoBehaviour
     /// 从 YooAsset 加载 AOT 元数据和热更新 DLL。
     /// </summary>
     /// <returns>DLL 加载完成任务。</returns>
-    private async UniTask LoadAssembliesAsync()
+    private MTask LoadAssembliesAsync()
     {
         SetPromptInfo("正在加载热更代码...");
 #if !UNITY_EDITOR
+        return LoadPlayerAssembliesAsync();
+#else
+        SetPromptInfo("加载完成，准备进入游戏...");
+        return MTask.CompletedTask;
+#endif
+    }
+
+#if !UNITY_EDITOR
+    /// <summary>
+    /// 在 Player 中依次加载 AOT 补充元数据和 HotUpdate 程序集。
+    /// </summary>
+    /// <returns>Player 程序集加载完成任务。</returns>
+    private async MTask LoadPlayerAssembliesAsync()
+    {
         // 加载 AOT 补充元数据
         foreach (string dll in HybridClrAotMetadata.AotMetadataAddresses)
         {
@@ -361,7 +384,7 @@ public class UpdateMainWindow : MonoBehaviour
             }
 
             AssetHandle handle = package.LoadAssetAsync<TextAsset>(dll);
-            await handle.Task;
+            await handle.ToMTask();
             TextAsset dllText = handle.AssetObject as TextAsset;
             if (dllText == null)
             {
@@ -372,7 +395,7 @@ public class UpdateMainWindow : MonoBehaviour
         }
 
         AssetHandle hotUpdateHandle = package.LoadAssetAsync<TextAsset>(hotUpdateDllPath);
-        await hotUpdateHandle.Task;
+        await hotUpdateHandle.ToMTask();
         TextAsset hotUpdateText = hotUpdateHandle.AssetObject as TextAsset;
         if (hotUpdateText == null)
         {
@@ -380,15 +403,15 @@ public class UpdateMainWindow : MonoBehaviour
         }
 
         Assembly.Load(hotUpdateText.bytes);
-#endif
         SetPromptInfo("加载完成，准备进入游戏...");
     }
+#endif
 
     /// <summary>
     /// 在目标场景加载完成后调用 HotUpdate 的静态启动方法。
     /// </summary>
     /// <returns>入口启动完成任务。</returns>
-    private async UniTask StartHotUpdateAsync()
+    private async MTask StartHotUpdateAsync()
     {
         Type startupType = AppDomain.CurrentDomain.GetAssemblies()
             .Select(assembly => assembly.GetType(HotUpdateStartupTypeName, false))
@@ -401,13 +424,13 @@ public class UpdateMainWindow : MonoBehaviour
         MethodInfo startMethod = startupType.GetMethod(HotUpdateStartupMethodName, BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
         if (startMethod == null)
         {
-            throw new InvalidOperationException($"HotUpdate 启动类型缺少无参静态 Task 方法：{startupType.FullName}.{HotUpdateStartupMethodName}");
+            throw new InvalidOperationException($"HotUpdate 启动类型缺少无参静态 MTask 方法：{startupType.FullName}.{HotUpdateStartupMethodName}");
         }
 
         object invokeResult = startMethod.Invoke(null, null);
-        if (!(invokeResult is Task startTask))
+        if (!(invokeResult is MTask startTask))
         {
-            throw new InvalidOperationException($"HotUpdate 启动方法必须返回 {nameof(Task)}：{startupType.FullName}.{HotUpdateStartupMethodName}");
+            throw new InvalidOperationException($"HotUpdate 启动方法必须返回 {nameof(MTask)}：{startupType.FullName}.{HotUpdateStartupMethodName}");
         }
 
         await startTask;
@@ -417,7 +440,7 @@ public class UpdateMainWindow : MonoBehaviour
     /// 在客户端模式下加载热更新业务场景。
     /// </summary>
     /// <returns>场景加载完成任务。</returns>
-    private async UniTask EnterGameAsync()
+    private async MTask EnterGameAsync()
     {
         if (Application.isBatchMode)
         {
@@ -426,7 +449,7 @@ public class UpdateMainWindow : MonoBehaviour
 
         SetPromptInfo("即将进入游戏...");
         var handle = package.LoadSceneAsync(mainSceneName, UnityEngine.SceneManagement.LoadSceneMode.Single, UnityEngine.SceneManagement.LocalPhysicsMode.None, false);
-        await handle.ToUniTask();
+        await handle.ToMTask();
     }
 
     /// <summary>

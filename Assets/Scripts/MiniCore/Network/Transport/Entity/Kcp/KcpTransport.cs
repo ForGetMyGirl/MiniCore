@@ -1,9 +1,8 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace MiniCore.Model
 {
@@ -87,7 +86,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 接收到 KCP 重组后的完整业务包时触发。
         /// </summary>
-        public event Func<ReadOnlyMemory<byte>, UniTask> OnDataReceived;
+        public event Func<ReadOnlyMemory<byte>, MTask> OnDataReceived;
         /// <summary>
         /// KCP 传输断开时触发。
         /// </summary>
@@ -110,10 +109,10 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask ConnectAsync(string host, int port, CancellationToken token = default)
+        public MTask ConnectAsync(string host, int port)
         {
+            CancellationToken token = MTaskExternal.GetCancellationToken();
             Disconnect();
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             socket.Connect(host, port);
@@ -131,18 +130,17 @@ namespace MiniCore.Model
 
             receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
             updateCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            _ = ReceiveLoopAsync(receiveCts.Token);
-            _ = UpdateLoopAsync(updateCts.Token);
-            return UniTask.CompletedTask;
+            ReceiveLoopAsync(receiveCts.Token).Forget();
+            UpdateLoopAsync(updateCts.Token).Forget();
+            return MTask.CompletedTask;
         }
 
         /// <summary>
         /// 将完整业务包交给 KCP 分片并发送。
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public UniTask SendAsync(ArraySegment<byte> data, CancellationToken token = default)
+        public MTask SendAsync(ArraySegment<byte> data)
         {
             if (!IsConnected)
             {
@@ -159,7 +157,7 @@ namespace MiniCore.Model
                 uint now = CurrentMS();
                 kcp.Update(now);
             }
-            return UniTask.CompletedTask;
+            return MTask.CompletedTask;
         }
 
         /// <summary>
@@ -184,14 +182,13 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 ReceiveLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask ReceiveLoopAsync(CancellationToken token)
+        private async MTask ReceiveLoopAsync(CancellationToken token)
         {
             byte[] buffer = ByteBufferPool.Shared.Rent(MaxDatagramSize);
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 while (!token.IsCancellationRequested && IsConnected)
                 {
                     int received = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None, token).ConfigureAwait(false);
@@ -269,13 +266,12 @@ namespace MiniCore.Model
         /// <summary>
         /// 执行 UpdateLoopAsync 相关处理。
         /// </summary>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask UpdateLoopAsync(CancellationToken token)
+        private async MTask UpdateLoopAsync(CancellationToken token)
         {
             try
             {
-                await UniTask.SwitchToThreadPool();
+                await MTask.SwitchTo(MTaskExecutors.Network);
                 while (!token.IsCancellationRequested && IsConnected)
                 {
                     uint current = CurrentMS();
@@ -289,7 +285,7 @@ namespace MiniCore.Model
                     int delay = TimeDiff(next, current);
                     if (delay < 1) delay = 1;
                     if (delay > config.Interval) delay = config.Interval;
-                    await Task.Delay(delay, token).ConfigureAwait(false);
+                    await MTask.Delay(delay);
                 }
             }
             catch (OperationCanceledException)
@@ -361,7 +357,7 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="data">执行该方法所需的 data 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        private async UniTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
+        private async MTask InvokeDataReceivedAsync(ReadOnlyMemory<byte> data)
         {
             await TransportEventDispatcher.DispatchAsync(OnDataReceived, data);
         }

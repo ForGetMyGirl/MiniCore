@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using MiniCore.Threading;
 using System;
 using System.Net.Sockets;
 using System.Threading;
@@ -38,9 +38,8 @@ namespace MiniCore.Model
         /// </summary>
         /// <param name="host">执行该方法所需的 host 参数。</param>
         /// <param name="port">执行该方法所需的 port 参数。</param>
-        /// <param name="token">执行该方法所需的 token 参数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public override UniTask ConnectAsync(string host, int port, CancellationToken token = default)
+        public override MTask ConnectAsync(string host, int port)
         {
             throw new NotSupportedException("TcpServerTransport does not support ConnectAsync.");
         }

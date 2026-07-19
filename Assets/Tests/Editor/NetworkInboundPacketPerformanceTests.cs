@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
+using MiniCore.Threading;
 using MiniCore.HotUpdate;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
@@ -170,11 +170,11 @@ namespace MiniCore.EditorTests
             /// </summary>
             /// <param name="session">本次消息关联的网络会话，基准测试中为空。</param>
             /// <param name="message">已完成反序列化的普通消息。</param>
-            /// <returns>同步完成的 UniTask。</returns>
-            public override UniTask HandleAsync(NetworkSession session, TestNetworkData message)
+            /// <returns>同步完成的 MTask。</returns>
+            public override MTask HandleAsync(NetworkSession session, TestNetworkData message)
             {
                 handledCount += message.Id;
-                return UniTask.CompletedTask;
+                return MTask.CompletedTask;
             }
 
             #endregion
