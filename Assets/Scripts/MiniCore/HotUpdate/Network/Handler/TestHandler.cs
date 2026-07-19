@@ -8,7 +8,7 @@ namespace MiniCore.HotUpdate
 {
     /// <summary>
     /// 示例：处理 TestNetworkData 消息。
-    /// 运行 Opcode 生成器后会为 TestNetworkData 分配 opcode，NetworkMessageComponent 会自动绑定。
+    /// 运行 Opcode 生成器后会为 TestNetworkData 分配 opcode，NetworkService 会自动绑定。
     /// </summary>
     public class TestHandler : AMHandler<TestNetworkData>
     {

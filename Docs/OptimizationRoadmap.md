@@ -15,10 +15,10 @@
 
 | 项目 | 记录 |
 | --- | --- |
-| 优化范围 | `LogSwitch` 默认开关策略，以及 `NetworkMessageComponent` 的收包、普通发送、RPC 请求和 RPC 响应日志路径；仅调整日志关闭时的热路径，不改变网络包处理语义。 |
+| 优化范围 | `LogSwitch` 默认开关策略，以及 `NetworkService` 的收包、普通发送、RPC 请求和 RPC 响应日志路径；仅调整日志关闭时的热路径，不改变网络包处理语义。 |
 | 原始问题 | 旧路径在 `LogSwitch.EnableLog = false` 时仍会先格式化时间、构造插值日志字符串，再进入已关闭的 `LogSwitch.Info`。日志输出被抑制，但每包字符串与时间格式化成本已经发生。 |
 | 基线与归因证据 | `NetworkIncomingLogPerformanceTests.cs` 使用相同日志文本对比旧写法与候选写法，均在日志关闭状态下每组执行 `10,000` 次。旧路径 `IncomingLog_BuildsStrings_WhenLoggingDisabled` 三次中位值为 `22.116 / 22.168 / 22.318 ms`，每次 `GC() = 10.0005`；优化路径 `IncomingLog_SkipsStrings_WhenLoggingDisabled` 三次中位值为 `0.034 / 0.036 / 0.036 ms`，每次 `GC() = 0`。 |
-| 实施方案 | `LogSwitch` 在 Editor/Development 默认开启、正式非开发构建默认关闭；`NetworkMessageComponent` 的收包、普通发送、RPC 请求和 RPC 响应日志均先判断 `EnableLog`，再格式化时间和字符串；Payload 日志同时要求 `EnableLog && EnablePayloadLog`。 |
+| 实施方案 | `LogSwitch` 在 Editor/Development 默认开启、正式非开发构建默认关闭；`NetworkService` 的收包、普通发送、RPC 请求和 RPC 响应日志均先判断 `EnableLog`，再格式化时间和字符串；Payload 日志同时要求 `EnableLog && EnablePayloadLog`。 |
 | 前后性能数据 | 关闭日志时的收包日志热路径从旧路径中位数约 `22.168 ms / 10,000 次` 降至优化路径约 `0.036 ms / 10,000 次`，约减少 `99.84%`；`GC.Alloc` 采样从稳定 `10.0005` 归零。 |
 | 测试状态 | 框架阶段性能验证已确认；尚未做真实业务网络冒烟验证。 |
 | 残余风险 | 日志开启时仍会保留诊断字符串构造成本；正式包默认关闭日志可避免热路径分配，但需要确认外部调试流程不会依赖正式非开发构建默认输出网络日志。 |
@@ -44,7 +44,7 @@
 
 | 能力 | 当前实现 | 后续关注点 |
 | --- | --- | --- |
-| 收包跨线程转发 | `NetworkMessageComponent` 使用 `ConcurrentQueue<NetworkIncomingPacket>`，网络线程只入队，Unity 主线程在 `Update` 中处理。 | 队列尚无容量上限和背压策略。 |
+| 收包跨线程转发 | `NetworkService` 使用 `ConcurrentQueue<NetworkIncomingPacket>`，网络线程只入队，Unity 主线程在 `Update` 中处理。 | 队列尚无容量上限和背压策略。 |
 | 收包缓冲复用 | `EnqueueIncoming` 从 `ByteBufferPool.Shared` 租用数组，处理完成后归还；每桶使用内部加锁的数组槽位栈。 | 单数组 1 MB、单桶 8 MB、全局 32 MB 上限已落实；后续补运行时命中率和容量统计。 |
 | Handler 派发 | `AMHandler`、`ARpcHandler` 通过非泛型 invoker 契约直调，避免每包 `MethodInfo.Invoke` 和 `object[]` 参数数组。 | 启动阶段仍会反射扫描；是否生成直连注册代码由压测决定。 |
 | Opcode 兼容性 | 使用稳定 manifest 和生成的 `OpcodeRegistry.Generated.cs`。 | 构建校验和协议版本治理应持续维护。 |
@@ -78,7 +78,7 @@
 
 ### 问题
 
-当前 `NetworkMessageComponent.EnqueueIncoming` 会持续向 `incomingPackets` 入队，而 `ProcessQueueAsync` 会在主线程顺序处理直到队列清空。主线程卡顿、恶意流量或 Handler 变慢时，队列可能无限增长，延迟和内存占用会相互放大。
+当前 `NetworkService.EnqueueIncoming` 会持续向 `incomingPackets` 入队，而 `ProcessQueueAsync` 会在主线程顺序处理直到队列清空。主线程卡顿、恶意流量或 Handler 变慢时，队列可能无限增长，延迟和内存占用会相互放大。
 
 ### 推荐方案
 

@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 协议契约与生成物 | `MiniCore.Protocol` | `INetworkMessage`、`INormalMessage`、`IRpcRequest`、`IRpcResponse`、Opcode、Protobuf Parser Registry |
 | 序列化 | `MiniCore.Serialization` | `INetworkSerializer`、`ProtobufSerializer`、JSON 迁移/性能实现 |
-| 网络运行时 | `MiniCore.Network` | `NetworkMessageComponent`、Session、RPC、心跳、Handler 基类、TCP/UDP/KCP |
+| 网络运行时 | `MiniCore.Network` | `NetworkService`、Session、RPC、心跳、Handler 基类、TCP/UDP/KCP |
 | 业务层 | `MiniCore.HotUpdate` | 业务 Proto 对应的 Handler 与自动生成的直接注册表 |
 | 编辑器生成 | `MiniCore.Editor` | Proto 生成、Handler 扫描、Opcode Manifest、构建校验 |
 
@@ -19,7 +19,7 @@ flowchart LR
     Handler["HotUpdate\nAMHandler / ARpcHandler"] --> Scan["脚本编译后自动扫描"]
     Scan --> Manifest["OpcodeManifest.json"]
     Scan --> Registry["OpcodeRegistry +\nHotUpdateHandlerRegistry"]
-    Protocol --> Net["NetworkMessageComponent"]
+    Protocol --> Net["NetworkService"]
     Registry --> Net
     Net --> Session["NetworkSession"]
     Session --> Transport["TCP / UDP / KCP"]
@@ -148,16 +148,16 @@ public sealed class EnterBattleHandler
 | UDP | 一个 datagram 对应一个业务 packet |
 | KCP | UDP 承载 KCP 分片，KCP 重组后向上交付完整业务 packet |
 
-`NetworkMessageComponent` 缓存 Type 到 Opcode 的结果、使用入站并发队列接收数据，并在主线程 Tick 中完成反序列化和业务 Handler 派发。网络线程不调用 Unity API，也不直接执行业务 Handler。
+`NetworkService` 缓存 Type 到 Opcode 的结果、使用入站并发队列接收数据，并在主线程 Tick 中完成反序列化和业务 Handler 派发。网络线程不调用 Unity API，也不直接执行业务 Handler。
 
 ## 5. 调用方式
 
 ### 客户端连接与发送
 
-`NetworkMessageComponent` 是业务入口，通常由 Client Entry 常驻 Pin 并由自动生成的 `HotUpdateHandlerRegistry.Register(network)` 注册 Handler。示例接口以实际组件 public API 为准：
+`NetworkService` 是业务网络入口，由启动配置生成的 `Global.RegisterAppService<INetworkService, NetworkService>` 注册，并由生成代码调用 `HotUpdateHandlerRegistry.Register(network)` 注册 Handler。业务侧通过接口获取：
 
 ```csharp
-NetworkMessageComponent network = Global.Pin<NetworkMessageComponent>();
+INetworkService network = Global.GetService<INetworkService>(this);
 
 bool connected = await network.ConnectDefaultTcpSessionAsync("127.0.0.1", 20000);
 if (!connected)
@@ -177,7 +177,7 @@ EnterBattleResponse response = await network.CallAsync<EnterBattleRequest, Enter
 `GameStartup` 在 Dedicated Server batch mode 下执行：
 
 ```text
-Global.Pin<NetworkMessageComponent>()
+Global.RegisterAppService<INetworkService, NetworkService>()
     -> HotUpdateHandlerRegistry.Register(network)
     -> Global.Pin<TimerComponent>()
     -> network.StartKcpServerAsync("0.0.0.0", port)

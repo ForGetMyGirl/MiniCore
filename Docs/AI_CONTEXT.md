@@ -29,6 +29,9 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 - 只有退出、切服等最高层中断可用 `Global.ForceRemove<T>()`。
 - 每个 owner 获取一次，就必须释放一次；不要用静态字段或隐式单例绕开引用计数。
 - Unity 每帧由 `UnityGlobalDriver.Update -> Global.Tick()` 驱动。不得在此链路每帧 new Context 或分配临时集合。
+- 系统级能力使用 `AAppService + [AppService]`，调用方只能通过 `Global.GetService<TInterface>(owner)` 取得接口；不要用 `Global.Get<TConcreteService>` 绕过服务接口。
+- `IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`ISceneBindingService` / `SceneBindingService`、`IUIService` / `UIService` 已替换并删除旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`UIFactoryComponent`；不得重新引入这些旧类型或兼容包装。
+- 普通 `AComponent` 不在启动配置左侧登记。需要让开发者发现时使用 `[ComponentCatalog("名称", Description = "具体职责")]`；不要把框架内部装配组件标为目录能力。
 
 ## 网络与协议规则
 
@@ -56,6 +59,12 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 - AOT 元数据先于 HotUpdate DLL 加载。不要把所有剥离 DLL 盲目打入包；以生成的 HybridCLR AOT 地址表为准。
 - `MiniCore.HotUpdate.dll` 必须在 YooAsset 包中，地址为 Bootstrap 配置使用的 `HotUpdate`。
 - `MiniCoreStartup` 根据 `Application.isBatchMode` 选择生成的 Client 或 Server 模块列表；`GameStartup` 负责项目业务启动，服务端端口参数为 `-serverPort`，默认 `20000`。
+- 启动配置只选择 AppService Provider 并覆盖非敏感 Args。每个接口在同一 Client/Server 目标只能启用一个 Provider；`RequiresServices` 必须在同一目标可用。
+- 只有实现 `MiniCore.Service.IAsyncAppService` 的 Provider 才会在生成代码中调用 `InitializeAsync()`；不要对所有具体服务生成接口模式匹配。
+- `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 都可填写 `Description`，供启动配置窗口的只读目录展示。
+- HTTP 服务不再配置 `BaseUrl`，所有 HTTP 请求必须由调用方传入完整的 HTTP/HTTPS 绝对地址；密钥、令牌、私钥和动态服务地址不得写入启动 Args。
+- 本地存储必须通过 `IStoragePathService` 取得根目录。`StoragePathService.RelativePath` 只能填写开发者定义的相对目录；最终路径为产品专属 `persistentDataPath/RelativePath`，代码默认值为兼容旧项目的 `MiniCore`。存档和本地运行数据分别使用其 `Saves`、`Telemetry` 子目录，不能硬编码 `persistentDataPath/MiniCore`。
+- `EncryptedSaveService` 通过启动参数 `EncryptionKey` 派生 AES/HMAC 密钥；此参数明文存储于启动配置和生成代码，只适合本地防误改，修改后旧存档不可读。`LocalTelemetryFileService` 的显示名为“本地运行数据记录”，只把指标、事件和异常写入本地存储根目录的 `Telemetry` 子目录，不上传数据。
 - Base 程序集不依赖具体业务类；Entry 的反射创建仅发生一次，Handler 运行时注册使用生成的直接构造，不扫描 AppDomain，不用字符串/`Activator` 创建 Handler。
 
 ## C# 与仓库操作规则
@@ -73,6 +82,7 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 | 任务 | 先读代码/文档 |
 | --- | --- |
 | Global、组件生命周期、纯 C# 服务 | `Runtime/Core/Global`、[架构总览](Architecture.md#3-global-组件运行时) |
+| AppService、启动配置、资源/UI 迁移、加密存档与 HTTP 规则 | `Runtime/Service`、`HotUpdate/Service`、`Unity/Service`、[项目启动与服务配置](StartupModules.md) |
 | 网络收发、RPC、传输 | `Network/Core`、`Network/Transport`、[网络与协议](NetworkLayerAnalysis.md) |
 | 新协议与 Proto | `Proto/`、`Editor/Protocol/ProtoCodeGenerator.cs`、[网络与协议](NetworkLayerAnalysis.md#2-proto-与生成流程) |
 | Opcode/Handler 生成 | `Editor/Opcode*.cs`、`Protocol/Generated/Registry`、`HotUpdate/Generated/Network` |

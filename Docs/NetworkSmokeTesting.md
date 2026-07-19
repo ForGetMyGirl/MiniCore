@@ -1,6 +1,6 @@
 # 网络冒烟测试
 
-`NetworkSmokeTestRunner` 使用真实的 `NetworkMessageComponent`、生成的 HotUpdate Handler、Protobuf 以及 TCP/KCP/UDP 传输，顺序验证本机回环的连接探测、普通消息、RPC 回显和业务断开。
+`NetworkSmokeTestRunner` 使用真实的 `NetworkService`、生成的 HotUpdate Handler、Protobuf 以及 TCP/KCP/UDP 传输，顺序验证本机回环的连接探测、普通消息、RPC 回显和业务断开。
 
 ## Editor
 

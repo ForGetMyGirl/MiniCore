@@ -1,5 +1,6 @@
 ﻿using Cysharp.Threading.Tasks;
 using MiniCore.Model;
+using MiniCore.Service;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,7 +10,7 @@ namespace MiniCore.Core
 
     /// <summary>
     /// 管理同一类型对象的可用与使用中实例。
-    /// 异步创建期间会以对象池自身为 owner 短暂持有 AssetsComponent，避免跨 await 使用失效组件。
+    /// 异步创建期间会以对象池自身为 owner 短暂持有资产服务，避免跨 await 使用失效服务。
     /// </summary>
     public class GameObjectPool : IDisposable
     {
@@ -64,10 +65,10 @@ namespace MiniCore.Core
         /// <returns>已初始化并进入使用中列表的池对象。</returns>
         public async UniTask<IPoolObject> CreateObjectAsync(string path, Transform parent = null)
         {
-            AssetsComponent assetsComponent = Global.Get<AssetsComponent>(this);
+            IAssetService assetService = Global.GetService<IAssetService>(this);
             try
             {
-                GameObject obj = await assetsComponent.InstantiateAsync(path, parent);
+                GameObject obj = await assetService.InstantiateAsync(path, parent);
                 obj.name = $"{typeName}_{groupName}_{Guid.NewGuid()}";
                 IPoolObject poolObj = obj.GetComponent<IPoolObject>();
                 poolObj.GroupName = groupName;
@@ -78,7 +79,7 @@ namespace MiniCore.Core
             }
             finally
             {
-                Global.Remove<AssetsComponent>(this);
+                Global.ReleaseAll(this);
             }
         }
 

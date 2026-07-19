@@ -90,7 +90,7 @@ BenchmarkPerformance/History/20260714_224500_123/
 
 ## 第二项测试：Protobuf 正式路径与 JSON 对比基线
 
-`NetworkMessageComponent` 在未显式设置 serializer 时默认使用 `ProtobufSerializer`，这是当前正式网络路径。`NewtonsoftJsonSerializer` 仅保留为迁移和性能对比实现；JSON 测试不代表当前客户端或 Dedicated Server 的默认配置。
+`NetworkService` 在未显式设置 serializer 时默认使用 `ProtobufSerializer`，这是当前正式网络路径。`NewtonsoftJsonSerializer` 仅保留为迁移和性能对比实现；JSON 测试不代表当前客户端或 Dedicated Server 的默认配置。
 
 先运行 Protobuf 序列化基准 `Assets/Tests/Editor/ProtobufSerializationPerformanceTests.cs`：
 
@@ -114,7 +114,7 @@ Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包�
 
 测试文件是 `Assets/Tests/Editor/NetworkIncomingQueuePerformanceTests.cs`，测试名为 `IncomingQueue_TransfersMediumPackets_BetweenNetworkAndMainThread`。
 
-它用固定的 512 B 业务包模拟现有 `NetworkMessageComponent.EnqueueIncoming` 和 `ProcessQueueAsync` 中的内存路径：从传输层输入复制到 `ByteBufferPool` 租用的数组、放入 `ConcurrentQueue`、主线程出队、再归还数组。测试不启动 TCP/UDP/KCP，不做 JSON 或 Protobuf 反序列化，也不调用业务 Handler；因此它只回答“当前队列与缓冲池的基础交接成本是多少、是否产生异常 GC”。
+它用固定的 512 B 业务包模拟现有 `NetworkService.EnqueueIncoming` 和 `ProcessQueueAsync` 中的内存路径：从传输层输入复制到 `ByteBufferPool` 租用的数组、放入 `ConcurrentQueue`、主线程出队、再归还数组。测试不启动 TCP/UDP/KCP，不做 JSON 或 Protobuf 反序列化，也不调用业务 Handler；因此它只回答“当前队列与缓冲池的基础交接成本是多少、是否产生异常 GC”。
 
 每个测量组连续处理 `10,000` 个业务包。报告中的 `Network.IncomingQueue.MediumPacket` 是这一整组的总耗时，换算单包成本时除以 `10,000`。在 Test Runner 的 `EditMode` 下单独运行它三次；每次完成后可在 `MiniCore > Performance > History` 中查看并保留记录。
 
@@ -137,7 +137,7 @@ Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包�
 
 ## 第四项测试：关闭日志时的收包字符串分配
 
-`NetworkMessageComponent.HandleIncoming` 当前会在调用 `LogSwitch.Info` 前格式化时间并构造插值字符串。`LogSwitch.EnableLog = false` 只能阻止日志输出，不能阻止已经发生的字符串创建。
+`NetworkService.HandleIncoming` 当前会在调用 `LogSwitch.Info` 前格式化时间并构造插值字符串。`LogSwitch.EnableLog = false` 只能阻止日志输出，不能阻止已经发生的字符串创建。
 
 测试文件 `NetworkIncomingLogPerformanceTests.cs` 使用相同的收包日志文本分别测量当前写法和候选优化写法：
 

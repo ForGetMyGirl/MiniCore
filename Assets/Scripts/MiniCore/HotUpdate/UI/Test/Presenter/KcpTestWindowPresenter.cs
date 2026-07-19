@@ -4,6 +4,7 @@ using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
+using MiniCore.Service;
 
 namespace MiniCore.HotUpdate
 {
@@ -18,12 +19,12 @@ namespace MiniCore.HotUpdate
         private bool clientConnected;
         private bool serverRunning;
         private bool localJoined;
-        private NetworkMessageComponent net;
+        private INetworkService net;
         private Action clientDisconnectedHandler;
 
         protected override void OnBind()
         {
-            net = Global.Get<NetworkMessageComponent>(this);
+            net = Global.GetService<INetworkService>(this);
             EventCenter.AddListener<string>(HotEvent.KcpTestMessage, OnKcpTestMessage);
             View.OnStartServerClicked += StartServer;
             View.OnStopServerClicked += () => StopServerAsync().Forget();
@@ -68,7 +69,7 @@ namespace MiniCore.HotUpdate
         {
             if (net == null)
             {
-                View.UpdatePrompt("NetworkMessageComponent missing.");
+                View.UpdatePrompt("NetworkService missing.");
                 return;
             }
 
@@ -104,7 +105,7 @@ namespace MiniCore.HotUpdate
         {
             if (net == null)
             {
-                View.UpdatePrompt("NetworkMessageComponent missing.");
+                View.UpdatePrompt("NetworkService missing.");
                 return;
             }
 
@@ -234,7 +235,7 @@ namespace MiniCore.HotUpdate
         {
             if (net == null)
             {
-                View.UpdatePrompt("NetworkMessageComponent missing.");
+                View.UpdatePrompt("NetworkService missing.");
                 return;
             }
 

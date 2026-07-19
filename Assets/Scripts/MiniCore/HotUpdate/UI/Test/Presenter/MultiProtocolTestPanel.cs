@@ -3,6 +3,7 @@ using MiniCore;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
+using MiniCore.Service;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -22,7 +23,7 @@ namespace MiniCore.HotUpdate
         private readonly List<string> logs = new List<string>();
         private readonly ConcurrentQueue<string> pendingLogs = new ConcurrentQueue<string>();
 
-        private NetworkMessageComponent net;
+        private INetworkService net;
 
         private string host = "127.0.0.1";
         private string message = "hello";
@@ -49,7 +50,7 @@ namespace MiniCore.HotUpdate
 
         private void Awake()
         {
-            net = Global.Get<NetworkMessageComponent>(this);
+            net = Global.GetService<INetworkService>(this);
             if (net != null)
             {
                 net.OnServerSessionCreated += HandleServerSessionCreated;

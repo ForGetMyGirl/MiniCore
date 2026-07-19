@@ -11,7 +11,7 @@ namespace MiniCore.EditorTests
 {
     /// <summary>
     /// 完整普通业务包进入主线程后的解析、反序列化和 Handler 派发性能基线测试。
-    /// 测试不包含 Socket 收发、跨线程队列和日志，仅覆盖 NetworkMessageComponent.HandleIncoming 的普通消息成功分支。
+    /// 测试不包含 Socket 收发、跨线程队列和日志，仅覆盖 NetworkService.HandleIncoming 的普通消息成功分支。
     /// </summary>
     public sealed class NetworkInboundPacketPerformanceTests
     {
@@ -22,7 +22,7 @@ namespace MiniCore.EditorTests
         private const int PacketCountPerMeasurement = 10000; // 每组连续处理的完整业务包数量。
         private const uint TestNetworkDataOpcode = 100003; // OpcodeRegistry 中 TestNetworkData 的稳定协议号。
         private const string MediumContent = "MiniCore inbound packet benchmark payload. This fixed message represents a medium-sized normal protocol packet and remains unchanged between measurements."; // 固定的中等业务正文。
-        private readonly Dictionary<uint, InboundHandlerRegistration> handlers = new Dictionary<uint, InboundHandlerRegistration>(); // 模拟 NetworkMessageComponent 的 opcode 到 Handler 映射。
+        private readonly Dictionary<uint, InboundHandlerRegistration> handlers = new Dictionary<uint, InboundHandlerRegistration>(); // 模拟 NetworkService 的 opcode 到 Handler 映射。
         private readonly BenchmarkInboundHandler handler = new BenchmarkInboundHandler(); // 承接反序列化消息的无日志基准 Handler。
         private INetworkSerializer serializer; // 当前运行时实际使用的 JSON 序列化器。
         private byte[] inboundPacket; // 在测量前生成并复用的完整业务包。
@@ -78,7 +78,7 @@ namespace MiniCore.EditorTests
         #region Private 私有成员
 
         /// <summary>
-        /// 模拟普通消息在 NetworkMessageComponent.HandleIncoming 中的成功处理路径。
+        /// 模拟普通消息在 NetworkService.HandleIncoming 中的成功处理路径。
         /// </summary>
         private void ProcessInboundPacket()
         {

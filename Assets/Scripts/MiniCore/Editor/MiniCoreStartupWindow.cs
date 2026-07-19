@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using MiniCore.Model;
 using MiniCore.Unity;
@@ -16,8 +17,12 @@ namespace MiniCore.EditorTools
     {
         #region Private 私有成员
 
-        private readonly HashSet<string> expandedModules = new HashSet<string>(); // 当前展开参数面板的模块类型名。
+        private readonly HashSet<string> expandedServices = new HashSet<string>(); // 当前展开参数面板的服务类型名。
         private Vector2 scrollPosition; // 窗口滚动位置。
+        private Vector2 catalogScrollPosition; // 项目能力目录滚动位置。
+        private bool showServiceCatalog = true; // 是否展开服务目录。
+        private bool showModuleCatalog = true; // 是否展开模块目录。
+        private bool showComponentCatalog = true; // 是否展开普通组件目录。
         private MiniCoreStartupSettings settings; // 当前项目启动配置资源。
 
         #endregion
@@ -47,16 +52,23 @@ namespace MiniCore.EditorTools
         private void OnGUI()
         {
             EnsureSettings();
-            List<MiniCoreStartupCodeGenerator.StartupModuleInfo> modules = MiniCoreStartupCodeGenerator.DiscoverModules();
+            List<MiniCoreStartupCodeGenerator.AppServiceInfo> services = MiniCoreStartupCodeGenerator.DiscoverAppServices();
+            List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules = MiniCoreStartupCodeGenerator.DiscoverAppModules();
+            List<Type> components = DiscoverOrdinaryComponents(services, appModules);
             GUILayout.Label("MiniCore 项目启动配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("每个启动模块都可独立勾选 Client 和 Server。生成器会在对应目标中补齐 DependsOn 并按依赖顺序 Pin。参数的“覆盖默认值”勾选后可填写启动值；未勾选时使用 Args 类中的默认值。", MessageType.Info);
+            EditorGUILayout.HelpBox("AppService 需要按 Client / Server 显式勾选启用；新发现服务默认关闭。若同一服务接口在同一目标勾选多个实现，生成时会报错；生成器会完成接口绑定、依赖排序和异步初始化。密钥、令牌等敏感值不要填写到此配置或生成代码中，应由项目的安全 Provider 在运行时提供。", MessageType.Info);
 
+            float catalogWidth = Mathf.Clamp(position.width * 0.30f, 340f, 500f);
+            float configurationWidth = Mathf.Max(760f, position.width - catalogWidth - 18f);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.BeginVertical(GUILayout.Width(configurationWidth));
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            for (int i = 0; i < modules.Count; i++)
-            {
-                DrawModule(modules[i]);
-            }
+            DrawServices(services);
             EditorGUILayout.EndScrollView();
+            EditorGUILayout.EndVertical();
+
+            DrawProjectCatalog(services, appModules, components, catalogWidth);
+            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();
             EditorGUILayout.BeginHorizontal();
@@ -85,50 +97,208 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 绘制单个启动模块的目标勾选与初始化参数。
+        /// 绘制项目当前可调用能力的只读目录。
+        /// 目录不会变更启动勾选或生成配置，仅用于开发阶段发现功能。
         /// </summary>
-        /// <param name="module">要显示的启动模块描述。</param>
-        private void DrawModule(MiniCoreStartupCodeGenerator.StartupModuleInfo module)
+        /// <param name="services">已发现的应用服务。</param>
+        /// <param name="appModules">已发现的应用模块。</param>
+        /// <param name="components">已标注能力说明的普通组件。</param>
+        /// <param name="catalogWidth">右侧能力目录宽度。</param>
+        private void DrawProjectCatalog(
+            List<MiniCoreStartupCodeGenerator.AppServiceInfo> services,
+            List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules,
+            List<Type> components,
+            float catalogWidth)
         {
-            MiniCoreStartupModuleSettings moduleSettings = FindModuleSettings(module.Type);
-            if (moduleSettings == null)
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox, GUILayout.Width(catalogWidth));
+            GUILayout.Label("项目能力目录（只读）", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("这里列出当前项目可发现的 Service、AppModule 与已标注职责的普通 AComponent，便于查找可调用能力；不会修改启动配置，也不显示框架内部实现与 GameStartup。", MessageType.None);
+
+            catalogScrollPosition = EditorGUILayout.BeginScrollView(catalogScrollPosition);
+            showServiceCatalog = EditorGUILayout.Foldout(showServiceCatalog, $"Service ({services.Count})", true);
+            if (showServiceCatalog)
             {
-                return;
-            }
-
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Label(module.Attribute.DisplayName, EditorStyles.boldLabel);
-            GUILayout.FlexibleSpace();
-            GUILayout.Label(module.Type.FullName, EditorStyles.miniLabel);
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.BeginHorizontal();
-            DrawTargetToggle("Client", ref moduleSettings.EnableClient);
-            DrawTargetToggle("Server", ref moduleSettings.EnableServer);
-            EditorGUILayout.EndHorizontal();
-
-            if (module.Attribute.DependsOn != null && module.Attribute.DependsOn.Length > 0)
-            {
-                EditorGUILayout.LabelField("依赖", string.Join("、", Array.ConvertAll(module.Attribute.DependsOn, item => item.Name)), EditorStyles.miniLabel);
-            }
-
-            if (module.ArgsType != null)
-            {
-                bool expanded = expandedModules.Contains(module.Type.AssemblyQualifiedName);
-                bool nextExpanded = EditorGUILayout.Foldout(expanded, $"启动参数 ({module.ArgsType.Name})", true);
-                if (nextExpanded)
+                for (int index = 0; index < services.Count; index++)
                 {
-                    expandedModules.Add(module.Type.AssemblyQualifiedName);
-                    DrawArguments(module, moduleSettings);
-                }
-                else
-                {
-                    expandedModules.Remove(module.Type.AssemblyQualifiedName);
+                    MiniCoreStartupCodeGenerator.AppServiceInfo service = services[index];
+                    DrawCatalogItem(
+                        service.Attribute.DisplayName,
+                        service.Type,
+                        GetCatalogDescription(service.Attribute.Description),
+                        $"服务接口：{string.Join("、", service.Attribute.ServiceTypes.Select(item => item.Name))}");
                 }
             }
 
+            showModuleCatalog = EditorGUILayout.Foldout(showModuleCatalog, $"AppModule ({appModules.Count})", true);
+            if (showModuleCatalog)
+            {
+                for (int index = 0; index < appModules.Count; index++)
+                {
+                    MiniCoreStartupCodeGenerator.AppModuleInfo module = appModules[index];
+                    string key = string.IsNullOrEmpty(module.Attribute.Key) ? "默认实现" : module.Attribute.Key;
+                    DrawCatalogItem(
+                        module.Type.Name,
+                        module.Type,
+                        GetCatalogDescription(module.Attribute.Description),
+                        $"模块接口：{module.Attribute.ModuleType.Name} / Key: {key}");
+                }
+            }
+
+            showComponentCatalog = EditorGUILayout.Foldout(showComponentCatalog, $"普通 AComponent ({components.Count})", true);
+            if (showComponentCatalog)
+            {
+                for (int index = 0; index < components.Count; index++)
+                {
+                    Type component = components[index];
+                    ComponentCatalogAttribute attribute = component.GetCustomAttribute<ComponentCatalogAttribute>();
+                    DrawCatalogItem(attribute.DisplayName, component, GetCatalogDescription(attribute.Description));
+                }
+            }
+
+            EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// 绘制能力目录中的单个只读条目。
+        /// </summary>
+        /// <param name="title">条目显示名称。</param>
+        /// <param name="type">条目具体类型。</param>
+        /// <param name="description">条目面向开发者的具体职责说明。</param>
+        /// <param name="detail">条目的接口或 Key 等补充信息。</param>
+        private static void DrawCatalogItem(string title, Type type, string description, string detail = null)
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.inspectorDefaultMargins);
+            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(description, EditorStyles.wordWrappedMiniLabel);
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                EditorGUILayout.LabelField(detail, EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.SelectableLabel(type.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// 获取用于能力目录显示的职责说明。
+        /// </summary>
+        /// <param name="description">标记中声明的职责说明。</param>
+        /// <returns>可直接显示的职责说明。</returns>
+        private static string GetCatalogDescription(string description)
+        {
+            return string.IsNullOrWhiteSpace(description) ? "未填写用途说明。" : description;
+        }
+
+        /// <summary>
+        /// 收集项目程序集内已标注具体职责的普通 AComponent 类型。
+        /// 未标注的类型以及 GameStartup、网络会话等框架内部装配实现不会出现在能力目录中。
+        /// </summary>
+        /// <param name="services">已发现的应用服务。</param>
+        /// <param name="appModules">已发现的应用模块。</param>
+        /// <returns>按完整类型名稳定排序的已标注组件集合。</returns>
+        private static List<Type> DiscoverOrdinaryComponents(
+            List<MiniCoreStartupCodeGenerator.AppServiceInfo> services,
+            List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules)
+        {
+            var classifiedTypes = new HashSet<Type>();
+            for (int index = 0; index < services.Count; index++)
+            {
+                classifiedTypes.Add(services[index].Type);
+            }
+
+            for (int index = 0; index < appModules.Count; index++)
+            {
+                classifiedTypes.Add(appModules[index].Type);
+            }
+
+            var result = new List<Type>();
+            foreach (Type type in TypeCache.GetTypesDerivedFrom<AComponent>())
+            {
+                if (type == null || type.IsAbstract || classifiedTypes.Contains(type) || !IsProjectRuntimeType(type) || IsInfrastructureComponent(type) || type.GetCustomAttribute<ComponentCatalogAttribute>() == null)
+                {
+                    continue;
+                }
+
+                result.Add(type);
+            }
+
+            result.Sort((left, right) => string.CompareOrdinal(left.FullName, right.FullName));
+            return result;
+        }
+
+        /// <summary>
+        /// 判断类型是否属于项目的可运行 MiniCore 或 Bootstrap 程序集。
+        /// </summary>
+        /// <param name="type">待检查的类型。</param>
+        /// <returns>类型应出现在项目能力目录时返回 true。</returns>
+        private static bool IsProjectRuntimeType(Type type)
+        {
+            string assemblyName = type.Assembly.GetName().Name;
+            return assemblyName.StartsWith("MiniCore.", StringComparison.Ordinal) &&
+                   !assemblyName.EndsWith(".Editor", StringComparison.Ordinal) &&
+                   !assemblyName.EndsWith(".EditorTests", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 判断普通组件是否为框架内部装配实现，而非业务直接使用的能力。
+        /// </summary>
+        /// <param name="type">待检查的组件类型。</param>
+        /// <returns>应从业务能力目录隐藏时返回 true。</returns>
+        private static bool IsInfrastructureComponent(Type type)
+        {
+            return typeof(AGameStartup).IsAssignableFrom(type) || typeof(MiniCore.Core.INetworkSessionService).IsAssignableFrom(type);
+        }
+
+        /// <summary>
+        /// 按具体 AppService 实现绘制与传统模块一致的 Client/Server 勾选配置。
+        /// </summary>
+        /// <param name="services">已发现服务实现。</param>
+        private void DrawServices(List<MiniCoreStartupCodeGenerator.AppServiceInfo> services)
+        {
+            GUILayout.Label("AppService", EditorStyles.boldLabel);
+            foreach (MiniCoreStartupCodeGenerator.AppServiceInfo service in services)
+            {
+                MiniCoreAppServiceSettings serviceSettings = FindServiceSettings(service.Type);
+                if (serviceSettings == null)
+                {
+                    continue;
+                }
+
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Label(service.Attribute.DisplayName, EditorStyles.boldLabel);
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.SelectableLabel(service.Type.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                EditorGUILayout.BeginHorizontal();
+                DrawTargetToggle("Client", ref serviceSettings.EnableClient);
+                DrawTargetToggle("Server", ref serviceSettings.EnableServer);
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.LabelField("服务接口", string.Join("、", service.Attribute.ServiceTypes.Select(item => item.Name)), EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("描述", GetCatalogDescription(service.Attribute.Description), EditorStyles.miniLabel);
+                if (service.Attribute.RequiresServices != null && service.Attribute.RequiresServices.Length > 0)
+                {
+                    EditorGUILayout.LabelField("依赖", string.Join("、", service.Attribute.RequiresServices.Select(item => item.Name)), EditorStyles.miniLabel);
+                }
+
+                if (service.ArgsType != null)
+                {
+                    bool expanded = expandedServices.Contains(service.Type.AssemblyQualifiedName);
+                    bool nextExpanded = EditorGUILayout.Foldout(expanded, $"启动参数 ({service.ArgsType.Name})", true);
+                    if (nextExpanded)
+                    {
+                        expandedServices.Add(service.Type.AssemblyQualifiedName);
+                        DrawArguments(service.ArgsType, serviceSettings.Arguments, service.Attribute.DisplayName);
+                    }
+                    else
+                    {
+                        expandedServices.Remove(service.Type.AssemblyQualifiedName);
+                    }
+                }
+
+                EditorGUILayout.EndVertical();
+            }
         }
 
         /// <summary>
@@ -142,25 +312,26 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 绘制一个模块的 Args 覆盖成员。
+        /// 绘制启动模块或 AppService 的 Args 覆盖成员。
         /// </summary>
-        /// <param name="module">拥有 Args 类型的模块描述。</param>
-        /// <param name="moduleSettings">模块的可持久化配置。</param>
-        private void DrawArguments(MiniCoreStartupCodeGenerator.StartupModuleInfo module, MiniCoreStartupModuleSettings moduleSettings)
+        /// <param name="argsType">启动参数类型。</param>
+        /// <param name="arguments">对应类型的持久化参数配置。</param>
+        /// <param name="ownerName">当前参数所属模块或服务的显示名称。</param>
+        private void DrawArguments(Type argsType, List<MiniCoreStartupArgumentSettings> arguments, string ownerName)
         {
-            List<MemberInfo> members = MiniCoreStartupCodeGenerator.GetEditableArgumentMembers(module.ArgsType);
+            List<MemberInfo> members = MiniCoreStartupCodeGenerator.GetEditableArgumentMembers(argsType);
             if (members.Count == 0)
             {
                 EditorGUILayout.HelpBox("当前 Args 没有可编辑的 public 字段或可写属性。", MessageType.None);
                 return;
             }
 
-            EditorGUILayout.HelpBox("勾选“覆盖默认值”后填写此模块的启动值；未勾选时，生成代码使用 Args 类中定义的默认值。", MessageType.None);
+            EditorGUILayout.HelpBox($"勾选“覆盖默认值”后填写“{ownerName}”的启动值；未勾选时，生成代码使用 Args 类中定义的默认值。", MessageType.None);
             EditorGUI.indentLevel++;
             for (int i = 0; i < members.Count; i++)
             {
                 MemberInfo member = members[i];
-                MiniCoreStartupArgumentSettings argument = FindArgumentSettings(moduleSettings, member.Name);
+                MiniCoreStartupArgumentSettings argument = FindArgumentSettings(arguments, member.Name);
                 if (argument == null)
                 {
                     continue;
@@ -226,18 +397,18 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 获取模块配置中与指定组件类型对应的条目。
+        /// 获取指定 AppService 实现的持久化配置。
         /// </summary>
-        /// <param name="componentType">启动组件类型。</param>
-        /// <returns>对应的持久化模块配置；不存在时返回 null。</returns>
-        private MiniCoreStartupModuleSettings FindModuleSettings(Type componentType)
+        /// <param name="serviceType">具体服务实现类型。</param>
+        /// <returns>对应服务设置；不存在时返回 null。</returns>
+        private MiniCoreAppServiceSettings FindServiceSettings(Type serviceType)
         {
-            for (int i = 0; i < settings.Modules.Count; i++)
+            for (int index = 0; index < settings.Services.Count; index++)
             {
-                MiniCoreStartupModuleSettings module = settings.Modules[i];
-                if (module != null && string.Equals(module.AssemblyQualifiedTypeName, componentType.AssemblyQualifiedName, StringComparison.Ordinal))
+                MiniCoreAppServiceSettings service = settings.Services[index];
+                if (service != null && string.Equals(service.AssemblyQualifiedTypeName, serviceType.AssemblyQualifiedName, StringComparison.Ordinal))
                 {
-                    return module;
+                    return service;
                 }
             }
 
@@ -245,16 +416,16 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 获取模块参数配置中与指定成员名对应的条目。
+        /// 获取参数配置中与指定成员名对应的条目。
         /// </summary>
-        /// <param name="module">模块持久化配置。</param>
+        /// <param name="arguments">模块或服务的参数配置集合。</param>
         /// <param name="memberName">Args 成员名称。</param>
         /// <returns>对应参数配置；不存在时返回 null。</returns>
-        private static MiniCoreStartupArgumentSettings FindArgumentSettings(MiniCoreStartupModuleSettings module, string memberName)
+        private static MiniCoreStartupArgumentSettings FindArgumentSettings(List<MiniCoreStartupArgumentSettings> arguments, string memberName)
         {
-            for (int i = 0; i < module.Arguments.Count; i++)
+            for (int i = 0; i < arguments.Count; i++)
             {
-                MiniCoreStartupArgumentSettings argument = module.Arguments[i];
+                MiniCoreStartupArgumentSettings argument = arguments[i];
                 if (argument != null && string.Equals(argument.MemberName, memberName, StringComparison.Ordinal))
                 {
                     return argument;

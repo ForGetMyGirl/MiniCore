@@ -5,15 +5,16 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
+using MiniCore.Core;
 using MiniCore.Serialization;
 
-namespace MiniCore.Core
+namespace MiniCore.Service
 {
     /// <summary>
     /// 网络消息中枢，负责多会话的发包、收包、RPC、心跳和处理器派发。
     /// </summary>
-    [MiniCoreStartupModule("网络消息")]
-    public class NetworkMessageComponent : AComponent
+    [AppService("网络", typeof(INetworkService), Description = "管理多会话的收发包、RPC、心跳和消息处理器派发。")]
+    public class NetworkService : AAppService, INetworkService
     {
         #region Private 私有成员
 
@@ -125,7 +126,7 @@ namespace MiniCore.Core
             {
                 foreach (var kv in pendingRpcs)
                 {
-                    kv.Value.Tcs.TrySetException(new ObjectDisposedException(nameof(NetworkMessageComponent)));
+                    kv.Value.Tcs.TrySetException(new ObjectDisposedException(nameof(NetworkService)));
                 }
                 pendingRpcs.Clear();
             }

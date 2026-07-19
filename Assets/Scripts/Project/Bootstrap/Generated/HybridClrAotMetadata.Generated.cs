@@ -25,9 +25,12 @@ namespace MiniCore.Bootstrap
 
         private static readonly string[] _aotMetadataAddresses =
         {
+            "Google.Protobuf.dll",
             "MiniCore.Network.dll",
             "MiniCore.Runtime.dll",
             "MiniCore.Unity.dll",
+            "Newtonsoft.Json.dll",
+            "System.Core.dll",
             "UniTask.dll",
             "UnityEngine.CoreModule.dll",
             "YooAsset.dll",

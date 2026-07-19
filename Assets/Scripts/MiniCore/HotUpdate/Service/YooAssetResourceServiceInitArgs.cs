@@ -1,13 +1,13 @@
 using System;
 using MiniCore.Model;
 
-namespace MiniCore.HotUpdate
+namespace MiniCore.Service
 {
     /// <summary>
-    /// YooAsset 资源组件的初始化参数。
-    /// 包名只在组件首次创建时使用，后续获取已有组件时不会重新应用。
+    /// YooAsset 资源服务的初始化参数。
+    /// 包名只在服务首次创建时使用，后续获取已有服务时不会重新应用。
     /// </summary>
-    public sealed class YooAssetResourceComponentInitArgs : ComponentInitArgs
+    public sealed class YooAssetResourceServiceInitArgs : ComponentInitArgs
     {
         #region Public 公共成员
 
@@ -21,7 +21,7 @@ namespace MiniCore.HotUpdate
         /// 使用代码默认值创建初始化参数。
         /// 该无参构造函数供项目启动配置生成器使用。
         /// </summary>
-        public YooAssetResourceComponentInitArgs()
+        public YooAssetResourceServiceInitArgs()
         {
         }
 
@@ -29,7 +29,7 @@ namespace MiniCore.HotUpdate
         /// 使用资源包名称创建初始化参数。
         /// </summary>
         /// <param name="packageName">YooAsset 中已注册的资源包名称。</param>
-        public YooAssetResourceComponentInitArgs(string packageName)
+        public YooAssetResourceServiceInitArgs(string packageName)
         {
             if (string.IsNullOrWhiteSpace(packageName))
             {

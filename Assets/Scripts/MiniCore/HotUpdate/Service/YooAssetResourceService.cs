@@ -4,14 +4,14 @@ using MiniCore.Model;
 using UnityEngine;
 using YooAsset;
 
-namespace MiniCore.HotUpdate
+namespace MiniCore.Service
 {
     /// <summary>
-    /// 基于 YooAsset 的资源加载组件。
-    /// 组件创建后绑定一个资源包，并缓存主动预加载的资源句柄。
+    /// 基于 YooAsset 的资源加载服务。
+    /// 服务创建后绑定一个资源包，并缓存主动预加载的资源句柄。
     /// </summary>
-    [MiniCoreStartupModule("YooAsset 资源")]
-    public class YooAssetResourceComponent : AComponent<YooAssetResourceComponentInitArgs>, IResourcesComponent
+    [AppService("YooAsset 资源", typeof(IResourceService), Description = "基于 YooAsset 加载、预加载、实例化和释放资源。", InitArgsType = typeof(YooAssetResourceServiceInitArgs))]
+    public sealed class YooAssetResourceService : AAppService, IResourceService
     {
         #region Private 私有成员
 
@@ -20,7 +20,7 @@ namespace MiniCore.HotUpdate
 
         #endregion
 
-        #region Public 公共成员
+        #region Interface 接口实现
 
         /// <summary>
         /// 同步实例化已加载的资源对象。
@@ -33,7 +33,7 @@ namespace MiniCore.HotUpdate
         {
             if (!loadedAssets.ContainsKey(key))
             {
-                await PreloadAssetsAsync<GameObject>(key);
+                await PreloadAssetAsync<GameObject>(key);
             }
 
             return loadedAssets[key].InstantiateSync(parent);
@@ -60,7 +60,7 @@ namespace MiniCore.HotUpdate
         /// <typeparam name="T">资源对象类型。</typeparam>
         /// <param name="key">资源地址或资源键。</param>
         /// <returns>预加载完成的资源对象。</returns>
-        public async UniTask<T> PreloadAssetsAsync<T>(string key) where T : Object
+        public async UniTask<T> PreloadAssetAsync<T>(string key) where T : Object
         {
             if (!loadedAssets.TryGetValue(key, out AssetHandle handle))
             {
@@ -77,7 +77,7 @@ namespace MiniCore.HotUpdate
         /// </summary>
         /// <param name="key">要释放的资源地址或资源键。</param>
         /// <returns>存在并释放资源句柄时返回 true；否则返回 false。</returns>
-        public bool ReleaseAssetAsync(string key)
+        public bool ReleaseAsset(string key)
         {
             if (!loadedAssets.TryGetValue(key, out AssetHandle handle))
             {
@@ -105,8 +105,8 @@ namespace MiniCore.HotUpdate
         #region Override 重写实现
 
         /// <summary>
-        /// 释放组件缓存的预加载资源句柄。
-        /// 该方法由租约归零或 Global 销毁触发，避免资源组件卸载后残留句柄。
+        /// 释放服务缓存的预加载资源句柄。
+        /// 该方法由租约归零或 Global 销毁触发，避免资源服务卸载后残留句柄。
         /// </summary>
         public override void Dispose()
         {
@@ -120,20 +120,25 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
-        /// 使用资源包参数初始化 YooAsset 资源组件。
+        /// 使用资源包参数初始化 YooAsset 资源服务。
         /// </summary>
         /// <param name="args">包含资源包名称的初始化参数。</param>
-        protected override void Awake(YooAssetResourceComponentInitArgs args)
+        public override void Awake(ComponentInitArgs args)
         {
-            if (string.IsNullOrWhiteSpace(args.PackageName))
+            if (args is not YooAssetResourceServiceInitArgs resourceArgs)
+            {
+                throw new System.ArgumentException("YooAsset 资源服务初始化参数类型不正确。", nameof(args));
+            }
+
+            if (string.IsNullOrWhiteSpace(resourceArgs.PackageName))
             {
                 throw new System.ArgumentException("YooAsset 资源包名称不能为空。", nameof(args));
             }
 
-            package = YooAssets.GetPackage(args.PackageName);
+            package = YooAssets.GetPackage(resourceArgs.PackageName);
             if (package == null)
             {
-                throw new System.InvalidOperationException($"未找到 YooAsset 资源包：{args.PackageName}。");
+                throw new System.InvalidOperationException($"未找到 YooAsset 资源包：{resourceArgs.PackageName}。");
             }
         }
 

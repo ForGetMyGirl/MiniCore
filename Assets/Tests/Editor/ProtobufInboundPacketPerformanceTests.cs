@@ -66,7 +66,7 @@ namespace MiniCore.EditorTests
         #region Private 私有成员
 
         /// <summary>
-        /// 执行一次与 NetworkMessageComponent 普通收包分支等价的处理流程。
+        /// 执行一次与 NetworkService 普通收包分支等价的处理流程。
         /// </summary>
         private void ProcessPacket()
         {

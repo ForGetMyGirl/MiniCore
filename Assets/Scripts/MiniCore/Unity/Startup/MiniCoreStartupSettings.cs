@@ -18,6 +18,18 @@ namespace MiniCore.Unity
         /// </summary>
         public List<MiniCoreStartupModuleSettings> Modules = new List<MiniCoreStartupModuleSettings>();
 
+        /// <summary>
+        /// 获取或设置按具体 AppService 实现保存的 Client/Server 启用状态。
+        /// 生成器负责校验同一服务接口在同一目标最多启用一个实现。
+        /// </summary>
+        public List<MiniCoreAppServiceSettings> Services = new List<MiniCoreAppServiceSettings>();
+
+        /// <summary>
+        /// 获取或设置服务启用状态配置的迁移版本。
+        /// 用于将早期“新服务默认全启用”的配置安全迁移为显式启用模式。
+        /// </summary>
+        public int ServiceSettingsVersion;
+
         #endregion
     }
 
@@ -47,6 +59,37 @@ namespace MiniCore.Unity
         /// <summary>
         /// 获取或设置组件初始化参数的字段或属性覆盖值。
         /// 未覆盖的成员保持 Args 类型在代码中声明的默认值。
+        /// </summary>
+        public List<MiniCoreStartupArgumentSettings> Arguments = new List<MiniCoreStartupArgumentSettings>();
+
+        #endregion
+    }
+
+    /// <summary>
+    /// 单个 AppService 实现在不同运行目标中的启用状态及启动参数。
+    /// </summary>
+    [Serializable]
+    public sealed class MiniCoreAppServiceSettings
+    {
+        #region Public 公共成员
+
+        /// <summary>
+        /// 获取或设置具体 AppService 实现程序集限定名。
+        /// </summary>
+        public string AssemblyQualifiedTypeName;
+
+        /// <summary>
+        /// 获取或设置是否在客户端启动当前服务实现。
+        /// </summary>
+        public bool EnableClient;
+
+        /// <summary>
+        /// 获取或设置是否在服务端启动当前服务实现。
+        /// </summary>
+        public bool EnableServer;
+
+        /// <summary>
+        /// 获取或设置当前服务实现的初始化参数覆盖值。
         /// </summary>
         public List<MiniCoreStartupArgumentSettings> Arguments = new List<MiniCoreStartupArgumentSettings>();
 

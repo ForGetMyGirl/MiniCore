@@ -17,6 +17,11 @@ namespace MiniCore.Model
         public string DisplayName { get; }
 
         /// <summary>
+        /// 获取或设置启动模块面向开发者的具体职责说明。
+        /// </summary>
+        public string Description { get; set; }
+
+        /// <summary>
         /// 获取或设置当前组件所依赖的其他启动组件类型。
         /// 生成器会先初始化依赖，再初始化当前组件；组件自身仍应通过 Global.Get 管理实际持有关系。
         /// </summary>

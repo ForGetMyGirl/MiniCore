@@ -1,6 +1,7 @@
 using System;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Service;
 using NUnit.Framework;
 
 namespace MiniCore.EditorTests
@@ -214,6 +215,46 @@ namespace MiniCore.EditorTests
             Assert.Throws<ArgumentException>(() => new ArgumentComponent().Awake(new OtherInitArgs()));
         }
 
+        /// <summary>
+        /// 验证不同 ComponentGroup 中的同类型组件互不共享，销毁一组不会影响另一组。
+        /// </summary>
+        [Test]
+        public void ComponentGroup_SameType_CreatesIndependentInstances()
+        {
+            using ComponentGroup firstGroup = Global.CreateGroup("first", 10001);
+            using ComponentGroup secondGroup = Global.CreateGroup("second", 10002);
+
+            CountingComponent first = firstGroup.GetOrAdd<CountingComponent>();
+            CountingComponent second = secondGroup.GetOrAdd<CountingComponent>();
+
+            Assert.AreNotSame(first, second);
+            Assert.AreEqual(10001, first.GroupId.Value);
+            Assert.AreEqual(10002, second.GroupId.Value);
+
+            firstGroup.Dispose();
+
+            Assert.IsTrue(first.IsDisposed);
+            Assert.IsFalse(second.IsDisposed);
+        }
+
+        /// <summary>
+        /// 验证应用服务必须经由接口解析，并且接口引用仍纳入 owner 生命周期。
+        /// </summary>
+        [Test]
+        public void AppService_GetService_ResolvesInterfaceAndReleasesOwnerReference()
+        {
+            object owner = new object();
+            TestAppService service = Global.RegisterAppService<ITestAppService, TestAppService>();
+
+            ITestAppService resolved = Global.GetService<ITestAppService>(owner);
+
+            Assert.AreSame(service, resolved);
+            Global.ReleaseAll(owner);
+            Assert.IsFalse(service.IsDisposed);
+            Global.Unpin<TestAppService>();
+            Assert.IsTrue(service.IsDisposed);
+        }
+
         #endregion
 
         #region Private 私有成员
@@ -264,6 +305,20 @@ namespace MiniCore.EditorTests
             }
 
             #endregion
+        }
+
+        /// <summary>
+        /// 用于验证服务接口解析的最小测试服务接口。
+        /// </summary>
+        private interface ITestAppService : IAppService
+        {
+        }
+
+        /// <summary>
+        /// 用于验证服务注册的最小实现。
+        /// </summary>
+        private sealed class TestAppService : AAppService, ITestAppService
+        {
         }
 
         /// <summary>

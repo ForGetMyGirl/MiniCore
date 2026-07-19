@@ -63,6 +63,9 @@ flowchart BT
 | `Global.GetOrAdd<T>(owner[, args])` | 临时或业务组件；首次创建时执行 `Awake` | `Global.Remove<T>(owner)` 或 `ReleaseAll(owner)` |
 | `Global.Pin<T>([args])` | 网络、计时器、资源等常驻基础设施 | `Global.Unpin<T>()` |
 | `Global.CreateScope(name)` | 场景、战斗、临时玩法等成组生命周期 | `scope.Dispose()` 自动 `ReleaseAll(scope)` |
+| `Global.CreateGroup(name, businessId)` | 房间、地图、对局等同类型组件多实例容器 | `group.Dispose()` 强制释放该 Group 的全部组件 |
+| `Global.GetService<T>(owner)` | 获取启动配置选中的 AppService 接口 | `ReleaseAll(owner)` 归还引用 |
+| `Global.GetOrAddModule<T>([key], owner)` | 获取按需创建的 AppModule 接口 | `ReleaseAll(owner)` 归还引用 |
 | `Global.Tick()` | 驱动活动组件的 `MonoUpdate` | 由宿主每帧调用 |
 | `Global.ForceRemove<T>()` | 退出、切服等最高层中断 | 不用于普通业务 |
 
@@ -86,6 +89,26 @@ public sealed class BattleFlow : IDisposable
 ```
 
 不要将 `Global` 再包装为 `Global.Com`；不要把 `ForceRemove` 当成普通释放；不要遗漏 owner 释放。
+
+### 服务、模块与玩法组件
+
+`Global` 仍是唯一宿主，不引入 .NET 风格的容器链。新增分类只是在边界处约束“谁可以替换、谁可以多实例”：
+
+| 分类 | 基类/标记 | 创建方式 | 外部访问 |
+|---|---|---|---|
+| AppService | `AAppService` + `[AppService]` | 启动配置为每个接口在 Client/Server 选择一个 Provider，生成代码 Pin | `Global.GetService<TInterface>(owner)` |
+| AppModule | `AAppModule` + `[AppModule]` | 生成的注册表注册，业务按需创建 | `Global.GetOrAddModule<TInterface>(key, owner)` |
+| 普通组件/玩法 | `AComponent`；需要目录可发现性时加 `[ComponentCatalog]` | 业务自由 `GetOrAdd`，可放入 Group | 具体类型 |
+
+AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.Get<TConcreteService>` 绕过接口会抛出诊断。Dedicated Server 是 Unity Player，不存在“框架层禁止资源、Canvas 或物理加载”的规则；每个目标只校验自己所选服务、依赖与 Provider 是否完整。
+
+资源、资产、场景绑定与 UI 已完成 AppService 化：`IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`ISceneBindingService` / `SceneBindingService`、`IUIService` / `UIService`。它们必须通过 `Global.GetService<TInterface>(owner)` 获取，旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`UIFactoryComponent` 已删除且没有兼容包装。完整迁移映射和使用示例见 [项目启动与服务配置](StartupModules.md#已迁移的资源与-ui-服务)。
+
+普通 `AComponent` 不属于启动配置左侧列表。若它是开发者可直接调用的能力，可用 `[ComponentCatalog("名称", Description = "具体职责")]` 将其只读展示在右侧项目能力目录；未标记类型和框架内部装配类型不会显示。
+
+启动配置保存 AppService 的启用状态和 Args 覆盖值。`StoragePathService` 统一提供存档和本地运行数据的根目录；`RelativePath` 只能填写相对于产品专属 `Application.persistentDataPath` 的目录，例如 `MyGame` 或 `Company/MyGame`，代码默认值为兼容旧项目的 `MiniCore`。`EncryptedSaveService` 只依赖 `IStoragePathService`，并通过开发者填写的 `EncryptionKey` 以 SHA-256 派生主密钥、以 HMAC-SHA256 按槽位派生工作密钥。该参数会明文保存在配置资产和生成代码中，适合本地防误改，不能作为对抗逆向或本机攻击的安全边界；修改后旧存档无法读取。具体启用与替换流程见 [项目启动与服务配置](StartupModules.md#加密存档)。
+
+`ComponentGroup` 的键是 `(组件具体类型, GroupId)`。因此两个 MOBA 对局可各自拥有 `BattleComponent`、`RoomComponent` 与计时器实例；单位、子弹、怪物等高频对象仍应由 Battle 内部实体容器或对象池管理，而不应成为 Global 多实例组件。
 
 ### Unity 与非 Unity 宿主
 
@@ -119,11 +142,13 @@ Bootstrap 在加载 DLL 后反射调用固定静态类型 `MiniCore.HotUpdate.Mi
 
 Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步骤失败时不应启动监听。
 
-### 项目启动模块与 GameStartup
+### AppService、GameStartup 与生成代码
 
-通过 `MiniCore > 项目启动配置` 为每个带 `[MiniCoreStartupModule]` 的组件选择 Client、Server 或两者，并填写 Args 参数。生成器解析 `DependsOn` 后写入 `HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`，按依赖顺序初始化组件；选择网络模块时同步注册 HotUpdate Handler。
+通过 `MiniCore > 项目启动配置` 为 AppService Provider 选择 Client、Server 或两者，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。同一目标没有异步服务时，生成普通 `Task` 方法，避免无意义的 `async` 与无效模式匹配。
 
-所有模块完成初始化后，生成代码调用项目唯一的 `GameStartup.StartAsync()`。完整接入步骤和新增模块示例见 [项目启动模块配置](StartupModules.md)。
+右侧只读能力目录按 Service、AppModule 和带 `ComponentCatalogAttribute` 的普通 `AComponent` 分组，可折叠显示描述、接口和完整命名空间。`Description` 是 `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 的统一元数据；它不参与启动逻辑。
+
+所有已选服务完成初始化后，生成代码调用项目唯一的 `GameStartup.StartAsync()`。`MiniCoreStartupModule` 保留给已有项目的传统常驻组件流程；新系统级能力应优先使用 AppService。完整接入步骤、服务列表和 HTTP/密钥约束见 [项目启动与服务配置](StartupModules.md)。
 
 ### HybridCLR 与 YooAsset
 
@@ -157,8 +182,9 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 | 消息角色、Opcode、Protobuf 生成物 | `Protocol/Model`、`Protocol/Generated` |
 | 通用序列化器 | `Serialization/Interface`、`Serialization/Protobuf`、`Serialization/NewtonsoftJson` |
 | 网络会话、收发、Handler 基类、传输实现 | `Network/Core`、`Network/Handler`、`Network/Transport` |
-| Unity 生命周期、输入、UI 契约、Unity serializer | `Unity/Driver`、`Unity/Mono`、`Unity/UI`、`Unity/Serialization` |
-| 客户端资源/UI/对象池业务 | `HotUpdate/Client` |
+| Unity 生命周期、输入、UI 契约、Unity serializer、平台服务 | `Unity/Driver`、`Unity/Mono`、`Unity/UI`、`Unity/Serialization`、`Unity/Service` |
+| 热更新资源、资产、场景绑定和 UI 服务 | `HotUpdate/Service` |
+| 客户端对象池与其他业务 | `HotUpdate/Client` |
 | Client/Server 热更新启动入口 | `HotUpdate/Entry` |
 | 业务网络 Handler | `HotUpdate/Network/Handler` |
 | Bootstrap 与生成的 AOT 地址表 | `Project/Bootstrap` |
@@ -182,6 +208,6 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 1. Proto 注解、RPC `Code/Msg` 固定字段、生成的 Message/Role/Parser Registry 一致性。
 2. Opcode Manifest、当前 Handler、Opcode Registry 与 HotUpdate Handler Registry 一致性。
 3. HybridCLR 配置、AOT 元数据与热更新 DLL/YooAsset 资源同步。
-4. Dedicated Server 不得引入客户端 UI 依赖。
+4. 每个 Client/Server 目标的 AppService 接口只能选定一个 Provider，且该 Provider 的依赖必须在同一目标完整可用。
 
 若校验报错，先修正源 Proto 或 Handler，等待 Unity 自动编译和同步完成，再执行构建；不要手改生成映射绕过校验。

@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
+using MiniCore.Service;
 using UnityEngine;
 
 namespace MiniCore.HotUpdate
@@ -25,7 +26,7 @@ namespace MiniCore.HotUpdate
         private static readonly TimeSpan StageTimeout = TimeSpan.FromSeconds(5); // 单个验证阶段的最长等待时长。
 
         private readonly UniTaskCompletionSource<bool> completionSource = new UniTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
-        private NetworkMessageComponent network; // 已由客户端入口初始化并注册 Handler 的网络组件。
+        private INetworkService network; // 已由客户端入口初始化并注册 Handler 的网络服务。
         private GUIStyle statusStyle; // Player 屏幕状态文本样式缓存。
         private bool heldNetworkReference; // 当前对象是否持有网络组件引用。
         private bool subscribedToNetworkEvents; // 是否已订阅业务网络事件。
@@ -161,7 +162,7 @@ namespace MiniCore.HotUpdate
         {
             try
             {
-                network = Global.Get<NetworkMessageComponent>(this);
+                network = Global.GetService<INetworkService>(this);
                 heldNetworkReference = true;
                 network.OnServerSessionCreated += HandleServerSessionCreated;
                 network.OnServerSessionClosed += HandleServerSessionClosed;

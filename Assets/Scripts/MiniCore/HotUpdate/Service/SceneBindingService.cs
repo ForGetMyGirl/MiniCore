@@ -1,13 +1,14 @@
 using MiniCore.Model;
 using UnityEngine;
 
-namespace MiniCore.Core
+namespace MiniCore.Service
 {
     /// <summary>
-    /// 延迟查找并缓存约定场景标签的组件。
+    /// 延迟查找并缓存约定场景节点的服务。
+    /// 为资产与 UI 服务提供 Canvas 和对象池根节点绑定。
     /// </summary>
-    [MiniCoreStartupModule("场景标签")]
-    public class TagsComponent : AComponent
+    [AppService("场景绑定", typeof(ISceneBindingService), Description = "提供场景中的 UI Canvas 和对象池根节点绑定。")]
+    public sealed class SceneBindingService : AAppService, ISceneBindingService
     {
         #region Private 私有成员
 

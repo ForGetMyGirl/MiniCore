@@ -14,6 +14,7 @@ namespace MiniCore.Model
         private Dictionary<Type, AComponent> components; // 按具体类型索引的子组件集合。
         private List<AComponent> componentSnapshot; // 遍历期间使用的子组件快照缓存。
         private bool isDisposed; // 组件是否已完成释放。
+        private ComponentGroupId groupId; // 当前组件所属的 Global 分组身份。
 
         #endregion
 
@@ -30,6 +31,12 @@ namespace MiniCore.Model
         /// 已释放组件不可再次注册或参与更新，应通过 Global 重新获取新实例。
         /// </summary>
         public bool IsDisposed => isDisposed;
+
+        /// <summary>
+        /// 获取当前组件所属的 Global 分组身份。
+        /// 默认组表示传统全局单实例；非默认组用于房间、对局等多实例组件。
+        /// </summary>
+        public ComponentGroupId GroupId => groupId;
 
         /// <summary>
         /// 获取已添加的指定类型子组件。
@@ -88,6 +95,15 @@ namespace MiniCore.Model
         public virtual void Awake(ComponentInitArgs args)
         {
             throw new InvalidOperationException($"组件 {GetType().FullName} 不接受初始化参数 {args?.GetType().FullName ?? "null"}。");
+        }
+
+        /// <summary>
+        /// 由 Global 运行时在组件初始化前写入所属分组身份。
+        /// </summary>
+        /// <param name="value">组件所属的分组身份。</param>
+        internal void SetGroupId(ComponentGroupId value)
+        {
+            groupId = value;
         }
 
         /// <summary>

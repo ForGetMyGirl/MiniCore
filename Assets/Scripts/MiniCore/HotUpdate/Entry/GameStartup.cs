@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Service;
 using UnityEngine;
 
 namespace MiniCore.HotUpdate
@@ -91,7 +92,7 @@ namespace MiniCore.HotUpdate
         /// <returns>KCP 监听完成启动的任务。</returns>
         private async Task StartDedicatedServerAsync()
         {
-            NetworkMessageComponent network = Global.Get<NetworkMessageComponent>(this);
+            INetworkService network = Global.GetService<INetworkService>(this);
             await network.StartKcpServerAsync("0.0.0.0", ReadServerPort()).AsTask();
         }
 

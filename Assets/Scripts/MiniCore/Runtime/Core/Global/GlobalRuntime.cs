@@ -16,6 +16,9 @@ namespace MiniCore.Core
         private static readonly OwnerReferenceComparer OwnerComparer = new OwnerReferenceComparer(); // owner 的引用身份比较器。
         private readonly object rootOwner = new object(); // 常驻组件的内部 owner。
         private readonly Dictionary<Type, ComponentEntry> entries = new Dictionary<Type, ComponentEntry>(); // 按组件类型保存的生命周期条目。
+        private readonly Dictionary<ComponentKey, ComponentEntry> groupEntries = new Dictionary<ComponentKey, ComponentEntry>(); // 按类型和分组保存的多实例组件条目。
+        private readonly List<ComponentKey> releaseGroupKeys = new List<ComponentKey>(); // 分组组件释放时复用的键快照。
+        private readonly List<ComponentKey> destroyGroupKeys = new List<ComponentKey>(); // 销毁指定分组时复用的键快照。
         private readonly List<Type> releaseTypes = new List<Type>(); // ReleaseAll 的复用快照。
         private readonly List<AComponent> tickSnapshot = new List<AComponent>(); // Tick 的复用快照。
         private readonly List<AComponent> disposeSnapshot = new List<AComponent>(); // Shutdown 的复用快照。
@@ -57,6 +60,34 @@ namespace MiniCore.Core
         }
 
         /// <summary>
+        /// 获取指定分组中已经存在的组件并增加 owner 引用。
+        /// </summary>
+        /// <typeparam name="T">组件类型。</typeparam>
+        /// <param name="owner">本次持有组件的 owner。</param>
+        /// <param name="groupId">组件所属分组。</param>
+        /// <returns>已激活的分组组件。</returns>
+        internal T Get<T>(object owner, ComponentGroupId groupId) where T : AComponent, new()
+        {
+            if (groupId.IsDefault)
+            {
+                return Get<T>(owner);
+            }
+
+            EnsureAvailable();
+            ValidateOwner(owner);
+            ComponentKey key = new ComponentKey(typeof(T), groupId);
+            if (!groupEntries.TryGetValue(key, out ComponentEntry entry))
+            {
+                throw new InvalidOperationException($"未找到分组组件：{typeof(T).FullName} group:{groupId}。请先调用 GetOrAdd。");
+            }
+
+            T component = entry.Component as T;
+            EnsureUsable(typeof(T), component);
+            entry.AddReference(owner);
+            return component;
+        }
+
+        /// <summary>
         /// 获取或创建无参组件并增加 owner 引用。
         /// </summary>
         /// <typeparam name="T">组件类型。</typeparam>
@@ -82,6 +113,82 @@ namespace MiniCore.Core
             }
 
             return GetOrCreate<T>(owner, args);
+        }
+
+        /// <summary>
+        /// 获取或创建指定分组中的无参组件并增加 owner 引用。
+        /// </summary>
+        /// <typeparam name="T">组件类型。</typeparam>
+        /// <param name="owner">本次持有组件的 owner。</param>
+        /// <param name="groupId">组件所属分组。</param>
+        /// <returns>已激活的分组组件。</returns>
+        internal T GetOrAdd<T>(object owner, ComponentGroupId groupId) where T : AComponent, new()
+        {
+            return GetOrCreateGrouped<T>(owner, groupId, null);
+        }
+
+        /// <summary>
+        /// 获取或创建指定分组中的带参数组件并增加 owner 引用。
+        /// </summary>
+        /// <typeparam name="T">组件类型。</typeparam>
+        /// <param name="owner">本次持有组件的 owner。</param>
+        /// <param name="groupId">组件所属分组。</param>
+        /// <param name="args">首次创建时使用的参数。</param>
+        /// <returns>已激活的分组组件。</returns>
+        internal T GetOrAdd<T>(object owner, ComponentGroupId groupId, ComponentInitArgs args) where T : AComponent, new()
+        {
+            if (args == null)
+            {
+                throw new ArgumentNullException(nameof(args));
+            }
+
+            return GetOrCreateGrouped<T>(owner, groupId, args);
+        }
+
+        /// <summary>
+        /// 强制销毁指定分组中的所有组件。
+        /// </summary>
+        /// <param name="groupId">待销毁的非默认分组身份。</param>
+        /// <param name="groupName">用于诊断的分组名称。</param>
+        internal void DestroyGroup(ComponentGroupId groupId, string groupName)
+        {
+            EnsureThread();
+            if (groupId.IsDefault)
+            {
+                throw new InvalidOperationException("默认全局组不能通过 DestroyGroup 销毁。");
+            }
+
+            destroyGroupKeys.Clear();
+            foreach (KeyValuePair<ComponentKey, ComponentEntry> pair in groupEntries)
+            {
+                if (pair.Key.GroupId == groupId)
+                {
+                    destroyGroupKeys.Add(pair.Key);
+                }
+            }
+
+            for (int i = 0; i < destroyGroupKeys.Count; i++)
+            {
+                ComponentKey key = destroyGroupKeys[i];
+                if (groupEntries.TryGetValue(key, out ComponentEntry entry))
+                {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    if (entry.ReferenceCount > 0)
+                    {
+                        LogSwitch.Warning($"销毁组件分组时仍存在 owner 引用：{key.ComponentType.FullName} group:{groupId} owners:{entry.DescribeOwners(rootOwner)}");
+                    }
+#endif
+                    groupEntries.Remove(key);
+                    DisposeEntry(entry);
+                }
+            }
+
+            if (destroyGroupKeys.Count > 0)
+            {
+                LogSwitch.Warning($"已强制销毁组件分组：{groupName} group:{groupId} count:{destroyGroupKeys.Count}");
+            }
+
+            destroyGroupKeys.Clear();
         }
 
         /// <summary>
@@ -154,11 +261,19 @@ namespace MiniCore.Core
             EnsureThread();
             ValidateOwner(owner);
             releaseTypes.Clear();
+            releaseGroupKeys.Clear();
             foreach (KeyValuePair<Type, ComponentEntry> pair in entries)
             {
                 if (pair.Value.HasReference(owner))
                 {
                     releaseTypes.Add(pair.Key);
+                }
+            }
+            foreach (KeyValuePair<ComponentKey, ComponentEntry> pair in groupEntries)
+            {
+                if (pair.Value.HasReference(owner))
+                {
+                    releaseGroupKeys.Add(pair.Key);
                 }
             }
 
@@ -172,7 +287,22 @@ namespace MiniCore.Core
                 }
             }
 
+            for (int i = 0; i < releaseGroupKeys.Count; i++)
+            {
+                ComponentKey key = releaseGroupKeys[i];
+                if (groupEntries.TryGetValue(key, out ComponentEntry entry))
+                {
+                    entry.RemoveAllReferences(owner);
+                    if (entry.ReferenceCount <= 0)
+                    {
+                        groupEntries.Remove(key);
+                        DisposeEntry(entry);
+                    }
+                }
+            }
+
             releaseTypes.Clear();
+            releaseGroupKeys.Clear();
         }
 
         /// <summary>
@@ -199,13 +329,17 @@ namespace MiniCore.Core
         {
             EnsureAvailable();
             EnsureThread();
-            if (entries.Count == 0)
+            if (entries.Count == 0 && groupEntries.Count == 0)
             {
                 return;
             }
 
             tickSnapshot.Clear();
             foreach (ComponentEntry entry in entries.Values)
+            {
+                tickSnapshot.Add(entry.Component);
+            }
+            foreach (ComponentEntry entry in groupEntries.Values)
             {
                 tickSnapshot.Add(entry.Component);
             }
@@ -235,8 +369,13 @@ namespace MiniCore.Core
             {
                 disposeSnapshot.Add(entry.Component);
             }
+            foreach (ComponentEntry entry in groupEntries.Values)
+            {
+                disposeSnapshot.Add(entry.Component);
+            }
 
             entries.Clear();
+            groupEntries.Clear();
             for (int i = 0; i < disposeSnapshot.Count; i++)
             {
                 DisposeComponent(disposeSnapshot[i]);
@@ -244,6 +383,8 @@ namespace MiniCore.Core
 
             disposeSnapshot.Clear();
             releaseTypes.Clear();
+            releaseGroupKeys.Clear();
+            destroyGroupKeys.Clear();
             tickSnapshot.Clear();
         }
 
@@ -290,6 +431,55 @@ namespace MiniCore.Core
             ComponentEntry newEntry = new ComponentEntry(component);
             newEntry.AddReference(owner);
             entries.Add(componentType, newEntry);
+            return component;
+        }
+
+        /// <summary>
+        /// 获取已有分组组件或在首次访问时创建组件。
+        /// </summary>
+        /// <typeparam name="T">组件类型。</typeparam>
+        /// <param name="owner">本次持有组件的 owner。</param>
+        /// <param name="groupId">组件所属分组。</param>
+        /// <param name="args">首次创建参数。</param>
+        /// <returns>已激活的分组组件。</returns>
+        private T GetOrCreateGrouped<T>(object owner, ComponentGroupId groupId, ComponentInitArgs args) where T : AComponent, new()
+        {
+            if (groupId.IsDefault)
+            {
+                return args == null ? GetOrCreate<T>(owner, null) : GetOrCreate<T>(owner, args);
+            }
+
+            EnsureAvailable();
+            ValidateOwner(owner);
+            ComponentKey key = new ComponentKey(typeof(T), groupId);
+            if (groupEntries.TryGetValue(key, out ComponentEntry entry))
+            {
+                T existing = entry.Component as T;
+                EnsureUsable(typeof(T), existing);
+                entry.AddReference(owner);
+                return existing;
+            }
+
+            T component = new T();
+            component.SetGroupId(groupId);
+            if (args == null)
+            {
+                component.Awake();
+            }
+            else
+            {
+                component.Awake(args);
+            }
+
+            if (component.IsDisposed)
+            {
+                throw new InvalidOperationException($"分组组件 {typeof(T).FullName} 在 Awake 期间已被释放。");
+            }
+
+            component.IsActive = true;
+            ComponentEntry newEntry = new ComponentEntry(component);
+            newEntry.AddReference(owner);
+            groupEntries.Add(key, newEntry);
             return component;
         }
 
@@ -417,6 +607,70 @@ namespace MiniCore.Core
         }
 
         /// <summary>
+        /// 标识一个 Global 组件实例的类型与分组组合键。
+        /// 默认分组不写入 groupEntries，非默认分组使用该键实现同类型多实例。
+        /// </summary>
+        private readonly struct ComponentKey : IEquatable<ComponentKey>
+        {
+            #region Public 公共成员
+
+            /// <summary>
+            /// 获取组件具体类型。
+            /// </summary>
+            public Type ComponentType { get; }
+
+            /// <summary>
+            /// 获取组件所属分组。
+            /// </summary>
+            public ComponentGroupId GroupId { get; }
+
+            /// <summary>
+            /// 创建组件实例键。
+            /// </summary>
+            /// <param name="componentType">组件具体类型。</param>
+            /// <param name="groupId">组件所属分组。</param>
+            public ComponentKey(Type componentType, ComponentGroupId groupId)
+            {
+                ComponentType = componentType;
+                GroupId = groupId;
+            }
+
+            /// <summary>
+            /// 判断两个组件实例键是否相同。
+            /// </summary>
+            /// <param name="other">待比较键。</param>
+            /// <returns>类型与分组都相同时返回 true。</returns>
+            public bool Equals(ComponentKey other)
+            {
+                return ComponentType == other.ComponentType && GroupId == other.GroupId;
+            }
+
+            /// <summary>
+            /// 判断当前对象是否为相同组件实例键。
+            /// </summary>
+            /// <param name="obj">待比较对象。</param>
+            /// <returns>对象为相同键时返回 true。</returns>
+            public override bool Equals(object obj)
+            {
+                return obj is ComponentKey other && Equals(other);
+            }
+
+            /// <summary>
+            /// 获取组件实例键哈希值。
+            /// </summary>
+            /// <returns>类型与分组组合的哈希值。</returns>
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return ((ComponentType != null ? ComponentType.GetHashCode() : 0) * 397) ^ GroupId.GetHashCode();
+                }
+            }
+
+            #endregion
+        }
+
+        /// <summary>
         /// 保存组件实例及其 owner 引用计数。
         /// </summary>
         private sealed class ComponentEntry
@@ -509,6 +763,23 @@ namespace MiniCore.Core
             public bool HasReference(object owner)
             {
                 return ownerReferences.ContainsKey(owner);
+            }
+
+            /// <summary>
+            /// 构建仅用于 Development/Editor 销毁诊断的 owner 引用摘要。
+            /// </summary>
+            /// <param name="root">Global 的常驻根 owner。</param>
+            /// <returns>owner 类型与引用计数摘要。</returns>
+            public string DescribeOwners(object root)
+            {
+                var descriptions = new List<string>(ownerReferences.Count);
+                foreach (KeyValuePair<object, int> pair in ownerReferences)
+                {
+                    string ownerName = ReferenceEquals(pair.Key, root) ? "Global.Pin" : pair.Key?.GetType().FullName ?? "null";
+                    descriptions.Add(ownerName + "x" + pair.Value);
+                }
+
+                return string.Join(", ", descriptions);
             }
 
             /// <summary>

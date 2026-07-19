@@ -33,16 +33,24 @@ namespace MiniCore.HotUpdate
         /// 初始化 Client 已启用的全局模块。 
         /// </summary>
         /// <returns>项目启动完成任务。</returns>
-        private static Task StartClientAsync()
+        private static async Task StartClientAsync()
         {
-            Global.Pin<global::MiniCore.Core.TagsComponent>();
-            Global.Pin<global::MiniCore.HotUpdate.YooAssetResourceComponent>(new global::MiniCore.HotUpdate.YooAssetResourceComponentInitArgs());
-            Global.Pin<global::MiniCore.Core.AssetsComponent>();
-            NetworkMessageComponent network = Global.Pin<global::MiniCore.Core.NetworkMessageComponent>();
-            HotUpdateHandlerRegistry.Register(network);
-            Global.Pin<global::MiniCore.Core.TimerComponent>();
-            Global.Pin<global::MiniCore.Core.UIFactoryComponent>();
-            return Task.CompletedTask;
+            global::MiniCore.Service.YooAssetResourceService service0 = Global.RegisterAppService<global::MiniCore.Service.IResourceService, global::MiniCore.Service.YooAssetResourceService>(new global::MiniCore.Service.YooAssetResourceServiceInitArgs());
+            global::MiniCore.Service.SceneBindingService service1 = Global.RegisterAppService<global::MiniCore.Service.ISceneBindingService, global::MiniCore.Service.SceneBindingService>(null);
+            global::MiniCore.Service.AssetService service2 = Global.RegisterAppService<global::MiniCore.Service.IAssetService, global::MiniCore.Service.AssetService>(null);
+            global::MiniCore.Service.AudioService service3 = Global.RegisterAppService<global::MiniCore.Service.IAudioService, global::MiniCore.Service.AudioService>(new global::MiniCore.Service.AudioServiceInitArgs());
+            global::MiniCore.Service.ConfigurationService service4 = Global.RegisterAppService<global::MiniCore.Service.IConfigurationService, global::MiniCore.Service.ConfigurationService>(null);
+            global::MiniCore.Service.DeviceSettingsService service5 = Global.RegisterAppService<global::MiniCore.Service.IDeviceSettingsService, global::MiniCore.Service.DeviceSettingsService>(null);
+            global::MiniCore.Service.StoragePathService service6 = Global.RegisterAppService<global::MiniCore.Service.IStoragePathService, global::MiniCore.Service.StoragePathService>(new global::MiniCore.Service.StoragePathServiceInitArgs { RelativePath = "MiniCoreDefaultTest" });
+            global::MiniCore.Service.EncryptedSaveService service7 = Global.RegisterAppService<global::MiniCore.Service.ISaveService, global::MiniCore.Service.EncryptedSaveService>(new global::MiniCore.Service.EncryptedSaveServiceInitArgs { EncryptionKey = "wnm9527" });
+            global::MiniCore.Service.LocalTelemetryFileService service8 = Global.RegisterAppService<global::MiniCore.Service.ITelemetryService, global::MiniCore.Service.LocalTelemetryFileService>(null);
+            global::MiniCore.Service.NetworkService service9 = Global.RegisterAppService<global::MiniCore.Service.INetworkService, global::MiniCore.Service.NetworkService>(null);
+            HotUpdateHandlerRegistry.Register(service9);
+            global::MiniCore.Service.SettingsService service10 = Global.RegisterAppService<global::MiniCore.Service.ISettingsService, global::MiniCore.Service.SettingsService>(null);
+            await ((global::MiniCore.Service.IAsyncAppService)service10).InitializeAsync();
+            global::MiniCore.Service.TimerService service11 = Global.RegisterAppService<global::MiniCore.Service.ITimerService, global::MiniCore.Service.TimerService>(null);
+            global::MiniCore.Service.UIService service12 = Global.RegisterAppService<global::MiniCore.Service.IUIService, global::MiniCore.Service.UIService>(null);
+            global::MiniCore.Service.UnityWebRequestHttpService service13 = Global.RegisterAppService<global::MiniCore.Service.IHttpService, global::MiniCore.Service.UnityWebRequestHttpService>(new global::MiniCore.Service.HttpServiceInitArgs());
         }
 
         /// <summary>
@@ -51,13 +59,18 @@ namespace MiniCore.HotUpdate
         /// <returns>项目启动完成任务。</returns>
         private static Task StartServerAsync()
         {
-            Global.Pin<global::MiniCore.Core.TagsComponent>();
-            Global.Pin<global::MiniCore.HotUpdate.YooAssetResourceComponent>(new global::MiniCore.HotUpdate.YooAssetResourceComponentInitArgs());
-            Global.Pin<global::MiniCore.Core.AssetsComponent>();
-            NetworkMessageComponent network = Global.Pin<global::MiniCore.Core.NetworkMessageComponent>();
-            HotUpdateHandlerRegistry.Register(network);
-            Global.Pin<global::MiniCore.Core.TimerComponent>();
-            Global.Pin<global::MiniCore.Core.UIFactoryComponent>();
+            global::MiniCore.Service.YooAssetResourceService service0 = Global.RegisterAppService<global::MiniCore.Service.IResourceService, global::MiniCore.Service.YooAssetResourceService>(new global::MiniCore.Service.YooAssetResourceServiceInitArgs());
+            global::MiniCore.Service.SceneBindingService service1 = Global.RegisterAppService<global::MiniCore.Service.ISceneBindingService, global::MiniCore.Service.SceneBindingService>(null);
+            global::MiniCore.Service.AssetService service2 = Global.RegisterAppService<global::MiniCore.Service.IAssetService, global::MiniCore.Service.AssetService>(null);
+            global::MiniCore.Service.ConfigurationService service3 = Global.RegisterAppService<global::MiniCore.Service.IConfigurationService, global::MiniCore.Service.ConfigurationService>(null);
+            global::MiniCore.Service.DeviceSettingsService service4 = Global.RegisterAppService<global::MiniCore.Service.IDeviceSettingsService, global::MiniCore.Service.DeviceSettingsService>(null);
+            global::MiniCore.Service.StoragePathService service5 = Global.RegisterAppService<global::MiniCore.Service.IStoragePathService, global::MiniCore.Service.StoragePathService>(new global::MiniCore.Service.StoragePathServiceInitArgs { RelativePath = "MiniCoreDefaultTest" });
+            global::MiniCore.Service.EncryptedSaveService service6 = Global.RegisterAppService<global::MiniCore.Service.ISaveService, global::MiniCore.Service.EncryptedSaveService>(new global::MiniCore.Service.EncryptedSaveServiceInitArgs { EncryptionKey = "wnm9527" });
+            global::MiniCore.Service.LocalTelemetryFileService service7 = Global.RegisterAppService<global::MiniCore.Service.ITelemetryService, global::MiniCore.Service.LocalTelemetryFileService>(null);
+            global::MiniCore.Service.NetworkService service8 = Global.RegisterAppService<global::MiniCore.Service.INetworkService, global::MiniCore.Service.NetworkService>(null);
+            HotUpdateHandlerRegistry.Register(service8);
+            global::MiniCore.Service.TimerService service9 = Global.RegisterAppService<global::MiniCore.Service.ITimerService, global::MiniCore.Service.TimerService>(null);
+            global::MiniCore.Service.UnityWebRequestHttpService service10 = Global.RegisterAppService<global::MiniCore.Service.IHttpService, global::MiniCore.Service.UnityWebRequestHttpService>(new global::MiniCore.Service.HttpServiceInitArgs());
             return Task.CompletedTask;
         }
     }

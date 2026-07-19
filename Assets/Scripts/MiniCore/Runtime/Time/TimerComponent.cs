@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
+using MiniCore.Core;
 using MiniCore.Model;
 
-namespace MiniCore.Core
+namespace MiniCore.Service
 {
     /// <summary>
-    /// 由 Global Tick 驱动的计时器组件，所有回调均在组件管理线程执行。
+    /// 由 Global Tick 驱动的计时器服务，所有回调均在组件管理线程执行。
     /// </summary>
-    [MiniCoreStartupModule("计时器")]
-    public sealed class TimerComponent : AComponent
+    [AppService("计时器", typeof(ITimerService), Description = "创建、暂停、恢复和移除由 Global Tick 驱动的计时任务。")]
+    public sealed class TimerService : AAppService, ITimerService
     {
         #region Private 私有成员
 
@@ -142,7 +143,7 @@ namespace MiniCore.Core
     }
 
     /// <summary>
-    /// 由 TimerComponent 推进的单个计时任务。
+    /// 由 TimerService 推进的单个计时任务。
     /// </summary>
     public sealed class TimerTask
     {

@@ -1,5 +1,6 @@
 using System.Collections;
 using MiniCore.Core;
+using MiniCore.Service;
 using MiniCore.HotUpdate;
 using MiniCore.Model;
 using NUnit.Framework;
@@ -39,7 +40,7 @@ namespace MiniCore.EditorTests
             LogSwitch.EnableLog = false;
             LogSwitch.EnablePayloadLog = false;
 
-            NetworkMessageComponent network = Global.Pin<NetworkMessageComponent>();
+            NetworkService network = Global.RegisterAppService<INetworkService, NetworkService>();
             HotUpdateHandlerRegistry.Register(network);
 
             runnerObject = new GameObject("NetworkLoopbackIntegrationTests");

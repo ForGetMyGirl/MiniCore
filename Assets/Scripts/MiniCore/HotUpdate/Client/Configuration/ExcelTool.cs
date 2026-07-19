@@ -1,5 +1,6 @@
 ﻿using Cysharp.Threading.Tasks;
 using MiniCore.Model;
+using MiniCore.Service;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -56,16 +57,16 @@ namespace MiniCore.Core
         /// <returns>返回CsvTable<T>类型的对象</returns>
         public static async UniTask<CsvTable<T>> LoadCsvFileAsync<T>(string path) where T : ICsvTable, new()
         {
-            AssetsComponent assetsComponent = Global.Get<AssetsComponent>(assetsOwner);
+            IAssetService assetService = Global.GetService<IAssetService>(assetsOwner);
             try
             {
-                TextAsset context = await assetsComponent.LoadAssetAsync<TextAsset>(path);
+                TextAsset context = await assetService.LoadAssetAsync<TextAsset>(path);
                 string contextResult = context.text.TrimEnd('\r', '\n');
                 return DeserializeContext<T>(contextResult);
             }
             finally
             {
-                Global.Remove<AssetsComponent>(assetsOwner);
+                Global.ReleaseAll(assetsOwner);
             }
         }
 

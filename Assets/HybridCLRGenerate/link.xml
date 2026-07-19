@@ -1,7 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <linker>
+  <assembly fullname="Google.Protobuf">
+    <type fullname="Google.Protobuf.IMessage`1" preserve="all" />
+    <type fullname="Google.Protobuf.MessageParser`1" preserve="all" />
+  </assembly>
   <assembly fullname="MiniCore.Network">
-    <type fullname="MiniCore.Core.NetworkMessageComponent" preserve="all" />
     <type fullname="MiniCore.Model.AMHandler`1" preserve="all" />
     <type fullname="MiniCore.Model.ARpcHandler`2" preserve="all" />
     <type fullname="MiniCore.Model.INetworkMessageHandlerInvoker" preserve="all" />
@@ -11,6 +14,8 @@
     <type fullname="MiniCore.Model.KcpTransportConfig" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSession" preserve="all" />
     <type fullname="MiniCore.Model.UdpServerConfig" preserve="all" />
+    <type fullname="MiniCore.Service.INetworkService" preserve="all" />
+    <type fullname="MiniCore.Service.NetworkService" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Protocol">
     <type fullname="MiniCore.Protocol.Generated.DemoNormalMessage" preserve="all" />
@@ -21,15 +26,26 @@
   </assembly>
   <assembly fullname="MiniCore.Runtime">
     <type fullname="MiniCore.Core.Global" preserve="all" />
-    <type fullname="MiniCore.Core.TimerComponent" preserve="all" />
     <type fullname="MiniCore.Model.AComponent" preserve="all" />
-    <type fullname="MiniCore.Model.AComponent`1" preserve="all" />
     <type fullname="MiniCore.Model.AGameStartup" preserve="all" />
+    <type fullname="MiniCore.Model.ComponentCatalogAttribute" preserve="all" />
     <type fullname="MiniCore.Model.ComponentInitArgs" preserve="all" />
     <type fullname="MiniCore.Model.EventCenter" preserve="all" />
     <type fullname="MiniCore.Model.LogSwitch" preserve="all" />
-    <type fullname="MiniCore.Model.MiniCoreStartupModuleAttribute" preserve="all" />
     <type fullname="MiniCore.Model.ReflectionUtils" preserve="all" />
+    <type fullname="MiniCore.Service.AAppService" preserve="all" />
+    <type fullname="MiniCore.Service.AppServiceAttribute" preserve="all" />
+    <type fullname="MiniCore.Service.IAppService" preserve="all" />
+    <type fullname="MiniCore.Service.IAsyncAppService" preserve="all" />
+    <type fullname="MiniCore.Service.IAudioService" preserve="all" />
+    <type fullname="MiniCore.Service.IDeviceSettingsService" preserve="all" />
+    <type fullname="MiniCore.Service.IHttpService" preserve="all" />
+    <type fullname="MiniCore.Service.ISaveService" preserve="all" />
+    <type fullname="MiniCore.Service.ISettingsService" preserve="all" />
+    <type fullname="MiniCore.Service.IStoragePathService" preserve="all" />
+    <type fullname="MiniCore.Service.ITelemetryService" preserve="all" />
+    <type fullname="MiniCore.Service.ITimerService" preserve="all" />
+    <type fullname="MiniCore.Service.TimerService" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Unity">
     <type fullname="MiniCore.Model.APresenter`1" preserve="all" />
@@ -40,6 +56,20 @@
     <type fullname="MiniCore.Model.UICanvasLayer" preserve="all" />
     <type fullname="MiniCore.Model.UIWindowAttribute" preserve="all" />
     <type fullname="MiniCore.Model.UnreadPropertyAttribute" preserve="all" />
+    <type fullname="MiniCore.Service.AudioService" preserve="all" />
+    <type fullname="MiniCore.Service.AudioServiceInitArgs" preserve="all" />
+    <type fullname="MiniCore.Service.DeviceSettingsService" preserve="all" />
+    <type fullname="MiniCore.Service.EncryptedSaveService" preserve="all" />
+    <type fullname="MiniCore.Service.EncryptedSaveServiceInitArgs" preserve="all" />
+    <type fullname="MiniCore.Service.HttpServiceInitArgs" preserve="all" />
+    <type fullname="MiniCore.Service.LocalTelemetryFileService" preserve="all" />
+    <type fullname="MiniCore.Service.SettingsService" preserve="all" />
+    <type fullname="MiniCore.Service.StoragePathService" preserve="all" />
+    <type fullname="MiniCore.Service.StoragePathServiceInitArgs" preserve="all" />
+    <type fullname="MiniCore.Service.UnityWebRequestHttpService" preserve="all" />
+  </assembly>
+  <assembly fullname="Newtonsoft.Json">
+    <type fullname="Newtonsoft.Json.JsonConvert" preserve="all" />
   </assembly>
   <assembly fullname="System">
     <type fullname="System.Collections.Generic.Stack`1" preserve="all" />
@@ -79,6 +109,7 @@
     <type fullname="UnityEngine.Object" preserve="all" />
     <type fullname="UnityEngine.Quaternion" preserve="all" />
     <type fullname="UnityEngine.Rect" preserve="all" />
+    <type fullname="UnityEngine.Resources" preserve="all" />
     <type fullname="UnityEngine.Screen" preserve="all" />
     <type fullname="UnityEngine.TextAsset" preserve="all" />
     <type fullname="UnityEngine.Transform" preserve="all" />
@@ -120,6 +151,7 @@
     <type fullname="System.Collections.Generic.Dictionary`2" preserve="all" />
     <type fullname="System.Collections.Generic.Dictionary`2/ValueCollection" preserve="all" />
     <type fullname="System.Collections.Generic.Dictionary`2/ValueCollection/Enumerator" preserve="all" />
+    <type fullname="System.Collections.Generic.IEqualityComparer`1" preserve="all" />
     <type fullname="System.Collections.Generic.List`1" preserve="all" />
     <type fullname="System.Convert" preserve="all" />
     <type fullname="System.DateTime" preserve="all" />
@@ -151,8 +183,10 @@
     <type fullname="System.Runtime.CompilerServices.IAsyncStateMachine" preserve="all" />
     <type fullname="System.Runtime.CompilerServices.RuntimeCompatibilityAttribute" preserve="all" />
     <type fullname="System.Runtime.CompilerServices.TaskAwaiter" preserve="all" />
+    <type fullname="System.Runtime.CompilerServices.TupleElementNamesAttribute" preserve="all" />
     <type fullname="System.RuntimeTypeHandle" preserve="all" />
     <type fullname="System.String" preserve="all" />
+    <type fullname="System.StringComparer" preserve="all" />
     <type fullname="System.StringComparison" preserve="all" />
     <type fullname="System.StringSplitOptions" preserve="all" />
     <type fullname="System.Threading.CancellationToken" preserve="all" />
