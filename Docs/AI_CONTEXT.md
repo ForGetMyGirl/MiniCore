@@ -70,8 +70,8 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 - `UpdateMainWindow` 负责 YooAsset 初始化、版本/清单/下载、AOT 元数据加载、`MiniCore.HotUpdate.dll` 加载，并在最后调用 Entry。
 - AOT 元数据先于 HotUpdate DLL 加载。不要把所有剥离 DLL 盲目打入包；以生成的 HybridCLR AOT 地址表为准。
 - `MiniCore.HotUpdate.dll` 必须在 YooAsset 包中，地址为 Bootstrap 配置使用的 `HotUpdate`。
-- `MiniCoreStartup` 根据 `Application.isBatchMode` 选择生成的 Client 或 Server 模块列表；`GameStartup` 负责项目业务启动，服务端端口参数为 `-serverPort`，默认 `20000`。
-- 启动配置只选择 AppService Provider 并覆盖非敏感 Args。每个接口在同一 Client/Server 目标只能启用一个 Provider；`RequiresServices` 必须在同一目标可用。
+- `MiniCoreStartup` 在所有运行形态使用同一份已启用模块和 AppService 清单；`GameStartup` 根据打包目标负责项目业务启动，服务端端口参数为 `-serverPort`，默认 `20000`。
+- 启动配置只选择 AppService Provider 并覆盖非敏感 Args。每个接口只能启用一个 Provider；`RequiresServices` 必须在项目启动配置中可用。
 - 只有实现 `MiniCore.Service.IAsyncAppService` 的 Provider 才会在生成代码中调用 `InitializeAsync()`；不要对所有具体服务生成接口模式匹配。
 - `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 都可填写 `Description`，供启动配置窗口的只读目录展示。
 - HTTP 服务不再配置 `BaseUrl`，所有 HTTP 请求必须由调用方传入完整的 HTTP/HTTPS 绝对地址；密钥、令牌、私钥和动态服务地址不得写入启动 Args。

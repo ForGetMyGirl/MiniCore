@@ -8,7 +8,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 
 - **小而可组合**：系统级能力使用可替换的 AppService，普通 `AComponent` 负责局部业务能力。
 - **边界清晰**：Runtime、Protocol、Serialization 和 Network 保持纯 C#；Unity API 集中在适配层与业务层。
-- **启动简单**：编辑器为 Client/Server 选择 AppService Provider，自动按依赖顺序生成初始化代码；项目只维护一个 `GameStartup`。
+- **启动简单**：编辑器以统一“启用”开关选择 AppService Provider，自动按依赖顺序生成初始化代码；项目只维护一个 `GameStartup`。
 - **异步结构化**：业务统一使用零第三方依赖的 `MTask`；任务自动继承父链与 Owner 生命周期，通常无需逐层传递取消令牌。
 - **业务可热更新**：Bootstrap 通过 YooAsset 和 HybridCLR 加载 `MiniCore.HotUpdate.dll`，Player 与业务程序集解耦。
 - **网络可验证**：内置 TCP、KCP、UDP、RPC、Protobuf、Handler 生成和本机/跨进程网络冒烟测试。
@@ -36,7 +36,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 
 打开 `MiniCore > 项目启动配置`：
 
-1. 在 **AppService** 区勾选 Client 或 Server 需要的服务。同一接口、同一目标只能启用一个 Provider；新服务默认关闭。
+1. 在 **AppService** 区勾选“启用模块（不勾选无法在项目中使用）”需要的服务。同一接口只能启用一个 Provider；新服务默认关闭。
 2. 仅为服务填写非敏感启动参数，例如超时、重试次数或对象池大小。
 3. 在右侧“项目能力目录”查看可用的 Service、AppModule 与已标注职责的普通 `AComponent`。
 4. 点击“保存启动参数并生成代码”，等待 Unity 编译完成。
@@ -115,7 +115,7 @@ HotUpdateScene
   → HybridCLR AOT 元数据加载
   → MiniCore.HotUpdate.dll 加载
   → MiniCoreStartup.StartAsync()
-  → 自动生成的 Client / Server AppService 注册代码
+  → 自动生成的统一 AppService 注册代码
   → GameStartup.StartAsync()
 ```
 

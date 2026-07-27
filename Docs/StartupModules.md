@@ -5,8 +5,8 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 ## 项目启动流程
 
 1. Bootstrap 场景的 `UpdateMainWindow` 初始化 YooAsset、HybridCLR 并加载 HotUpdate DLL。
-2. Bootstrap 根据 Player 模式调用客户端或 Dedicated Server 的稳定入口。
-3. `MiniCoreStartup.StartAsync()` 按 Player 模式为每个 AppService 接口选择一个 Provider，使用 `Global.RegisterAppService` 注册，并按依赖顺序启动。
+2. Bootstrap 调用统一的 HotUpdate 启动入口。
+3. `MiniCoreStartup.StartAsync()` 为每个已启用的 AppService 接口选择一个 Provider，使用 `Global.RegisterAppService` 注册，并按依赖顺序启动。
 4. 仅实现 `IAsyncAppService` 的服务会在注册后调用并等待 `InitializeAsync()`；生成入口统一返回 `MTask`，不会生成无效的接口判断。
 5. 服务启动完成后，调用项目唯一的 `GameStartup.StartAsync()`。
 
@@ -22,7 +22,7 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 
 打开 Unity 菜单 `MiniCore > 项目启动配置`：
 
-1. 在左侧 **AppService** 区按 Client / Server 显式勾选需要启动的服务；同一接口、同一目标只能勾选一个实现。新发现服务默认关闭。普通 `AComponent` 不再作为左侧启动项配置。
+1. 在左侧 **AppService** 区勾选“启用模块（不勾选无法在项目中使用）”需要启动的服务；未勾选的服务不会注册。同一接口只能勾选一个实现。新发现服务默认关闭。普通 `AComponent` 不再作为左侧启动项配置。
 2. 展开服务的“启动参数”区域，可覆盖非敏感 Args 的代码默认值；未勾选覆盖时采用 Args 类中的默认值。
 3. 右侧“项目能力目录”只读列出已发现的 Service、AppModule 和已标注具体职责的普通 AComponent，可折叠，用于查找项目当前可调用能力，不会改变启动配置。左侧会显示服务完整命名空间、接口、依赖、描述与可编辑 Args；右侧按类别显示用途、接口和完整类型名。
 4. `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 和传统 `MiniCoreStartupModuleAttribute` 都支持命名参数 `Description`。未填写描述时目录会明确显示“未填写用途说明”。普通组件只有显式添加 `ComponentCatalogAttribute` 才会显示，避免把框架内部实现误当作可调用功能：
@@ -39,7 +39,7 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 
 服务 Provider 与其 Args 覆盖值保存于 `Assets/Settings/MiniCoreStartupSettings.asset`，启动代码生成到 `Assets/Scripts/MiniCore/HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`。生成器会校验 AppService 接口、Provider、依赖和循环；不会因为目标是 Dedicated Server 而强制禁止 Unity 资源或 Canvas 服务。
 
-默认配置应只启用项目实际需要的服务。例如客户端通常启用场景绑定、YooAsset 资源、资产管理、UI、网络和计时器；Dedicated Server 是否启用资源/UI 由项目部署方式决定。
+默认配置应只启用项目实际需要的服务。客户端与 Dedicated Server 共用同一份已启用服务清单；两者的业务行为由各自的打包目标和 `GameStartup` 决定。
 
 ## 已迁移的资源与 UI 服务
 
@@ -68,7 +68,7 @@ Global.ReleaseAll(this);
 
 ## 内置服务速查
 
-右侧目录的服务说明来自 `[AppService(..., Description = "...")]`。当前内置 Provider 如下；是否启用仍由 Client/Server 勾选决定。
+右侧目录的服务说明来自 `[AppService(..., Description = "...")]`。当前内置 Provider 如下；是否启用由统一的“启用”勾选决定。
 
 | 显示名 | 接口 | 用途 |
 | --- | --- | --- |

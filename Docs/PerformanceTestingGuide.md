@@ -104,17 +104,30 @@ MTask 的功能回归测试位于 `Assets/Tests/Editor/MTaskTests.cs`，覆盖�
 
 | 测试名 | Sample Group | 测量内容 |
 | --- | --- | --- |
-| `ProtobufSerializer_SerializesMessage` | `Network.Protobuf.Serialize` | Protobuf 消息序列化的时间与 GC。 |
-| `ProtobufSerializer_DeserializesMessage` | `Network.Protobuf.Deserialize` | 通过生成 Parser Registry 反序列化的时间与 GC。 |
+| `ProtobufSerializer_SerializesMessage` | `Network.Protobuf.Serialize` | 将与 JSON 基准完全相同的 `TestNetworkData` 编码为 Protobuf 字节的时间与 GC。 |
+| `ProtobufSerializer_DeserializesMessage` | `Network.Protobuf.Deserialize` | 将同一份 `TestNetworkData` 的 Protobuf 字节通过生成 Parser Registry 还原的时间与 GC。 |
 
 保留的 JSON 对比测试在 `Assets/Tests/Editor/NetworkJsonSerializationPerformanceTests.cs`：
 
 | 测试名 | 测量问题 | 固定输入 |
 | --- | --- | --- |
-| `NewtonsoftJsonSerializer_SerializesMediumProtocolMessage` | 发送侧将协议对象编码为 UTF-8 JSON 字节需要多少时间、是否产生 GC。 | 一个携带固定中等长度文本的 `TestNetworkData`。 |
+| `NewtonsoftJsonSerializer_SerializesMediumProtocolMessage` | 发送侧将协议对象编码为 UTF-8 JSON 字节需要多少时间、是否产生 GC。 | 一个携带固定 `Id` 和中等长度文本的 `TestNetworkData`，与 Protobuf 基准相同。 |
 | `NewtonsoftJsonSerializer_DeserializesMediumProtocolMessage` | 收包侧将固定 JSON 字节还原为协议对象需要多少时间、是否产生 GC。 | 与发送侧相同协议生成的 JSON 字节。 |
 
-在 Test Runner 的 `EditMode` 中分别运行 Protobuf 和 JSON 测试，每条各运行三次并导出 CSV。每组包含 `10,000` 次操作，报告中的时间是每 `10,000` 次的总耗时；计算单次成本时除以 `10,000`。它们都不包含 Socket、协议包封装、跨线程队列和 Handler 派发。
+在 Test Runner 的 `EditMode` 中分别运行 Protobuf 和 JSON 测试，每条各运行三次并导出 CSV。每组包含 `10,000` 次操作，报告中的时间是每 `10,000` 次的总耗时；计算单次成本时除以 `10,000`。它们都不包含 Socket、协议包封装、跨线程队列和 Handler 派发。先运行 `NetworkSerializationComparisonTests.cs`，它会验证两条基准的字段值完全一致，并在 Test Runner 输出 JSON 与 Protobuf 的编码字节数；这两项是网络传输成本对比的一部分。
+
+### 2026-07-27 基线结果
+
+测试环境为 Mac 编辑器、Unity `2021.3.45f2c1`、`EditMode`；JSON 与 Protobuf 均使用同一个 `TestNetworkData` 固定输入。每个性能测试使用 `5` 组预热、`20` 组正式测量，每个测量组连续执行 `10,000` 次。下表的“三次原始中位数”是三次独立运行中 Performance Test Report 输出的中位数，`GC()` 为报告中的 GC 事件指标。
+
+| 路径 | 三次原始中位数（ms / 10,000 次） | 三次 `GC()` | 汇总中位数（ms / 10,000 次） | 单次换算 | 汇总 `GC()` |
+| --- | --- | --- | ---: | ---: | ---: |
+| JSON Serialize | `25.739 / 25.760 / 26.006` | `12.000500 / 12.000500 / 12.000500` | `25.760` | `2.5760 µs` | `12.000500` |
+| JSON Deserialize | `31.035 / 31.664 / 31.021` | `9.000500 / 9.000500 / 9.000500` | `31.035` | `3.1035 µs` | `9.000500` |
+| Protobuf Serialize | `9.044 / 9.111 / 9.088` | `2.000500 / 2.000500 / 2.000500` | `9.088` | `0.9088 µs` | `2.000500` |
+| Protobuf Deserialize | `6.908 / 6.914 / 6.922` | `3.000500 / 3.000500 / 3.000500` | `6.914` | `0.6914 µs` | `3.000500` |
+
+同一固定输入的网络正文长度为 JSON `179 B`、Protobuf `161 B`，Protobuf 少 `18 B`（约 `10.1%`）。因此，在这个固定 `TestNetworkData` 的编解码微基准中，Protobuf 序列化约为 JSON 的 `2.83` 倍快，反序列化约为 `4.49` 倍快，并且两条路径的 `GC()` 指标均更低。该结论适用于当前序列化器、生成的 Parser Registry 和这份固定中等载荷；它不代表端到端网络延迟，也不包含 Socket、协议包封装、跨线程队列、Handler 派发、日志或业务逻辑。完整入站包、RPC 和真实传输场景仍应按后续基准分别验证。
 
 Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包队列交接；随后分别运行 JSON 对比链路和 Protobuf 正式链路的完整入站包/RPC 基准。每次只新增一段链路，才能准确判断性能变化来自哪里。
 

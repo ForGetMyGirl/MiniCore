@@ -56,7 +56,7 @@ namespace MiniCore.EditorTools
             List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules = MiniCoreStartupCodeGenerator.DiscoverAppModules();
             List<Type> components = DiscoverOrdinaryComponents(services, appModules);
             GUILayout.Label("MiniCore 项目启动配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("AppService 需要按 Client / Server 显式勾选启用；新发现服务默认关闭。若同一服务接口在同一目标勾选多个实现，生成时会报错；生成器会完成接口绑定、依赖排序和异步初始化。密钥、令牌等敏感值不要填写到此配置或生成代码中，应由项目的安全 Provider 在运行时提供。", MessageType.Info);
+            EditorGUILayout.HelpBox("勾选“启用模块（不勾选无法在项目中使用）”后，AppService 会在所有项目运行形态中启动；未勾选的服务不会注册。若同一服务接口勾选多个实现，生成时会报错；生成器会完成接口绑定、依赖排序和异步初始化。密钥、令牌等敏感值不要填写到此配置或生成代码中，应由项目的安全 Provider 在运行时提供。", MessageType.Info);
 
             float catalogWidth = Mathf.Clamp(position.width * 0.30f, 340f, 500f);
             float configurationWidth = Mathf.Max(760f, position.width - catalogWidth - 18f);
@@ -251,7 +251,7 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 按具体 AppService 实现绘制与传统模块一致的 Client/Server 勾选配置。
+        /// 按具体 AppService 实现绘制项目统一的启用配置。
         /// </summary>
         /// <param name="services">已发现服务实现。</param>
         private void DrawServices(List<MiniCoreStartupCodeGenerator.AppServiceInfo> services)
@@ -271,10 +271,7 @@ namespace MiniCore.EditorTools
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
                 EditorGUILayout.SelectableLabel(service.Type.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                EditorGUILayout.BeginHorizontal();
-                DrawTargetToggle("Client", ref serviceSettings.EnableClient);
-                DrawTargetToggle("Server", ref serviceSettings.EnableServer);
-                EditorGUILayout.EndHorizontal();
+                DrawEnabledToggle(ref serviceSettings.Enabled);
                 EditorGUILayout.LabelField("服务接口", string.Join("、", service.Attribute.ServiceTypes.Select(item => item.Name)), EditorStyles.miniLabel);
                 EditorGUILayout.LabelField("描述", GetCatalogDescription(service.Attribute.Description), EditorStyles.miniLabel);
                 if (service.Attribute.RequiresServices != null && service.Attribute.RequiresServices.Length > 0)
@@ -302,13 +299,12 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 绘制一个启动目标勾选框。
+        /// 绘制一个项目统一的启用勾选框。
         /// </summary>
-        /// <param name="label">显示给开发者的目标名称。</param>
         /// <param name="value">对应的启用状态。</param>
-        private static void DrawTargetToggle(string label, ref bool value)
+        private static void DrawEnabledToggle(ref bool value)
         {
-            value = EditorGUILayout.ToggleLeft(label, value, GUILayout.Width(80));
+            value = EditorGUILayout.ToggleLeft("启用模块（不勾选无法在项目中使用）", value);
         }
 
         /// <summary>

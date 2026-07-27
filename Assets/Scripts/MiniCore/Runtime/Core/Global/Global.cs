@@ -174,11 +174,11 @@ namespace MiniCore.Core
         }
 
         /// <summary>
-        /// 通过服务接口获取当前启动目标选中的系统服务。
+        /// 通过服务接口获取项目启动配置中启用的系统服务。
         /// </summary>
         /// <typeparam name="TService">服务接口类型。</typeparam>
         /// <param name="owner">本次持有服务的 owner。</param>
-        /// <returns>当前目标选中的服务实现。</returns>
+        /// <returns>项目中启用的服务实现。</returns>
         public static TService GetService<TService>(object owner)
         {
             EnsureRuntime();
@@ -192,7 +192,7 @@ namespace MiniCore.Core
 
         /// <summary>
         /// 尝试通过接口获取一个可选应用服务。
-        /// 未在当前 Client/Server 服务配置中选择的服务会返回 false。
+        /// 未在项目启动配置中启用的服务会返回 false。
         /// </summary>
         /// <typeparam name="TService">服务接口类型。</typeparam>
         /// <param name="owner">本次持有服务的 owner。</param>

@@ -17,7 +17,6 @@ namespace MiniCore.EditorTests
         private const int WarmupMeasurementCount = 5; // 不计入结果的预热组数。
         private const int ResultMeasurementCount = 20; // 计入报告的测量组数。
         private const int SerializationCountPerMeasurement = 10000; // 每组连续序列化或反序列化的次数。
-        private const string MediumContent = "MiniCore network serialization benchmark payload. This fixed content represents a medium-sized protocol message and remains unchanged between measurements."; // 固定的中等负载业务文本。
         private INetworkSerializer serializer; // 当前网络场景实际使用的 JSON 序列化器。
         private TestNetworkData message; // 固定复用的真实业务协议对象。
         private byte[] serializedPayload; // 固定复用的 JSON 字节输入。
@@ -35,11 +34,7 @@ namespace MiniCore.EditorTests
         public void SetUp()
         {
             serializer = new NewtonsoftJsonSerializer();
-            message = new TestNetworkData
-            {
-                Id = 1001,
-                Content = MediumContent
-            };
+            message = NetworkSerializationBenchmarkPayload.CreateMediumMessage();
             serializedPayload = serializer.Serialize(message);
         }
 

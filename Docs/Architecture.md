@@ -20,7 +20,7 @@
 | `MiniCore.Network` | `Assets/Scripts/MiniCore/Network` | 否 | 收发、会话、RPC、心跳、Handler 基类、TCP/UDP/KCP | Runtime、Protocol、Serialization |
 | `MiniCore.Unity` | `Assets/Scripts/MiniCore/Unity` | 是 | `UnityGlobalDriver`、Unity 时间/日志、输入、Mono 与 UI 契约 | Runtime、Serialization；可使用 Unity API |
 | `MiniCore.HotUpdate` | `Assets/Scripts/MiniCore/HotUpdate` | 是 | 客户端/服务端业务入口、资源/UI 业务、业务 Handler、生成 Handler 表 | Runtime、Protocol、Serialization、Network、Unity |
-| `Project.Bootstrap` | `Assets/Scripts/Project/Bootstrap` | 是 | 场景启动、YooAsset、HybridCLR、DLL 加载、选择 Client/Server Entry | Runtime、Unity、YooAsset、HybridCLR；不可静态引用 HotUpdate |
+| `Project.Bootstrap` | `Assets/Scripts/Project/Bootstrap` | 是 | 场景启动、YooAsset、HybridCLR、DLL 加载、调用统一 HotUpdate Entry | Runtime、Unity、YooAsset、HybridCLR；不可静态引用 HotUpdate |
 | `MiniCore.Editor` | `Assets/Scripts/MiniCore/Editor` | Editor | Proto、Opcode、HybridCLR、构建校验与工具窗口 | 运行时程序集与 UnityEditor |
 
 依赖方向只能从上向下，不能反向：`Runtime <- Protocol/Serialization <- Network <- HotUpdate`。`MiniCore.Unity` 是适配层，不应成为 Runtime/Protocol/Network 的依赖。
@@ -98,11 +98,11 @@ public sealed class BattleFlow : IDisposable
 
 | 分类 | 基类/标记 | 创建方式 | 外部访问 |
 |---|---|---|---|
-| AppService | `AAppService` + `[AppService]` | 启动配置为每个接口在 Client/Server 选择一个 Provider，生成代码 Pin | `Global.GetService<TInterface>(owner)` |
+| AppService | `AAppService` + `[AppService]` | 启动配置为每个接口选择一个启用的 Provider，生成代码 Pin | `Global.GetService<TInterface>(owner)` |
 | AppModule | `AAppModule` + `[AppModule]` | 生成的注册表注册，业务按需创建 | `Global.GetOrAddModule<TInterface>(key, owner)` |
 | 普通组件/玩法 | `AComponent`；需要目录可发现性时加 `[ComponentCatalog]` | 业务自由 `GetOrAdd`，可放入 Group | 具体类型 |
 
-AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.Get<TConcreteService>` 绕过接口会抛出诊断。Dedicated Server 是 Unity Player，不存在“框架层禁止资源、Canvas 或物理加载”的规则；每个目标只校验自己所选服务、依赖与 Provider 是否完整。
+AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.Get<TConcreteService>` 绕过接口会抛出诊断。Dedicated Server 是 Unity Player，不存在“框架层禁止资源、Canvas 或物理加载”的规则；项目启动配置只校验已启用服务、依赖与 Provider 是否完整。
 
 资源、资产、场景绑定与 UI 已完成 AppService 化：`IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`ISceneBindingService` / `SceneBindingService`、`IUIService` / `UIService`。它们必须通过 `Global.GetService<TInterface>(owner)` 获取，旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`UIFactoryComponent` 已删除且没有兼容包装。完整迁移映射和使用示例见 [项目启动与服务配置](StartupModules.md#已迁移的资源与-ui-服务)。
 
@@ -153,16 +153,16 @@ sequenceDiagram
     Yoo-->>Boot: DLL bytes
     Boot->>DLL: Assembly.Load(bytes)
     Boot->>Startup: 反射一次调用静态 StartAsync
-    Startup->>Startup: 装配 Client 或 Server 模块并调用 GameStartup
+    Startup->>Startup: 装配统一启用模块并调用 GameStartup
 ```
 
-Bootstrap 在加载 DLL 后反射调用固定静态类型 `MiniCore.HotUpdate.MiniCoreStartup.StartAsync()`。该方法根据 `Application.isBatchMode` 选择 Client 或 Dedicated Server 的模块列表，随后调用 `GameStartup`。
+Bootstrap 在加载 DLL 后反射调用固定静态类型 `MiniCore.HotUpdate.MiniCoreStartup.StartAsync()`。该方法装配项目中统一启用的模块和服务，随后调用 `GameStartup`。
 
 Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步骤失败时不应启动监听。
 
 ### AppService、GameStartup 与生成代码
 
-通过 `MiniCore > 项目启动配置` 为 AppService Provider 选择 Client、Server 或两者，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
+通过 `MiniCore > 项目启动配置` 的“启用”勾选选择 AppService Provider，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
 
 右侧只读能力目录按 Service、AppModule 和带 `ComponentCatalogAttribute` 的普通 `AComponent` 分组，可折叠显示描述、接口和完整命名空间。`Description` 是 `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 的统一元数据；它不参与启动逻辑。
 
@@ -203,7 +203,7 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 | Unity 生命周期、输入、UI 契约、Unity serializer、平台服务 | `Unity/Driver`、`Unity/Mono`、`Unity/UI`、`Unity/Serialization`、`Unity/Service` |
 | 热更新资源、资产、场景绑定和 UI 服务 | `HotUpdate/Service` |
 | 客户端对象池与其他业务 | `HotUpdate/Client` |
-| Client/Server 热更新启动入口 | `HotUpdate/Entry` |
+| HotUpdate 项目启动入口 | `HotUpdate/Entry` |
 | 业务网络 Handler | `HotUpdate/Network/Handler` |
 | Bootstrap 与生成的 AOT 地址表 | `Project/Bootstrap` |
 | Unity Editor 生成器、构建校验和性能工具 | `MiniCore/Editor` |
@@ -226,6 +226,6 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 1. Proto 注解、RPC `Code/Msg` 固定字段、生成的 Message/Role/Parser Registry 一致性。
 2. Opcode Manifest、当前 Handler、Opcode Registry 与 HotUpdate Handler Registry 一致性。
 3. HybridCLR 配置、AOT 元数据与热更新 DLL/YooAsset 资源同步。
-4. 每个 Client/Server 目标的 AppService 接口只能选定一个 Provider，且该 Provider 的依赖必须在同一目标完整可用。
+4. 每个 AppService 接口只能选定一个启用的 Provider，且该 Provider 的依赖必须在项目启动配置中完整可用。
 
 若校验报错，先修正源 Proto 或 Handler，等待 Unity 自动编译和同步完成，再执行构建；不要手改生成映射绕过校验。

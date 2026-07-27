@@ -19,22 +19,16 @@ namespace MiniCore.Unity
         public List<MiniCoreStartupModuleSettings> Modules = new List<MiniCoreStartupModuleSettings>();
 
         /// <summary>
-        /// 获取或设置按具体 AppService 实现保存的 Client/Server 启用状态。
-        /// 生成器负责校验同一服务接口在同一目标最多启用一个实现。
+        /// 获取或设置按具体 AppService 实现保存的项目启用状态。
+        /// 生成器负责校验同一服务接口最多启用一个实现。
         /// </summary>
         public List<MiniCoreAppServiceSettings> Services = new List<MiniCoreAppServiceSettings>();
-
-        /// <summary>
-        /// 获取或设置服务启用状态配置的迁移版本。
-        /// 用于将早期“新服务默认全启用”的配置安全迁移为显式启用模式。
-        /// </summary>
-        public int ServiceSettingsVersion;
 
         #endregion
     }
 
     /// <summary>
-    /// 单个启动模块在 Client 与 Server 目标上的启用状态及初始化参数。
+    /// 单个启动模块在项目中的启用状态及初始化参数。
     /// </summary>
     [Serializable]
     public sealed class MiniCoreStartupModuleSettings
@@ -47,14 +41,9 @@ namespace MiniCore.Unity
         public string AssemblyQualifiedTypeName;
 
         /// <summary>
-        /// 获取或设置是否为客户端生成该模块的 Pin 代码。
+        /// 获取或设置是否在项目启动时生成该模块的 Pin 代码。
         /// </summary>
-        public bool EnableClient;
-
-        /// <summary>
-        /// 获取或设置是否为服务端生成该模块的 Pin 代码。
-        /// </summary>
-        public bool EnableServer;
+        public bool Enabled;
 
         /// <summary>
         /// 获取或设置组件初始化参数的字段或属性覆盖值。
@@ -66,7 +55,7 @@ namespace MiniCore.Unity
     }
 
     /// <summary>
-    /// 单个 AppService 实现在不同运行目标中的启用状态及启动参数。
+    /// 单个 AppService 实现在项目中的启用状态及启动参数。
     /// </summary>
     [Serializable]
     public sealed class MiniCoreAppServiceSettings
@@ -79,14 +68,9 @@ namespace MiniCore.Unity
         public string AssemblyQualifiedTypeName;
 
         /// <summary>
-        /// 获取或设置是否在客户端启动当前服务实现。
+        /// 获取或设置是否在项目启动时注册当前服务实现。
         /// </summary>
-        public bool EnableClient;
-
-        /// <summary>
-        /// 获取或设置是否在服务端启动当前服务实现。
-        /// </summary>
-        public bool EnableServer;
+        public bool Enabled;
 
         /// <summary>
         /// 获取或设置当前服务实现的初始化参数覆盖值。

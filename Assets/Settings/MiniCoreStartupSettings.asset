@@ -16,8 +16,7 @@ MonoBehaviour:
   Services:
   - AssemblyQualifiedTypeName: MiniCore.Service.UnityWebRequestHttpService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 0
     Arguments:
     - MemberName: DefaultTimeoutSeconds
       UseCodeDefault: 1
@@ -30,79 +29,65 @@ MonoBehaviour:
       Value: 
   - AssemblyQualifiedTypeName: MiniCore.Service.UIService, MiniCore.HotUpdate, Version=0.0.0.0,
       Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 0
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetResourceService, MiniCore.HotUpdate,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments:
     - MemberName: PackageName
       UseCodeDefault: 1
       Value: 
   - AssemblyQualifiedTypeName: MiniCore.Service.EncryptedSaveService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments:
     - MemberName: EncryptionKey
       UseCodeDefault: 0
       Value: wnm9527
   - AssemblyQualifiedTypeName: MiniCore.Service.SceneBindingService, MiniCore.HotUpdate,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.SettingsService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 0
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.StoragePathService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments:
     - MemberName: RelativePath
       UseCodeDefault: 0
       Value: MiniCoreDefaultTest
   - AssemblyQualifiedTypeName: MiniCore.Service.LocalTelemetryFileService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.NetworkService, MiniCore.Network,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.TimerService, MiniCore.Runtime, Version=0.0.0.0,
       Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.DeviceSettingsService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.AssetService, MiniCore.HotUpdate,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.ConfigurationService, MiniCore.HotUpdate,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 1
+    Enabled: 1
     Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.AudioService, MiniCore.Unity, Version=0.0.0.0,
       Culture=neutral, PublicKeyToken=null
-    EnableClient: 1
-    EnableServer: 0
+    Enabled: 1
     Arguments:
     - MemberName: PoolSize
       UseCodeDefault: 1
       Value: 
-  ServiceSettingsVersion: 1
