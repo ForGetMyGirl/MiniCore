@@ -22,7 +22,7 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 
 打开 Unity 菜单 `MiniCore > 项目启动配置`：
 
-1. 在左侧 **AppService** 区勾选“启用模块（不勾选无法在项目中使用）”需要启动的服务；未勾选的服务不会注册。同一接口只能勾选一个实现。新发现服务默认关闭。普通 `AComponent` 不再作为左侧启动项配置。
+1. 在左侧 **AppService** 区勾选“启用模块”需要启动的服务；未勾选的服务不会自动注册或启动。同一接口只能勾选一个实现。新发现服务默认关闭。普通 `AComponent` 不再作为左侧启动项配置。
 2. 展开服务的“启动参数”区域，可覆盖非敏感 Args 的代码默认值；未勾选覆盖时采用 Args 类中的默认值。
 3. 右侧“项目能力目录”只读列出已发现的 Service、AppModule 和已标注具体职责的普通 AComponent，可折叠，用于查找项目当前可调用能力，不会改变启动配置。左侧会显示服务完整命名空间、接口、依赖、描述与可编辑 Args；右侧按类别显示用途、接口和完整类型名。
 4. `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 和传统 `MiniCoreStartupModuleAttribute` 都支持命名参数 `Description`。未填写描述时目录会明确显示“未填写用途说明”。普通组件只有显式添加 `ComponentCatalogAttribute` 才会显示，避免把框架内部实现误当作可调用功能：
@@ -40,6 +40,19 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 服务 Provider 与其 Args 覆盖值保存于 `Assets/Settings/MiniCoreStartupSettings.asset`，启动代码生成到 `Assets/Scripts/MiniCore/HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`。生成器会校验 AppService 接口、Provider、依赖和循环；不会因为目标是 Dedicated Server 而强制禁止 Unity 资源或 Canvas 服务。
 
 默认配置应只启用项目实际需要的服务。客户端与 Dedicated Server 共用同一份已启用服务清单；两者的业务行为由各自的打包目标和 `GameStartup` 决定。
+
+## 未启用模块的行为
+
+“启用模块”只控制 AppService 的自动注册和启动，不会裁剪代码、程序集或资源；它们仍会保留在项目和最终包体中。
+
+通过 `Global.GetService<T>` 获取未启用服务会抛出“未注册应用服务接口”异常。服务本身是可选能力时，应改用 `Global.TryGetService<T>` 并根据返回值决定是否使用：
+
+```csharp
+if (Global.TryGetService<IUIService>(this, out IUIService ui))
+{
+    await ui.OpenAsync<LoginWindow, LoginPresenter>("UI/Login", UICanvasLayer.Main);
+}
+```
 
 ## 已迁移的资源与 UI 服务
 

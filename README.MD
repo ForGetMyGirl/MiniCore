@@ -36,12 +36,14 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 
 打开 `MiniCore > 项目启动配置`：
 
-1. 在 **AppService** 区勾选“启用模块（不勾选无法在项目中使用）”需要的服务。同一接口只能启用一个 Provider；新服务默认关闭。
+1. 在 **AppService** 区勾选“启用模块”需要的服务。同一接口只能启用一个 Provider；新服务默认关闭。
 2. 仅为服务填写非敏感启动参数，例如超时、重试次数或对象池大小。
 3. 在右侧“项目能力目录”查看可用的 Service、AppModule 与已标注职责的普通 `AComponent`。
 4. 点击“保存启动参数并生成代码”，等待 Unity 编译完成。
 
 配置保存于 `Assets/Settings/MiniCoreStartupSettings.asset`，生成代码位于 `Assets/Scripts/MiniCore/HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`。
+
+未启用模块不会自动注册或启动；它的代码、程序集和资源仍会保留在项目及最终包体中。通过 `Global.GetService<T>` 获取未启用服务会报错；可选服务请使用 `Global.TryGetService<T>` 判断。
 
 ### 3. 编写项目入口
 

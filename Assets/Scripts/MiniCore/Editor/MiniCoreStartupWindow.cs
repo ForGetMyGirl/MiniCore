@@ -56,7 +56,7 @@ namespace MiniCore.EditorTools
             List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules = MiniCoreStartupCodeGenerator.DiscoverAppModules();
             List<Type> components = DiscoverOrdinaryComponents(services, appModules);
             GUILayout.Label("MiniCore 项目启动配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("勾选“启用模块（不勾选无法在项目中使用）”后，AppService 会在所有项目运行形态中启动；未勾选的服务不会注册。若同一服务接口勾选多个实现，生成时会报错；生成器会完成接口绑定、依赖排序和异步初始化。密钥、令牌等敏感值不要填写到此配置或生成代码中，应由项目的安全 Provider 在运行时提供。", MessageType.Info);
+            EditorGUILayout.HelpBox("未启用模块不会自动注册或启动。", MessageType.Info);
 
             float catalogWidth = Mathf.Clamp(position.width * 0.30f, 340f, 500f);
             float configurationWidth = Mathf.Max(760f, position.width - catalogWidth - 18f);
@@ -304,7 +304,7 @@ namespace MiniCore.EditorTools
         /// <param name="value">对应的启用状态。</param>
         private static void DrawEnabledToggle(ref bool value)
         {
-            value = EditorGUILayout.ToggleLeft("启用模块（不勾选无法在项目中使用）", value);
+            value = EditorGUILayout.ToggleLeft("启用模块", value);
         }
 
         /// <summary>
