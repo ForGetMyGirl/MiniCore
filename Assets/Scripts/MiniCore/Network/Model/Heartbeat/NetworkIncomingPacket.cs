@@ -19,5 +19,9 @@ namespace MiniCore.Core
         /// 缓冲区中有效数据的字节长度。
         /// </summary>
         public int Length;
+        /// <summary>
+        /// 诊断启用时记录进入入站队列的 Stopwatch tick；零表示本包不采样。
+        /// </summary>
+        public long EnqueuedTicks;
     }
 }

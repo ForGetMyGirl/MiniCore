@@ -1,8 +1,8 @@
 using MiniCore.Threading;
 using MiniCore.Model;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using MiniCore.Core;
@@ -30,7 +30,29 @@ namespace MiniCore.Service
         private readonly Dictionary<uint, RpcHandlerInfo> rpcHandlers = new Dictionary<uint, RpcHandlerInfo>(); // RPC 处理器映射。
         private readonly Dictionary<string, NetworkHeartbeatState> heartbeatStates = new Dictionary<string, NetworkHeartbeatState>(); // 各会话心跳状态。
         private readonly Dictionary<Type, uint> opcodeCache = new Dictionary<Type, uint>(); // 协议类型到 opcode 的缓存。
-        private readonly ConcurrentQueue<NetworkIncomingPacket> incomingPackets = new ConcurrentQueue<NetworkIncomingPacket>(); // 等待主线程处理的收包队列。
+        private const int IncomingDataMaximumPacketCount = 4096; // 全局普通收包队列固定槽位数量。
+        private const int IncomingDataMaximumByteCount = 4 * 1024 * 1024; // 全局普通收包队列有效字节上限。
+        private const int IncomingControlMaximumPacketCount = 256; // Ping/Pong 与 RPC 收包的保留槽位数量；本机回环的 64 并发 RPC 请求与响应可同时短暂积压。
+        private const int IncomingControlMaximumByteCount = 64 * 1024; // Ping/Pong 与 RPC 收包的保留字节上限。
+        private const int IncomingSessionMaximumPacketCount = 1024; // 单会话全部收包最大数量。
+        private const int IncomingSessionMaximumByteCount = 1024 * 1024; // 单会话全部收包最大有效字节数。
+        private static readonly long IncomingCongestionDisconnectTicks = Stopwatch.Frequency * 3L; // 单会话持续三秒满载后断开的阈值。
+        private readonly object incomingQueueLock = new object(); // 同步全局预算、会话预算和两条固定队列。
+        private readonly FixedCapacityPacketQueue<NetworkIncomingPacket> incomingDataPackets = new FixedCapacityPacketQueue<NetworkIncomingPacket>(IncomingDataMaximumPacketCount, IncomingDataMaximumByteCount); // 普通业务收包环形队列。
+        private readonly FixedCapacityPacketQueue<NetworkIncomingPacket> incomingControlPackets = new FixedCapacityPacketQueue<NetworkIncomingPacket>(IncomingControlMaximumPacketCount, IncomingControlMaximumByteCount); // 心跳与 RPC 收包保留队列。
+        private readonly Dictionary<string, IncomingSessionBudget> incomingSessionBudgets = new Dictionary<string, IncomingSessionBudget>(); // 各会话当前占用与持续满载时刻。
+        private long incomingPacketCount; // 当前等待主线程处理的数据包数量。
+        private long incomingPacketBytes; // 当前等待主线程处理的数据总字节数。
+        private long peakIncomingPacketCount; // 统计周期内等待处理的数据包数量峰值。
+        private long peakIncomingPacketBytes; // 统计周期内等待处理的数据字节数峰值。
+        private long processedIncomingPacketCount; // 统计周期内已完成处理的数据包总数。
+        private long maxIncomingPacketProcessTicks; // 统计周期内单包处理耗时峰值的 Stopwatch tick。
+        private int incomingTimingMetricsEnabled; // 是否记录仅供压测诊断使用的入站队列等待耗时。
+        private long incomingQueueWaitSampleCount; // 当前统计周期内完成入站队列等待采样的包数量。
+        private long totalIncomingQueueWaitTicks; // 网络线程入队到主线程开始处理的累计 Stopwatch tick。
+        private long maxIncomingQueueWaitTicks; // 网络线程入队到主线程开始处理的最大 Stopwatch tick。
+        private long incomingControlRejectedPacketCount; // 统计周期内控制保留入站队列或单会话预算拒绝的包数量。
+        private long incomingDataRejectedPacketCount; // 统计周期内普通数据入站队列或单会话预算拒绝的包数量。
         private int processingQueue; // 收包队列处理任务的互斥标志。
         private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2); // 连接探测的默认超时。
 
@@ -43,6 +65,25 @@ namespace MiniCore.Service
             public string SessionId; // RPC 所属会话标识。
             public Type ResponseType; // 期望的 RPC 响应类型。
             public MTaskCompletionSource<object> Tcs; // 等待响应完成的任务源。
+        }
+
+        /// <summary>
+        /// 保存单个逻辑会话在入站固定队列中占用的容量与持续满载状态。
+        /// </summary>
+        private sealed class IncomingSessionBudget
+        {
+            /// <summary>
+            /// 当前会话等待主线程处理的数据包数量。
+            /// </summary>
+            public int PacketCount;
+            /// <summary>
+            /// 当前会话等待主线程处理的有效字节数。
+            /// </summary>
+            public long ByteCount;
+            /// <summary>
+            /// 最近一次连续容量拒绝开始的 Stopwatch tick；零表示当前未满载。
+            /// </summary>
+            public long FullSinceTicks;
         }
 
         private class HandlerInfo
@@ -490,6 +531,54 @@ namespace MiniCore.Service
         }
 
         /// <summary>
+        /// 获取当前收包队列的积压量、峰值与处理耗时诊断快照。
+        /// </summary>
+        /// <returns>不改变队列状态的当前诊断快照。</returns>
+        public NetworkIncomingQueueSnapshot GetIncomingQueueSnapshot()
+        {
+            long maxProcessTicks = Interlocked.Read(ref maxIncomingPacketProcessTicks);
+            long queueWaitSamples = Interlocked.Read(ref incomingQueueWaitSampleCount);
+            return new NetworkIncomingQueueSnapshot(
+                Interlocked.Read(ref incomingPacketCount),
+                Interlocked.Read(ref incomingPacketBytes),
+                Interlocked.Read(ref peakIncomingPacketCount),
+                Interlocked.Read(ref peakIncomingPacketBytes),
+                Interlocked.Read(ref processedIncomingPacketCount),
+                maxProcessTicks * 1000d / Stopwatch.Frequency,
+                queueWaitSamples,
+                ToAverageMilliseconds(Interlocked.Read(ref totalIncomingQueueWaitTicks), queueWaitSamples),
+                ToMilliseconds(Interlocked.Read(ref maxIncomingQueueWaitTicks)),
+                Interlocked.Read(ref incomingControlRejectedPacketCount),
+                Interlocked.Read(ref incomingDataRejectedPacketCount));
+        }
+
+        /// <summary>
+        /// 启用或关闭入站队列等待耗时诊断，并清空上一周期诊断数据。
+        /// </summary>
+        /// <param name="enabled">为 true 时记录网络线程入队到主线程开始处理的等待时间；仅建议由压测启用。</param>
+        public void SetIncomingQueueTimingMetricsEnabled(bool enabled)
+        {
+            Interlocked.Exchange(ref incomingTimingMetricsEnabled, enabled ? 1 : 0);
+            ResetIncomingQueueTimingMetrics();
+        }
+
+        /// <summary>
+        /// 重置收包队列的峰值、累计处理数量和单包最大处理耗时；当前积压不会被清除。
+        /// </summary>
+        public void ResetIncomingQueueMetrics()
+        {
+            incomingControlPackets.ResetMetrics();
+            incomingDataPackets.ResetMetrics();
+            Interlocked.Exchange(ref peakIncomingPacketCount, Interlocked.Read(ref incomingPacketCount));
+            Interlocked.Exchange(ref peakIncomingPacketBytes, Interlocked.Read(ref incomingPacketBytes));
+            Interlocked.Exchange(ref processedIncomingPacketCount, 0);
+            Interlocked.Exchange(ref maxIncomingPacketProcessTicks, 0);
+            Interlocked.Exchange(ref incomingControlRejectedPacketCount, 0);
+            Interlocked.Exchange(ref incomingDataRejectedPacketCount, 0);
+            ResetIncomingQueueTimingMetrics();
+        }
+
+        /// <summary>
         /// 断开并移除指定逻辑会话。
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
@@ -511,7 +600,7 @@ namespace MiniCore.Service
         /// </summary>
         protected override void Update()
         {
-            if (incomingPackets.IsEmpty)
+            if (!HasIncomingPackets())
             {
                 return;
             }
@@ -639,16 +728,16 @@ namespace MiniCore.Service
                 sendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                 LogSwitch.Info($"[{sendTime}] [{GetLogSide(session.SessionId)}] 发送RPC opcode:{opcode} rpcId:{rpcId} type:{request.GetType().FullName}");
             }
-            byte[] payload = GetSerializer().Serialize(request);
             if (isLogEnabled && LogSwitch.EnablePayloadLog)
             {
+                byte[] payload = GetSerializer().Serialize(request);
                 string payloadText = Encoding.UTF8.GetString(payload);
                 LogSwitch.Info($"[{sendTime}] 发送RPC内容: {payloadText}");
             }
-            byte[] body = BuildPacket(opcode, rpcId, payload);
+            byte[] body = BuildPacket(opcode, rpcId, request, out int bodyLength);
             try
             {
-                await session.SendAsync(new ArraySegment<byte>(body));
+                await session.SendOwnedAsync(body, bodyLength);
             }
             catch (Exception ex)
             {
@@ -696,14 +785,49 @@ namespace MiniCore.Service
                 sendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                 LogSwitch.Info($"[{sendTime}] [{GetLogSide(session.SessionId)}] 发送普通消息 opcode:{opcode} rpcId:0 type:{message.GetType().FullName}");
             }
-            byte[] payload = GetSerializer().Serialize(message);
             if (isLogEnabled && LogSwitch.EnablePayloadLog)
             {
+                byte[] payload = GetSerializer().Serialize(message);
                 string payloadText = Encoding.UTF8.GetString(payload);
                 LogSwitch.Info($"[{sendTime}] 发送普通消息内容: {payloadText}");
             }
-            byte[] body = BuildPacket(opcode, 0, payload);
-            await session.SendAsync(new ArraySegment<byte>(body));
+            byte[] body = BuildPacket(opcode, 0, message, out int bodyLength);
+            await session.SendOwnedAsync(body, bodyLength);
+        }
+
+        /// <summary>
+        /// 尝试将默认会话的高频普通消息放入非等待出站队列。
+        /// </summary>
+        /// <typeparam name="TMessage">需要发送的普通消息类型。</typeparam>
+        /// <param name="message">需要发送的高频普通消息。</param>
+        /// <returns>当前连接与队列接受或拒绝该消息的原因。</returns>
+        public NetworkSendResult TrySend<TMessage>(TMessage message) where TMessage : INormalMessage
+        {
+            return TrySend(DefaultSessionId, message);
+        }
+
+        /// <summary>
+        /// 尝试将指定会话的高频普通消息放入非等待出站队列。
+        /// </summary>
+        /// <typeparam name="TMessage">需要发送的普通消息类型。</typeparam>
+        /// <param name="sessionId">目标逻辑会话标识。</param>
+        /// <param name="message">需要发送的高频普通消息。</param>
+        /// <returns>当前连接与队列接受或拒绝该消息的原因。</returns>
+        public NetworkSendResult TrySend<TMessage>(string sessionId, TMessage message) where TMessage : INormalMessage
+        {
+            if (!TryGetSession(sessionId, out var session))
+            {
+                return NetworkSendResult.SessionNotFound;
+            }
+
+            if (!session.IsConnected)
+            {
+                return NetworkSendResult.Disconnected;
+            }
+
+            uint opcode = ResolveOpcode(message.GetType());
+            byte[] body = BuildPacket(opcode, 0, message, out int bodyLength);
+            return session.TrySendOwned(body, bodyLength);
         }
 
         /// <summary>
@@ -782,6 +906,30 @@ namespace MiniCore.Service
             }
 
             boundSessionReceivers.Clear();
+            DrainIncomingPackets();
+        }
+
+        /// <summary>
+        /// 在网络服务停止时归还两条入站固定队列中尚未交给主线程处理的缓冲区。
+        /// </summary>
+        private void DrainIncomingPackets()
+        {
+            lock (incomingQueueLock)
+            {
+                while (incomingControlPackets.TryDequeue(out NetworkIncomingPacket controlPacket, out _))
+                {
+                    ByteBufferPool.Shared.Return(controlPacket.Buffer);
+                }
+
+                while (incomingDataPackets.TryDequeue(out NetworkIncomingPacket dataPacket, out _))
+                {
+                    ByteBufferPool.Shared.Return(dataPacket.Buffer);
+                }
+
+                incomingSessionBudgets.Clear();
+                Interlocked.Exchange(ref incomingPacketCount, 0);
+                Interlocked.Exchange(ref incomingPacketBytes, 0);
+            }
         }
 
         /// <summary>
@@ -799,26 +947,78 @@ namespace MiniCore.Service
         }
 
         /// <summary>
-        /// 执行 BuildPacket 相关处理。
+        /// 将正式消息直接封装到租用数组中；Protobuf 路径不创建独立正文数组。
         /// </summary>
-        /// <param name="opcode">执行该方法所需的 opcode 参数。</param>
-        /// <param name="rpcId">执行该方法所需的 rpcId 参数。</param>
-        /// <param name="payload">执行该方法所需的 payload 参数。</param>
-        /// <returns>执行处理后的结果。</returns>
-        private byte[] BuildPacket(uint opcode, long rpcId, byte[] payload)
+        /// <typeparam name="TMessage">需要封装的协议消息类型。</typeparam>
+        /// <param name="opcode">消息对应的稳定 opcode。</param>
+        /// <param name="rpcId">普通消息为零的 RPC 关联标识。</param>
+        /// <param name="message">需要写入包体的协议消息。</param>
+        /// <param name="length">返回完整业务包有效长度。</param>
+        /// <returns>由调用方转交会话发送器归还的完整业务包数组。</returns>
+        private byte[] BuildPacket<TMessage>(uint opcode, long rpcId, TMessage message, out int length)
         {
-            // header: opcode(4 bytes, big-endian) + rpcId(8 bytes, big-endian)
-            int length = 4 + 8 + (payload?.Length ?? 0);
-            byte[] buffer = new byte[length];
+            INetworkSerializer currentSerializer = GetSerializer();
+            if (currentSerializer is ProtobufSerializer protobufSerializer)
+            {
+                int payloadLength = protobufSerializer.GetSerializedSize(message);
+                length = 12 + payloadLength;
+                byte[] buffer = ByteBufferPool.Shared.Rent(length);
+                try
+                {
+                    protobufSerializer.SerializeInto(message, buffer, 12, payloadLength);
+                    WritePacketHeader(buffer, opcode, rpcId);
+                    return buffer;
+                }
+                catch
+                {
+                    ByteBufferPool.Shared.Return(buffer);
+                    throw;
+                }
+            }
 
+            byte[] payload = currentSerializer.Serialize(message);
+            length = 12 + (payload?.Length ?? 0);
+            byte[] fallbackBuffer = ByteBufferPool.Shared.Rent(length);
+            try
+            {
+                WritePacketHeader(fallbackBuffer, opcode, rpcId);
+                if (payload != null && payload.Length > 0)
+                {
+                    Buffer.BlockCopy(payload, 0, fallbackBuffer, 12, payload.Length);
+                }
+
+                return fallbackBuffer;
+            }
+            catch
+            {
+                ByteBufferPool.Shared.Return(fallbackBuffer);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 创建没有业务正文的控制包。
+        /// </summary>
+        /// <param name="opcode">控制包 opcode。</param>
+        /// <param name="rpcId">控制包关联的 RPC 标识。</param>
+        /// <returns>由调用方转交会话发送器归还的十二字节业务包数组。</returns>
+        private byte[] BuildControlPacket(uint opcode, long rpcId)
+        {
+            byte[] buffer = ByteBufferPool.Shared.Rent(12);
+            WritePacketHeader(buffer, opcode, rpcId);
+            return buffer;
+        }
+
+        /// <summary>
+        /// 将固定十二字节业务包头写入目标数组。
+        /// </summary>
+        /// <param name="buffer">至少包含十二字节容量的目标数组。</param>
+        /// <param name="opcode">需要写入的 opcode。</param>
+        /// <param name="rpcId">需要写入的 RPC 标识。</param>
+        private static void WritePacketHeader(byte[] buffer, uint opcode, long rpcId)
+        {
             NetBinaryCodec.WriteUInt32BE(buffer, 0, opcode);
             NetBinaryCodec.WriteInt64BE(buffer, 4, rpcId);
-
-            if (payload != null && payload.Length > 0)
-            {
-                Buffer.BlockCopy(payload, 0, buffer, 12, payload.Length);
-            }
-            return buffer;
         }
 
         /// <summary>
@@ -921,14 +1121,14 @@ namespace MiniCore.Service
                 }
                 try
                 {
-                    byte[] respPayload = GetSerializer().Serialize(response);
                     if (isLogEnabled && LogSwitch.EnablePayloadLog)
                     {
+                        byte[] respPayload = GetSerializer().Serialize(response);
                         string payloadText = Encoding.UTF8.GetString(respPayload);
                         LogSwitch.Info($"[{sendTime}] 发送RPC响应内容: {payloadText}");
                     }
-                    byte[] packet = BuildPacket(respOpcode, rpcId, respPayload);
-                    await session.SendAsync(new ArraySegment<byte>(packet));
+                    byte[] packet = BuildPacket(respOpcode, rpcId, response, out int packetLength);
+                    await session.SendOwnedAsync(packet, packetLength);
                 }
                 catch (Exception ex)
                 {
@@ -1073,8 +1273,8 @@ namespace MiniCore.Service
             {
                 state.LastPingSentTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
-            byte[] body = BuildPacket(PingOpcode, 0, null);
-            await session.SendAsync(new ArraySegment<byte>(body));
+            byte[] body = BuildControlPacket(PingOpcode, 0);
+            await session.SendOwnedAsync(body, 12);
         }
 
         /// <summary>
@@ -1085,8 +1285,8 @@ namespace MiniCore.Service
         /// <returns>执行处理后的结果。</returns>
         private async MTask SendPongAsync(NetworkSession session, long rpcId)
         {
-            byte[] body = BuildPacket(PongOpcode, rpcId, null);
-            await session.SendAsync(new ArraySegment<byte>(body));
+            byte[] body = BuildControlPacket(PongOpcode, rpcId);
+            await session.SendOwnedAsync(body, 12);
         }
 
         /// <summary>
@@ -1503,14 +1703,65 @@ namespace MiniCore.Service
             }
 
             int length = data.Length;
-            byte[] buffer = ByteBufferPool.Shared.Rent(length);
-            data.Span.CopyTo(buffer);
-            incomingPackets.Enqueue(new NetworkIncomingPacket
+            bool disconnectForCongestion = false;
+            bool isControlPacket = IsIncomingControlPacket(data);
+            lock (incomingQueueLock)
             {
-                Session = session,
-                Buffer = buffer,
-                Length = length
-            });
+                IncomingSessionBudget budget = GetOrCreateIncomingBudget(session.SessionId);
+                if (!CanAcceptIncomingPacket(budget, length))
+                {
+                    disconnectForCongestion = MarkIncomingPacketRejected(budget, isControlPacket);
+                }
+                else
+                {
+                    FixedCapacityPacketQueue<NetworkIncomingPacket> queue = isControlPacket ? incomingControlPackets : incomingDataPackets;
+                    if (CanAcceptGlobalIncomingPacket(queue, length))
+                    {
+                        byte[] buffer = ByteBufferPool.Shared.Rent(length);
+                        try
+                        {
+                            data.Span.CopyTo(buffer);
+                            var packet = new NetworkIncomingPacket
+                            {
+                                Session = session,
+                                Buffer = buffer,
+                                Length = length,
+                                EnqueuedTicks = Volatile.Read(ref incomingTimingMetricsEnabled) != 0 ? Stopwatch.GetTimestamp() : 0
+                            };
+                            if (!queue.TryEnqueue(packet, length))
+                            {
+                                ByteBufferPool.Shared.Return(buffer);
+                                disconnectForCongestion = MarkIncomingPacketRejected(budget, isControlPacket);
+                            }
+                            else
+                            {
+                                budget.PacketCount++;
+                                budget.ByteCount += length;
+                                budget.FullSinceTicks = 0;
+                                long pendingCount = Interlocked.Increment(ref incomingPacketCount);
+                                long pendingBytes = Interlocked.Add(ref incomingPacketBytes, length);
+                                UpdateMaximum(ref peakIncomingPacketCount, pendingCount);
+                                UpdateMaximum(ref peakIncomingPacketBytes, pendingBytes);
+                            }
+                        }
+                        catch
+                        {
+                            ByteBufferPool.Shared.Return(buffer);
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        disconnectForCongestion = MarkIncomingPacketRejected(budget, isControlPacket);
+                    }
+                }
+            }
+
+            if (disconnectForCongestion)
+            {
+                session.Transport.Disconnect();
+            }
+
             return MTask.CompletedTask;
         }
 
@@ -1522,14 +1773,19 @@ namespace MiniCore.Service
         {
             try
             {
-                while (incomingPackets.TryDequeue(out var packet))
+                while (TryDequeueIncomingPacket(out NetworkIncomingPacket packet))
                 {
+                    RecordIncomingQueueWait(packet.EnqueuedTicks);
+                    long startedTicks = Stopwatch.GetTimestamp();
                     try
                     {
                         await HandleIncoming(packet.Session, new ReadOnlyMemory<byte>(packet.Buffer, 0, packet.Length));
                     }
                     finally
                     {
+                        long elapsedTicks = Stopwatch.GetTimestamp() - startedTicks;
+                        Interlocked.Increment(ref processedIncomingPacketCount);
+                        UpdateMaximum(ref maxIncomingPacketProcessTicks, elapsedTicks);
                         ByteBufferPool.Shared.Return(packet.Buffer);
                     }
                 }
@@ -1538,6 +1794,204 @@ namespace MiniCore.Service
             {
                 Interlocked.Exchange(ref processingQueue, 0);
             }
+        }
+
+        /// <summary>
+        /// 以无锁比较交换更新指定的最大值计数器。
+        /// </summary>
+        /// <param name="location">需要更新的最大值计数器。</param>
+        /// <param name="candidate">本次观察到的候选值。</param>
+        private static void UpdateMaximum(ref long location, long candidate)
+        {
+            long current = Interlocked.Read(ref location);
+            while (candidate > current)
+            {
+                long observed = Interlocked.CompareExchange(ref location, candidate, current);
+                if (observed == current)
+                {
+                    return;
+                }
+
+                current = observed;
+            }
+        }
+
+        /// <summary>
+        /// 记录一条已从入站队列取出的数据包等待时间。
+        /// </summary>
+        /// <param name="enqueuedTicks">该数据包进入队列时的 Stopwatch tick；零表示未启用采样。</param>
+        private void RecordIncomingQueueWait(long enqueuedTicks)
+        {
+            if (enqueuedTicks == 0)
+            {
+                return;
+            }
+
+            long elapsedTicks = Stopwatch.GetTimestamp() - enqueuedTicks;
+            Interlocked.Increment(ref incomingQueueWaitSampleCount);
+            Interlocked.Add(ref totalIncomingQueueWaitTicks, elapsedTicks);
+            UpdateMaximum(ref maxIncomingQueueWaitTicks, elapsedTicks);
+        }
+
+        /// <summary>
+        /// 清空入站队列等待耗时诊断，不影响当前已排队数据与拒绝计数。
+        /// </summary>
+        private void ResetIncomingQueueTimingMetrics()
+        {
+            Interlocked.Exchange(ref incomingQueueWaitSampleCount, 0);
+            Interlocked.Exchange(ref totalIncomingQueueWaitTicks, 0);
+            Interlocked.Exchange(ref maxIncomingQueueWaitTicks, 0);
+        }
+
+        /// <summary>
+        /// 将 Stopwatch tick 换算为毫秒。
+        /// </summary>
+        /// <param name="ticks">需要换算的 Stopwatch tick 数。</param>
+        /// <returns>对应的毫秒数。</returns>
+        private static double ToMilliseconds(long ticks)
+        {
+            return ticks * 1000d / Stopwatch.Frequency;
+        }
+
+        /// <summary>
+        /// 将累计 Stopwatch tick 换算为平均毫秒。
+        /// </summary>
+        /// <param name="totalTicks">累计 Stopwatch tick。</param>
+        /// <param name="sampleCount">参与累计的样本数量。</param>
+        /// <returns>没有样本时为零，否则返回平均毫秒。</returns>
+        private static double ToAverageMilliseconds(long totalTicks, long sampleCount)
+        {
+            return sampleCount <= 0 ? 0d : ToMilliseconds(totalTicks) / sampleCount;
+        }
+
+        /// <summary>
+        /// 判断两条入站固定队列中是否仍有待主线程处理的数据包。
+        /// </summary>
+        /// <returns>存在待处理数据包时返回 true。</returns>
+        private bool HasIncomingPackets()
+        {
+            lock (incomingQueueLock)
+            {
+                return Interlocked.Read(ref incomingPacketCount) > 0;
+            }
+        }
+
+        /// <summary>
+        /// 优先从控制队列取包，再从普通业务队列取包，并同步回收全局与会话预算。
+        /// </summary>
+        /// <param name="packet">成功时返回需要在主线程处理的数据包。</param>
+        /// <returns>存在可处理数据包时返回 true。</returns>
+        private bool TryDequeueIncomingPacket(out NetworkIncomingPacket packet)
+        {
+            lock (incomingQueueLock)
+            {
+                if (!incomingControlPackets.TryDequeue(out packet, out _) && !incomingDataPackets.TryDequeue(out packet, out _))
+                {
+                    packet = default;
+                    return false;
+                }
+
+                Interlocked.Decrement(ref incomingPacketCount);
+                Interlocked.Add(ref incomingPacketBytes, -packet.Length);
+                if (packet.Session != null && incomingSessionBudgets.TryGetValue(packet.Session.SessionId, out IncomingSessionBudget budget))
+                {
+                    budget.PacketCount--;
+                    budget.ByteCount -= packet.Length;
+                    if (budget.PacketCount == 0)
+                    {
+                        budget.FullSinceTicks = 0;
+                        incomingSessionBudgets.Remove(packet.Session.SessionId);
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// 判断当前入站包是否应进入心跳与 RPC 的保留控制队列。
+        /// </summary>
+        /// <param name="data">完整业务包数据。</param>
+        /// <returns>Ping、Pong 或带 RPC 标识的数据包时返回 true。</returns>
+        private bool IsIncomingControlPacket(ReadOnlyMemory<byte> data)
+        {
+            if (data.Length < 12)
+            {
+                return false;
+            }
+
+            uint opcode = NetBinaryCodec.ReadUInt32BE(data.Span, 0);
+            if (opcode == PingOpcode || opcode == PongOpcode)
+            {
+                return true;
+            }
+
+            return NetBinaryCodec.ReadInt64BE(data.Span, 4) != 0;
+        }
+
+        /// <summary>
+        /// 获取指定会话的入站预算记录；首次收包时才创建一次记录。
+        /// </summary>
+        /// <param name="sessionId">逻辑会话标识。</param>
+        /// <returns>当前会话的可变预算记录。</returns>
+        private IncomingSessionBudget GetOrCreateIncomingBudget(string sessionId)
+        {
+            if (!incomingSessionBudgets.TryGetValue(sessionId, out IncomingSessionBudget budget))
+            {
+                budget = new IncomingSessionBudget();
+                incomingSessionBudgets.Add(sessionId, budget);
+            }
+
+            return budget;
+        }
+
+        /// <summary>
+        /// 判断单会话预算是否还允许接收指定长度的数据包。
+        /// </summary>
+        /// <param name="budget">需要检查的会话预算。</param>
+        /// <param name="length">即将接收的数据包有效字节数。</param>
+        /// <returns>会话包数量与字节数均未达到上限时返回 true。</returns>
+        private static bool CanAcceptIncomingPacket(IncomingSessionBudget budget, int length)
+        {
+            return budget.PacketCount < IncomingSessionMaximumPacketCount && length <= IncomingSessionMaximumByteCount - budget.ByteCount;
+        }
+
+        /// <summary>
+        /// 判断指定优先级全局队列是否仍有可用固定槽位与字节预算。
+        /// </summary>
+        /// <param name="queue">需要检查的固定容量队列。</param>
+        /// <param name="length">即将进入队列的数据包有效字节数。</param>
+        /// <returns>队列允许该数据包进入时返回 true。</returns>
+        private static bool CanAcceptGlobalIncomingPacket(FixedCapacityPacketQueue<NetworkIncomingPacket> queue, int length)
+        {
+            return queue.CanAccept(length);
+        }
+
+        /// <summary>
+        /// 记录一次容量拒绝，并在同一会话持续满载三秒时请求主动断开。
+        /// </summary>
+        /// <param name="budget">需要更新的会话预算。</param>
+        /// <param name="isControlPacket">本次拒绝是否属于 Ping、Pong 或 RPC 保留队列。</param>
+        /// <returns>持续满载达到断开阈值时返回 true。</returns>
+        private bool MarkIncomingPacketRejected(IncomingSessionBudget budget, bool isControlPacket)
+        {
+            if (isControlPacket)
+            {
+                Interlocked.Increment(ref incomingControlRejectedPacketCount);
+            }
+            else
+            {
+                Interlocked.Increment(ref incomingDataRejectedPacketCount);
+            }
+
+            long now = Stopwatch.GetTimestamp();
+            if (budget.FullSinceTicks == 0)
+            {
+                budget.FullSinceTicks = now;
+                return false;
+            }
+
+            return now - budget.FullSinceTicks >= IncomingCongestionDisconnectTicks;
         }
 
         /// <summary>

@@ -25,6 +25,7 @@ namespace MiniCore.HotUpdate
         private const int KcpPort = 25002; // 本机 KCP 冒烟监听端口。
         private const int UdpPort = 25003; // 本机 UDP 冒烟监听端口。
         private const uint KcpConv = 1001; // 本机 KCP 冒烟连接标识。
+        private const int TrySendMessageCount = 16; // 每种传输用于验证非等待高频发送队列的消息数量。
         private static readonly TimeSpan StageTimeout = TimeSpan.FromSeconds(5); // 单个验证阶段的最长等待时长。
 
         private readonly MTaskCompletionSource<bool> completionSource = new MTaskCompletionSource<bool>(); // 对外暴露的单次运行完成通知。
@@ -40,7 +41,9 @@ namespace MiniCore.HotUpdate
         private bool isPassed; // 冒烟流程是否成功。
         private int serverSessionCreatedCount; // 已观察到的服务端会话创建数量。
         private int serverSessionClosedCount; // 已观察到的服务端会话关闭数量。
+        private int receivedTrySendMessageCount; // 当前协议已由 Handler 收到的 TrySend 消息数量。
         private string expectedNormalContent; // 当前等待的普通消息内容。
+        private string expectedTrySendContentPrefix; // 当前等待的 TrySend 消息内容前缀。
         private string lastNetworkEvent; // 最近收到的业务网络事件文本。
         private string statusMessage = "等待网络冒烟测试启动。"; // 当前屏幕与 Console 状态文本。
         private string failureMessage = string.Empty; // 失败时输出的可定位摘要。
@@ -271,6 +274,17 @@ namespace MiniCore.HotUpdate
             await network.SendAsync(sessionId, new DemoNormalMessage { Content = expectedNormalContent });
             await WaitForConditionAsync(IsExpectedNormalMessageReceived, protocol, "normal-message", sessionId);
 
+            expectedTrySendContentPrefix = $"{SmokePrefix}{protocol}-try-send-";
+            receivedTrySendMessageCount = 0;
+            ReportStage(protocol, "try-send", sessionId);
+            for (int index = 0; index < TrySendMessageCount; index++)
+            {
+                NetworkSendResult sendResult = network.TrySend(sessionId, new DemoNormalMessage { Content = $"{expectedTrySendContentPrefix}{index}" });
+                Ensure(sendResult == NetworkSendResult.Accepted, protocol, "try-send", sessionId, $"第 {index + 1} 条消息未被出站队列接受，结果:{sendResult}。");
+            }
+
+            await WaitForConditionAsync(IsExpectedTrySendMessagesReceived, protocol, "try-send", sessionId);
+
             ReportStage(protocol, "rpc", sessionId);
             string rpcPayload = $"{SmokePrefix}{protocol}-rpc";
             DemoRpcResponse response = await network.CallAsync<DemoRpcRequest, DemoRpcResponse>(sessionId, new DemoRpcRequest { Payload = rpcPayload });
@@ -323,6 +337,15 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
+        /// 判断当前协议的全部 TrySend 消息是否均已由真实业务 Handler 接收。
+        /// </summary>
+        /// <returns>收到预期数量的 TrySend 消息时返回 true。</returns>
+        private bool IsExpectedTrySendMessagesReceived()
+        {
+            return !string.IsNullOrEmpty(expectedTrySendContentPrefix) && receivedTrySendMessageCount >= TrySendMessageCount;
+        }
+
+        /// <summary>
         /// 记录服务端新建会话事件。
         /// </summary>
         /// <param name="session">刚创建的服务端逻辑会话。</param>
@@ -353,6 +376,10 @@ namespace MiniCore.HotUpdate
         private void HandleNetworkEvent(DemoMessageReceivedEvent @event)
         {
             lastNetworkEvent = @event.Message;
+            if (!string.IsNullOrEmpty(expectedTrySendContentPrefix) && !string.IsNullOrEmpty(@event.Message) && @event.Message.IndexOf(expectedTrySendContentPrefix, StringComparison.Ordinal) >= 0)
+            {
+                receivedTrySendMessageCount++;
+            }
         }
 
         /// <summary>

@@ -12,6 +12,9 @@
     <type fullname="MiniCore.Model.INetworkTransport" preserve="all" />
     <type fullname="MiniCore.Model.KcpServerConfig" preserve="all" />
     <type fullname="MiniCore.Model.KcpTransportConfig" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkIncomingQueueSnapshot" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkOutboundQueueSnapshot" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkSendResult" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSession" preserve="all" />
     <type fullname="MiniCore.Model.UdpServerConfig" preserve="all" />
     <type fullname="MiniCore.Service.INetworkService" preserve="all" />
@@ -26,11 +29,16 @@
   </assembly>
   <assembly fullname="MiniCore.Runtime">
     <type fullname="MiniCore.Core.Global" preserve="all" />
+    <type fullname="MiniCore.Eventing.ApplicationEventBusModule" preserve="all" />
+    <type fullname="MiniCore.Eventing.EventSubscription" preserve="all" />
+    <type fullname="MiniCore.Eventing.IApplicationEventBus" preserve="all" />
+    <type fullname="MiniCore.Eventing.IEvent" preserve="all" />
+    <type fullname="MiniCore.Eventing.IEventBus" preserve="all" />
+    <type fullname="MiniCore.Eventing.ISyncEvent" preserve="all" />
     <type fullname="MiniCore.Model.AComponent" preserve="all" />
     <type fullname="MiniCore.Model.AGameStartup" preserve="all" />
     <type fullname="MiniCore.Model.ComponentCatalogAttribute" preserve="all" />
     <type fullname="MiniCore.Model.ComponentInitArgs" preserve="all" />
-    <type fullname="MiniCore.Model.EventCenter" preserve="all" />
     <type fullname="MiniCore.Model.LogSwitch" preserve="all" />
     <type fullname="MiniCore.Model.ReflectionUtils" preserve="all" />
     <type fullname="MiniCore.Service.AAppService" preserve="all" />
@@ -39,7 +47,6 @@
     <type fullname="MiniCore.Service.IAsyncAppService" preserve="all" />
     <type fullname="MiniCore.Service.IAudioService" preserve="all" />
     <type fullname="MiniCore.Service.IDeviceSettingsService" preserve="all" />
-    <type fullname="MiniCore.Service.IHttpService" preserve="all" />
     <type fullname="MiniCore.Service.ISaveService" preserve="all" />
     <type fullname="MiniCore.Service.ISettingsService" preserve="all" />
     <type fullname="MiniCore.Service.IStoragePathService" preserve="all" />
@@ -75,12 +82,10 @@
     <type fullname="MiniCore.Service.DeviceSettingsService" preserve="all" />
     <type fullname="MiniCore.Service.EncryptedSaveService" preserve="all" />
     <type fullname="MiniCore.Service.EncryptedSaveServiceInitArgs" preserve="all" />
-    <type fullname="MiniCore.Service.HttpServiceInitArgs" preserve="all" />
     <type fullname="MiniCore.Service.LocalTelemetryFileService" preserve="all" />
     <type fullname="MiniCore.Service.SettingsService" preserve="all" />
     <type fullname="MiniCore.Service.StoragePathService" preserve="all" />
     <type fullname="MiniCore.Service.StoragePathServiceInitArgs" preserve="all" />
-    <type fullname="MiniCore.Service.UnityWebRequestHttpService" preserve="all" />
     <type fullname="MiniCore.Unity.AMTaskBehaviour" preserve="all" />
     <type fullname="MiniCore.Unity.YooAssetMTaskExtensions" preserve="all" />
   </assembly>
@@ -89,19 +94,25 @@
   </assembly>
   <assembly fullname="System">
     <type fullname="System.Collections.Generic.Stack`1" preserve="all" />
+    <type fullname="System.Diagnostics.Stopwatch" preserve="all" />
   </assembly>
   <assembly fullname="Unity.TextMeshPro">
     <type fullname="TMPro.TMP_InputField" preserve="all" />
     <type fullname="TMPro.TMP_Text" preserve="all" />
   </assembly>
   <assembly fullname="UnityEngine.CoreModule">
+    <type fullname="Unity.Profiling.ProfilerCategory" preserve="all" />
+    <type fullname="Unity.Profiling.ProfilerRecorder" preserve="all" />
+    <type fullname="Unity.Profiling.ProfilerRecorderOptions" preserve="all" />
     <type fullname="UnityEngine.Application" preserve="all" />
+    <type fullname="UnityEngine.Application/LogCallback" preserve="all" />
     <type fullname="UnityEngine.Color" preserve="all" />
     <type fullname="UnityEngine.Component" preserve="all" />
     <type fullname="UnityEngine.Debug" preserve="all" />
     <type fullname="UnityEngine.Events.UnityAction" preserve="all" />
     <type fullname="UnityEngine.Events.UnityEvent" preserve="all" />
     <type fullname="UnityEngine.GameObject" preserve="all" />
+    <type fullname="UnityEngine.LogType" preserve="all" />
     <type fullname="UnityEngine.Mathf" preserve="all" />
     <type fullname="UnityEngine.Matrix4x4" preserve="all" />
     <type fullname="UnityEngine.MonoBehaviour" preserve="all" />
@@ -109,8 +120,11 @@
     <type fullname="UnityEngine.Quaternion" preserve="all" />
     <type fullname="UnityEngine.Rect" preserve="all" />
     <type fullname="UnityEngine.Resources" preserve="all" />
+    <type fullname="UnityEngine.RuntimePlatform" preserve="all" />
     <type fullname="UnityEngine.Screen" preserve="all" />
+    <type fullname="UnityEngine.SystemInfo" preserve="all" />
     <type fullname="UnityEngine.TextAsset" preserve="all" />
+    <type fullname="UnityEngine.Time" preserve="all" />
     <type fullname="UnityEngine.Transform" preserve="all" />
     <type fullname="UnityEngine.U2D.SpriteAtlas" preserve="all" />
     <type fullname="UnityEngine.Vector2" preserve="all" />
@@ -123,6 +137,9 @@
     <type fullname="UnityEngine.GUILayoutOption" preserve="all" />
     <type fullname="UnityEngine.GUISkin" preserve="all" />
     <type fullname="UnityEngine.GUIStyle" preserve="all" />
+  </assembly>
+  <assembly fullname="UnityEngine.JSONSerializeModule">
+    <type fullname="UnityEngine.JsonUtility" preserve="all" />
   </assembly>
   <assembly fullname="UnityEngine.TextRenderingModule">
     <type fullname="UnityEngine.FontStyle" preserve="all" />
@@ -143,29 +160,44 @@
     <type fullname="System.Activator" preserve="all" />
     <type fullname="System.ArgumentException" preserve="all" />
     <type fullname="System.ArgumentNullException" preserve="all" />
+    <type fullname="System.ArgumentOutOfRangeException" preserve="all" />
     <type fullname="System.Array" preserve="all" />
     <type fullname="System.Attribute" preserve="all" />
+    <type fullname="System.Byte" preserve="all" />
     <type fullname="System.Char" preserve="all" />
     <type fullname="System.Collections.Concurrent.ConcurrentQueue`1" preserve="all" />
     <type fullname="System.Collections.Generic.Dictionary`2" preserve="all" />
     <type fullname="System.Collections.Generic.Dictionary`2/ValueCollection" preserve="all" />
     <type fullname="System.Collections.Generic.Dictionary`2/ValueCollection/Enumerator" preserve="all" />
+    <type fullname="System.Collections.Generic.ICollection`1" preserve="all" />
+    <type fullname="System.Collections.Generic.IEnumerable`1" preserve="all" />
     <type fullname="System.Collections.Generic.IEqualityComparer`1" preserve="all" />
+    <type fullname="System.Collections.Generic.IList`1" preserve="all" />
     <type fullname="System.Collections.Generic.List`1" preserve="all" />
     <type fullname="System.Convert" preserve="all" />
     <type fullname="System.DateTime" preserve="all" />
     <type fullname="System.Delegate" preserve="all" />
     <type fullname="System.Diagnostics.DebuggableAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggableAttribute/DebuggingModes" preserve="all" />
+    <type fullname="System.Diagnostics.DebuggerBrowsableAttribute" preserve="all" />
+    <type fullname="System.Diagnostics.DebuggerBrowsableState" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerHiddenAttribute" preserve="all" />
+    <type fullname="System.Diagnostics.DebuggerStepThroughAttribute" preserve="all" />
     <type fullname="System.Double" preserve="all" />
     <type fullname="System.Enum" preserve="all" />
     <type fullname="System.Environment" preserve="all" />
     <type fullname="System.Exception" preserve="all" />
     <type fullname="System.Func`1" preserve="all" />
+    <type fullname="System.Globalization.CultureInfo" preserve="all" />
     <type fullname="System.Guid" preserve="all" />
     <type fullname="System.IDisposable" preserve="all" />
+    <type fullname="System.IFormatProvider" preserve="all" />
+    <type fullname="System.IO.Directory" preserve="all" />
+    <type fullname="System.IO.DirectoryInfo" preserve="all" />
+    <type fullname="System.IO.File" preserve="all" />
+    <type fullname="System.IO.Path" preserve="all" />
     <type fullname="System.Int32" preserve="all" />
+    <type fullname="System.Int64" preserve="all" />
     <type fullname="System.InvalidOperationException" preserve="all" />
     <type fullname="System.Math" preserve="all" />
     <type fullname="System.Object" preserve="all" />
@@ -179,14 +211,20 @@
     <type fullname="System.Runtime.CompilerServices.CompilationRelaxationsAttribute" preserve="all" />
     <type fullname="System.Runtime.CompilerServices.CompilerGeneratedAttribute" preserve="all" />
     <type fullname="System.Runtime.CompilerServices.IAsyncStateMachine" preserve="all" />
+    <type fullname="System.Runtime.CompilerServices.IsReadOnlyAttribute" preserve="all" />
     <type fullname="System.Runtime.CompilerServices.RuntimeCompatibilityAttribute" preserve="all" />
+    <type fullname="System.Runtime.CompilerServices.RuntimeHelpers" preserve="all" />
     <type fullname="System.Runtime.CompilerServices.TupleElementNamesAttribute" preserve="all" />
+    <type fullname="System.RuntimeFieldHandle" preserve="all" />
     <type fullname="System.RuntimeTypeHandle" preserve="all" />
     <type fullname="System.String" preserve="all" />
     <type fullname="System.StringComparer" preserve="all" />
     <type fullname="System.StringComparison" preserve="all" />
     <type fullname="System.StringSplitOptions" preserve="all" />
+    <type fullname="System.Text.Encoding" preserve="all" />
+    <type fullname="System.Text.StringBuilder" preserve="all" />
     <type fullname="System.Threading.Interlocked" preserve="all" />
+    <type fullname="System.Threading.Thread" preserve="all" />
     <type fullname="System.TimeSpan" preserve="all" />
     <type fullname="System.TimeoutException" preserve="all" />
     <type fullname="System.Type" preserve="all" />

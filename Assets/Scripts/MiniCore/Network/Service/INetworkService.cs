@@ -51,12 +51,40 @@ namespace MiniCore.Service
         List<NetworkSession> GetServerSessionsSnapshot();
         /// <summary>获取指定会话。</summary>
         NetworkSession GetSession(string sessionId);
+        /// <summary>
+        /// 获取当前收包队列的诊断快照。
+        /// </summary>
+        NetworkIncomingQueueSnapshot GetIncomingQueueSnapshot();
+        /// <summary>
+        /// 启用或关闭入站队列等待耗时诊断；仅建议在性能测试期间启用。
+        /// </summary>
+        /// <param name="enabled">为 true 时记录网络线程入队到主线程开始处理的等待时间。</param>
+        void SetIncomingQueueTimingMetricsEnabled(bool enabled);
+        /// <summary>
+        /// 重置收包队列的峰值与累计诊断统计。
+        /// </summary>
+        void ResetIncomingQueueMetrics();
         /// <summary>探测会话可用性。</summary>
         MTask<bool> ProbeSessionAsync(string sessionId, TimeSpan timeout);
         /// <summary>发送普通消息。</summary>
         MTask SendAsync<TMessage>(TMessage message) where TMessage : INormalMessage;
         /// <summary>向指定会话发送普通消息。</summary>
         MTask SendAsync<TMessage>(string sessionId, TMessage message) where TMessage : INormalMessage;
+        /// <summary>
+        /// 尝试将默认会话的高频普通消息放入有界出站队列，不等待底层 socket 写入。
+        /// </summary>
+        /// <typeparam name="TMessage">需要发送的普通消息类型。</typeparam>
+        /// <param name="message">需要发送的高频普通消息。</param>
+        /// <returns>当前会话和队列接受或拒绝该消息的原因。</returns>
+        NetworkSendResult TrySend<TMessage>(TMessage message) where TMessage : INormalMessage;
+        /// <summary>
+        /// 尝试将指定会话的高频普通消息放入有界出站队列，不等待底层 socket 写入。
+        /// </summary>
+        /// <typeparam name="TMessage">需要发送的普通消息类型。</typeparam>
+        /// <param name="sessionId">目标逻辑会话标识。</param>
+        /// <param name="message">需要发送的高频普通消息。</param>
+        /// <returns>当前会话和队列接受或拒绝该消息的原因。</returns>
+        NetworkSendResult TrySend<TMessage>(string sessionId, TMessage message) where TMessage : INormalMessage;
         /// <summary>调用默认会话 RPC。</summary>
         MTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request) where TRequest : IRpcRequest where TResponse : IRpcResponse;
         /// <summary>调用指定会话 RPC。</summary>

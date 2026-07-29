@@ -1,8 +1,10 @@
 using System.Collections;
 using MiniCore.Core;
+using MiniCore.Eventing;
 using MiniCore.Service;
 using MiniCore.HotUpdate;
 using MiniCore.Model;
+using MiniCore.Threading;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -20,6 +22,7 @@ namespace MiniCore.EditorTests
 
         private GameObject runnerObject; // 承载网络冒烟执行器的临时对象。
         private NetworkSmokeTestRunner runner; // 被测的共享冒烟执行器。
+        private MTaskMainThreadExecutor mainThreadExecutor; // 模拟 Player 主线程的 MTask 续体调度器。
         private bool previousEnableLog; // 用例开始前的普通日志开关状态。
         private bool previousEnablePayloadLog; // 用例开始前的正文日志开关状态。
 
@@ -34,12 +37,17 @@ namespace MiniCore.EditorTests
         public void SetUp()
         {
             Global.Shutdown();
+            MTaskRuntime.Shutdown();
+            mainThreadExecutor = new MTaskMainThreadExecutor("NetworkLoopbackIntegrationTests");
+            MTaskExecutors.Unity = mainThreadExecutor;
+            MTaskRuntime.Initialize(mainThreadExecutor);
             Global.Initialize();
             previousEnableLog = LogSwitch.EnableLog;
             previousEnablePayloadLog = LogSwitch.EnablePayloadLog;
             LogSwitch.EnableLog = false;
             LogSwitch.EnablePayloadLog = false;
 
+            Global.RegisterAppModule<IApplicationEventBus, ApplicationEventBusModule>();
             NetworkService network = Global.RegisterAppService<INetworkService, NetworkService>();
             HotUpdateHandlerRegistry.Register(network);
 
@@ -58,7 +66,9 @@ namespace MiniCore.EditorTests
             float deadline = Time.realtimeSinceStartup + TestTimeoutSeconds;
             while (!runner.IsCompleted && Time.realtimeSinceStartup < deadline)
             {
+                mainThreadExecutor.Drain();
                 Global.Tick();
+                mainThreadExecutor.Drain();
                 yield return null;
             }
 
@@ -79,7 +89,12 @@ namespace MiniCore.EditorTests
 
             runnerObject = null;
             runner = null;
+            MTaskRuntime.BeginFastShutdown();
             Global.Shutdown();
+            MTaskRuntime.CancelApplicationTasks();
+            mainThreadExecutor?.Drain();
+            MTaskRuntime.Shutdown();
+            mainThreadExecutor = null;
             LogSwitch.EnableLog = previousEnableLog;
             LogSwitch.EnablePayloadLog = previousEnablePayloadLog;
         }

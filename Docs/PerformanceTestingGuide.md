@@ -131,11 +131,25 @@ MTask 的功能回归测试位于 `Assets/Tests/Editor/MTaskTests.cs`，覆盖�
 
 Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包队列交接；随后分别运行 JSON 对比链路和 Protobuf 正式链路的完整入站包/RPC 基准。每次只新增一段链路，才能准确判断性能变化来自哪里。
 
+### 正式 Protobuf 链路的待归档基线
+
+在同一台 Mac 的 `EditMode` 下，依次单独运行三次 `ProtobufInboundPacketPerformanceTests`、`ProtobufRpcPerformanceTests`、`NetworkIncomingQueuePerformanceTests` 与 `NetworkLoopbackIntegrationTests`。前两项分别记录 `Network.Protobuf.InboundPacket` 和 `Network.Protobuf.Rpc` 的三次原始中位数、汇总中位数和 `GC()`；队列测试同时记录完整交接、仅复制、仅队列、仅 `BlockCopy`、仅缓冲池五个 Sample Group。`NetworkSerializationComparisonTests` 输出的 JSON/Protobuf 正文大小，以及完整入站包和 RPC 测试构造出的固定输入包长度，也要随 CSV 一起写入性能记录。
+
+`ByteBufferPoolTests` 与 `NetworkLoopbackIntegrationTests` 是进入 Android 压测前的功能前置条件：前者必须验证同尺寸复用、异常/清理与并发租还均通过；后者必须输出 `NETWORK_SMOKE: PASS (TCP / KCP / UDP)`。这些运行结果尚未在本文档中伪造为基线，完成实际 Unity Test Runner 运行后再填入具体数值。
+
+### Android 端到端网络压测
+
+Android Development Player 可传入 `-networkBenchmark` 启动完整本机回环压测；额外加入 `-networkBenchmarkQuit` 时，流程结束会以通过或失败退出码关闭 Player。该模式不会创建测试面板，只会启动 `NetworkBenchmarkRunner`，并自动关闭普通日志与 Payload 日志以外的 UI 干扰。
+
+每种 TCP、KCP、UDP 传输均依次运行正常消息 `100`、`1,000`、`5,000` 条/秒三档负载：每档预热 `10` 秒、正式测量 `60` 秒、重复 `3` 次；随后运行 `64` 并发、`60` 秒、重复 `3` 次的 RPC 饱和样本，以及一次 `1,000` 条/秒负载后的主线程 `2` 秒停顿诊断。正常消息采用固定宽度序号与固定长度正文，仍通过真实 Protobuf、真实 Handler 与本机传输处理。
+
+报告写入 `Application.persistentDataPath/NetworkBenchmark/<UTC 时间戳>/`，包含 `NetworkBenchmarkReport.json` 和 `NetworkBenchmarkReport.csv`。每条样本记录设备型号、系统、Unity 版本、构建类型、发送/接收/失败/未收消息数、吞吐、P50/P95/P99/最大端到端耗时、队列消息数与字节数峰值、单包主线程处理峰值、每帧 `GC Allocated In Frame` 峰值、断连数，以及主线程停顿后的恢复时间。只有中负载 P99 持续高于 `50 ms`、停止发送 `2` 秒后仍不能排空，或高负载下积压/内存持续增长时，才进入有界队列与主线程预算优化；在此之前不改动队列策略或 Handler 派发。
+
 ## 第三项测试：网络收包队列交接
 
-测试文件是 `Assets/Tests/Editor/NetworkIncomingQueuePerformanceTests.cs`，测试名为 `IncomingQueue_TransfersMediumPackets_BetweenNetworkAndMainThread`。
+测试文件是 `Assets/Tests/Editor/NetworkIncomingQueuePerformanceTests.cs`，完整交接测试名为 `IncomingQueue_TransfersMediumPackets_BetweenNetworkAndMainThread`。
 
-它用固定的 512 B 业务包模拟现有 `NetworkService.EnqueueIncoming` 和 `ProcessQueueAsync` 中的内存路径：从传输层输入复制到 `ByteBufferPool` 租用的数组、放入 `ConcurrentQueue`、主线程出队、再归还数组。测试不启动 TCP/UDP/KCP，不做 JSON 或 Protobuf 反序列化，也不调用业务 Handler；因此它只回答“当前队列与缓冲池的基础交接成本是多少、是否产生异常 GC”。
+它用固定的 512 B 业务包模拟现有 `NetworkService.EnqueueIncoming` 和 `ProcessQueueAsync` 中的内存路径：一个长驻后台线程从传输层输入复制到 `ByteBufferPool` 租用的数组、放入正式同预算的固定容量环形队列；测试主线程同时出队、再归还数组。队列容量为 `1024` 包或 `1 MiB`，与正式普通收包队列一致。测试不启动 TCP/UDP/KCP，不做 JSON 或 Protobuf 反序列化，也不调用业务 Handler；因此它只回答“固定队列与缓冲池的并发交接成本是多少、是否产生异常 GC”。
 
 每个测量组连续处理 `10,000` 个业务包。报告中的 `Network.IncomingQueue.MediumPacket` 是这一整组的总耗时，换算单包成本时除以 `10,000`。在 Test Runner 的 `EditMode` 下单独运行它三次；每次完成后可在 `MiniCore > Performance > History` 中查看并保留记录。
 
@@ -144,15 +158,15 @@ Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包�
 | 测试名 | Sample Group | 用途 |
 | --- | --- | --- |
 | `ByteBufferPool_CopiesMediumPackets_WithoutQueue` | `Network.IncomingQueue.BufferCopyOnly.MediumPacket` | 只测缓冲池租用、复制、归还，排除队列实现。 |
-| `ConcurrentQueue_TransfersMediumPackets_WithoutBufferCopy` | `Network.IncomingQueue.ConcurrentQueueOnly.MediumPacket` | 只测当前 `ConcurrentQueue` 对收包结构体的入队与出队，排除复制与缓冲池。 |
+| `FixedCapacityQueue_TransfersMediumPackets_ConcurrentlyWithoutBufferCopy` | `Network.IncomingQueue.FixedCapacityQueueOnly.MediumPacket` | 后台生产线程与主线程并发交接固定队列中的收包结构体，排除复制与缓冲池。 |
 | `BufferBlockCopy_CopiesMediumPackets_WithoutPool` | `Network.IncomingQueue.BlockCopyOnly.MediumPacket` | 只测固定数组间的字节复制，排除缓冲池容器操作。 |
 | `ByteBufferPool_RentsAndReturnsMediumPackets_WithoutCopy` | `Network.IncomingQueue.BufferPoolOnly.MediumPacket` | 只测缓冲池的租用和归还，排除字节复制。 |
 
-全部测试均使用相同的 `10,000` 包、512 B 输入和测量参数。2026-07-15 的第一次归因结果显示：`ConcurrentQueue` 测试为 `GC() = 5`，而包含 `ByteBufferPool.Rent/Return` 的测试为 `GC() = 10005`；因此当前优先怀疑缓冲池容器的入栈/出栈操作，而不是队列。
+全部测试均使用相同的 `10,000` 包、512 B 输入和测量参数。2026-07-15 的第一次归因结果显示：旧 `ConcurrentQueue` 测试为 `GC() = 5`，而包含 `ByteBufferPool.Rent/Return` 的测试为 `GC() = 10005`；因此当时优先怀疑缓冲池容器的入栈/出栈操作，而不是队列。
 
 2026-07-15 的第二次归因结果显示：纯 `Buffer.BlockCopy` 为 `GC() = 5`，仅 `ByteBufferPool.Rent/Return` 为 `GC() = 10005`。这确认了分配来自旧版缓冲池的 `ConcurrentStack` 内部节点，而不是字节复制或收包队列。
 
-当前 `ByteBufferPool` 已改为每桶内部加锁的 `byte[][]` 槽位栈，并设置单数组 1 MB、单桶 8 MB、全局 32 MB 的保留上限。下一次运行时，应重跑“仅租用/归还”和完整交接测试：稳定样本的 `GC()` 目标是接近当前测试环境的基础值 `5`。首次预热、池扩容或工作负载超过保留上限时仍可能发生数组分配，这是容量不足的正常诊断信号。
+当前 `ByteBufferPool` 已改为每桶内部加锁的 `byte[][]` 槽位栈，并设置单数组 1 MB、单桶 8 MB、全局 32 MB 的保留上限；正式收包队列也已替换为预分配、`lock` 保护的固定容量环形队列。下一次运行时，应重跑“仅租用/归还”、固定队列并发交接和完整交接测试：稳定样本的 `GC()` 目标是接近当前测试环境的基础值 `5`。首次预热、池扩容或工作负载超过保留上限时仍可能发生数组分配，这是容量不足的正常诊断信号。
 
 缓冲池改造后，除已有四条性能测试外，还应在 EditMode 中运行 `ByteBufferPoolTests`。它验证同尺寸数组会被复用，并验证多个线程同时执行 `Rent/Return` 时不会返回无效数组或产生并发异常。
 
@@ -198,3 +212,97 @@ Protobuf 基线稳定后，第三项先测试网络线程到主线程的收包�
 每组各处理 `10,000` 条固定输入。它们不包含真实 Socket、跨线程队列、日志和业务 I/O，目的是在可重复条件下比较框架编解码路径；端到端 TCP/UDP/KCP 冒烟仍需要单独场景验证。
 
 详细的长期优化顺序见 [优化路线图](OptimizationRoadmap.md)。
+
+## 2026-07-28 Android 首次运行结论与校准
+
+首次报告来自 Xiaomi 23116PN5BC、Android 16 API 36、Unity 2021.3.45f2 Development，共 `39` 条样本；TCP、KCP、UDP 均无失败、未收和断连，证明本机回环功能链路通过。原始 JSON/CSV 保存在开发机 `~/AndroidBenchmark/20260728_143449/`。
+
+该版本的正常消息循环逐条 `await network.SendAsync(...)`。TCP/UDP 的等待包含底层异步 socket 写入，三个目标速率分别只约达到 `15` 与 `31` 条/秒；KCP 当时同步写入自身发送缓冲，才接近设定速率。因此这些 TCP/UDP 正常消息和停顿样本**不能**用作传输吞吐、入站队列容量或 Handler 性能结论。
+
+后续基准改用 `TrySend` 固定速率投递，并记录 `OfferedCount`（尝试）、`SentCount`/接受数、`RejectedCount`（有界队列拒绝）和 `ReceivedCount`（Handler 已接收）。旧 `ConcurrentQueue` 微基准只覆盖预热后的特定模式，不能证明扩容路径不分配；正式收包队列必须以真正并发的固定队列压力测试验证稳定 GC。
+
+## 2026-07-29 固定收包队列并发基线
+
+在同一台 Mac 的 EditMode 中连续运行三次 `NetworkIncomingQueuePerformanceTests`。每个时间为处理 `10,000` 个 `512 B` 包的样本中位数；`GC()` 为 Performance Test Framework 采样计数。
+
+| Sample Group | 三次中位值（ms） | 汇总中位值（ms） | 稳定 GC() |
+| --- | ---: | ---: | ---: |
+| `Network.IncomingQueue.FixedCapacityQueueOnly.MediumPacket` | `3.506 / 3.791 / 3.638` | `3.638` | `6 / 6 / 6` |
+| `Network.IncomingQueue.BufferPoolOnly.MediumPacket` | `1.427 / 1.434 / 1.432` | `1.432` | `6 / 6 / 6` |
+| `Network.IncomingQueue.MediumPacket` | `5.945 / 8.826 / 7.635` | `7.635` | `6 / 6 / 6` |
+
+纯 `BlockCopy` 的三次中位值为 `0.161 / 0.154 / 0.158 ms`，可作为测试环境参考。第一次完整交接运行有一个 `GC() = 1037` 的单一样本，拉高了该次平均值，但其中位数仍为 `6`；后两次所有样本均稳定为 `6`。因此该单点视为首轮 Editor/性能框架预热扰动，不作为正式收包队列的稳定分配证据。
+
+在当前测试条件下，固定队列的稳定 `GC()` 与纯复制、缓冲池测试的环境基线一致，且没有表现出运行期扩容分配。它证明的是此容量、包长和单生产者/单消费者交错模型下的稳定性；不等同于任意真实业务负载下永不分配，Android 端仍需用 `TrySend` 压测验证队列峰值与拒绝情况。
+
+## 2026-07-29 Android 第二次运行：RPC 调度诊断，不计入基线
+
+报告目录为开发机 `~/AndroidBenchmark/20260729_142339/`，Player 正常结束并导出 `39` 条样本。但该版本的 RPC 负载循环在每次补发后使用 `MTask.Yield()`；该 API 的语义是把续体重新放到当前执行器队列尾部，并不保证等到 Unity 下一帧。主线程执行器会在同一次 Drain 中继续取出该续体，因此 UDP 的 RPC 第 2、3 轮在约 `4.9 s` 内达到 `500,000` 条安全上限并全部失败，不能作为 RPC 吞吐或稳定性基线。
+
+本轮采用的判定语义如下：目标速率完整达到、`RejectedCount/FailureCount/DroppedCount` 均为零且中压（`1,000` 条/秒）P99 不高于 `50 ms`，即为“通过并冻结”；高压 `5,000` 条/秒允许记录更高 P99，但不得拒绝或丢失。RPC 必须在预定测量时间内完成，且不能由压测执行器自身的调度方式制造失败；主线程停顿场景以停顿结束后的 `QueueRecoveryMilliseconds` 不高于 `50 ms` 为通过条件。
+
+| 条目 | 结果 | 证据与结论 | 后续动作 |
+| --- | --- | --- | --- |
+| TCP 普通消息 `100/s`，三轮 | 通过并冻结 | 零拒绝、零失败、零丢失；P99 中位 `35.898 ms`。 | 不重测，除非改动 TCP/正式队列/序列化。 |
+| KCP 普通消息 `100/1000/5000/s`，九轮 | 通过并冻结 | 三档均零拒绝、零失败、零丢失；`1000/s` P99 中位 `47.495 ms`；`5000/s` 达到约 `4,994/s`。高压 P99 中位 `58.536 ms` 作为基线记录。 | 不重测，除非改动 KCP/正式队列/序列化。 |
+| KCP 主线程停顿 | 通过并冻结 | `2 s` 停顿后恢复 `15.895 ms`，全部 `2,999` 条已接收。 | 不重测，除非改动入站队列或主线程派发。 |
+| UDP 普通消息 `100/s`，三轮 | 通过并冻结 | 零拒绝、零失败、零丢失；P99 中位 `36.339 ms`。 | 不重测，除非改动 UDP/正式队列/序列化。 |
+| TCP 普通消息 `1000/5000/s` 与 TCP 主线程停顿 | 未通过 | 两档分别约 `58%/91%` 的 `TrySend` 被拒绝，P99 约 `2.6 s`；停顿恢复达到 `2 s` 超时上限。 | 先定位 TCP 出站发送器/传输写入吞吐，再只重测这三项。 |
+| UDP 普通消息 `1000/5000/s` | 未通过 | 两档分别约 `13%/82%` 的 `TrySend` 被拒绝，P99 约 `1.2 s`。 | 先定位 UDP 出站发送器/传输写入吞吐，再只重测这两项。 |
+| TCP/KCP/UDP RPC | 本轮无效，必须重测 | `MTask.Yield()` 在同一次 Drain 内恢复，错误制造 RPC 启动风暴；UDP 第 2、3 轮约 `4.9 s` 即达到 `500,000` 上限。 | 修正调度后先跑 RPC 快速回归，再跑 RPC 专项基线。 |
+| TCP/UDP 主线程停顿（除 KCP 外） | 暂不判定 | 依赖未通过或无效的前置高频/RPC 状态；TCP 恢复超时，UDP 未能发送样本。 | 在对应普通消息或 RPC 问题修复后才重测。 |
+
+后续版本将 RPC 补发改为 `await MTask.Delay(1)`，每次最多发起 `8` 个请求；每次补发前读取客户端可靠出站队列，达到 `16` 包高水位就等待。它通过执行器定时器至少等待一个调度间隔，既不在同一次 Drain 中制造任务风暴，又能保持 `64` 并发目标，并为心跳和服务端响应保留可靠队列容量。
+
+日常修改不应重复运行完整 `39` 条 Android 样本。修改 RPC 或可靠出站队列后，先运行 `-networkBenchmark -networkBenchmarkRpcQuick`，它在三种传输上各运行一轮 `15` 秒 RPC，共导出 `3` 条结果；通过后如需正式 RPC 对比，再运行 `-networkBenchmark -networkBenchmarkRpcOnly` 导出 `9` 条结果。对于本轮 TCP/UDP 高频普通消息问题，修复后只运行对应传输和对应速率；默认完整 `39` 条只用于共享网络核心、序列化、正式入站/出站队列、传输实现变更后的版本基线归档。
+
+## 2026-07-29 RPC 快速回归：控制入站队列容量不足，不计入基线
+
+报告目录为开发机 `~/AndroidBenchmark/20260729_145729/`，三种传输均走完流程并导出 `3` 条结果。但该版本把“流程未抛异常”显示为 `PASS`，并不等于 RPC 样本质量通过；报告中的 TCP 为 `278` 发起、`241` 成功、`37` 失败，KCP 为 `6,110` 发起、`6,047` 成功、`63` 失败，只有 UDP 为零失败。
+
+TCP 与 KCP 的 `PeakQueuePacketCount` 都恰为旧的控制入站队列上限 `32`，分别出现约 `3.10 s` 与 `101 ms` 的 P99。结合 RPC 请求和响应在本机回环中共享同一个 `NetworkMessageComponent` 的控制队列，这强烈指向 64 并发 RPC 的双向短时积压撞到了 32 槽上限；旧报告未记录控制队列拒绝数，因此仍须以修正后的快照复测确认。这不是 `MTask.Delay(1)` 的同 Drain 启动风暴复现，也不能被当作网络可靠性已通过。
+
+后续修正把控制入站固定容量提高到 `256` 包（字节上限仍为 `64 KiB`，保持有界），并把控制/数据入站拒绝数写入快照与 CSV/JSON。RPC 快速与专项模式同时改为：只要任一 RPC 样本出现失败、未收或入站拒绝，仍然导出报告，但最终状态为 `NETWORK_BENCHMARK: FAIL`，退出码为 `1`。因此下一步只重跑 3 条 RPC 快速回归；它零失败、零未收、零入站拒绝后，才允许运行 9 条 RPC 专项基线。
+
+修正后的快速报告为 `~/AndroidBenchmark/20260729_151846/`。TCP、KCP、UDP 均为零失败、零未收、零入站拒绝，控制队列峰值分别为 `55`、`41`、`17`，均低于 `256`；这确认旧的 `32` 包控制容量确实无法覆盖本机 64 并发 RPC 的双向短时积压。该轮只有一次 `15 s` 样本，且 TCP/UDP 的 P99 仍为 `3,796.680 ms` 与 `463.802 ms`（KCP 为 `102.118 ms`），因此它只冻结“可靠性恢复”结论，不冻结吞吐与延迟基线；下一步运行 9 条 RPC 专项，以三轮中位数决定 TCP/UDP 是否需要继续优化。
+
+## 2026-07-29 RPC 专项基线：可靠性通过，TCP/UDP 仍需降延迟
+
+报告目录为 `~/AndroidBenchmark/20260729_153127/`，Xiaomi 23116PN5BC、Android 16、Unity 2021.3.45f2 Development。三种传输各三轮 `60 s`、64 并发 RPC 均为零失败、零未收、零断线、零入站拒绝，因此控制队列 `256` 包 / `64 KiB` 作为当前压测配置的可靠性容量已通过并冻结；不再需要重复这项容量验证，除非修改入站队列、RPC 并发目标或协议包体大小。
+
+| 传输 | 吞吐中位数（次/秒） | P50 中位数 | P95 中位数 | P99 中位数 | 队列峰值中位数 | 结论 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| TCP | `16.921` | `3,828.608 ms` | `4,228.805 ms` | `4,393.796 ms` | `65` 包 | 可靠性通过，但本机回环延迟不可接受，必须优化。 |
+| KCP | `461.096` | `66.840 ms` | `99.241 ms` | `102.056 ms` | `46` 包 | 可靠性通过；作为当前 KCP RPC 基线冻结。首轮单次 `1,076.929 ms` 最大值视为孤立扰动，三轮 P99 稳定。 |
+| UDP | `48.382` | `368.176 ms` | `467.687 ms` | `501.099 ms` | `16` 包 | 可靠性通过，但本机回环延迟偏高，必须优化。 |
+
+TCP 的连续 P50 约 `3.8 s`、UDP 的连续 P50 约 `368 ms`，与 KCP 的约 `67 ms` 形成数量级差异；它们不是队列容量问题，因为三者均零入站拒绝，且 TCP/KCP 峰值低于 `256`。当前根因假设是：会话出站发送器从 Unity 主线程启动，TCP/UDP 的底层 Socket 异步写入每次恢复都受主线程帧调度影响；KCP 的 `SendAsync` 同步交给自身发送缓冲，未经历同样的逐包等待。
+
+随后曾进行“将全部出站发送泵切到既有 `MTaskExecutors.Network`”的快速验证，报告目录为 `~/AndroidBenchmark/20260729_155243/`。虽然三种传输均零失败、零未收、零拒绝，但 TCP / KCP / UDP 的 P99 分别为 `2,201.055 ms` / `1,898.605 ms` / `1,895.775 ms`；相比本节的专项基线，KCP 与 UDP 均显著恶化。因此该方案不成立，已撤回。结合 `MTaskExecutors.Network` 是接收循环、KCP 更新循环和该发送泵共用的单一专用执行器，最合理的解释是新增发送工作与既有网络任务发生了执行器争用；这是基于测量的推断。
+
+独立出站线程方案没有直接证据证明能解决 TCP/UDP 的根因，已在进入下一次真机测试前撤回，不纳入当前架构。下一步先在原执行模型下记录客户端/服务端的出站排队等待、底层传输写入等待，以及入站队列等待；仅在这些分段指标证明调度位置是瓶颈后，才重新评估执行器隔离方案。该诊断只运行 3 条 RPC 快速回归，不进入性能基线。
+
+诊断报告会新增以下字段，只有由 `NetworkBenchmarkRunner` 启动的压测会启用采样，正式业务默认不记录这些时间戳：
+
+| 字段组 | 计时边界 | 用途 |
+| --- | --- | --- |
+| `ClientOutboundQueueWait*` | 客户端业务包进入出站队列 → 开始调用传输 `SendAsync` | 数值高表示客户端发送泵未被及时调度或前一包写入阻塞。 |
+| `ClientTransportSend*` | 客户端调用传输 `SendAsync` → 该操作完成 | 数值高表示 TCP/UDP/KCP 传输写入路径本身或其续体等待较长。 |
+| `ServerOutboundQueueWait*` / `ServerTransportSend*` | 本机服务端回包对应的相同两段 | 用来区分慢点是在 RPC 请求方向还是响应方向。 |
+| `IncomingQueueWait*` | 网络线程复制入站包 → Unity 主线程开始处理 | 数值高表示主线程收包派发是瓶颈；该值合并客户端和服务端两个方向。 |
+
+这四组数据不是端到端延迟的简单相加：它们不包含 Protobuf 编解码、RPC Handler 业务逻辑和 RPC 完成后的调度等待。但它们足以把下一步方向限定为“出站泵调度”“底层传输写入”或“主线程入站派发”之一，避免再凭现象修改线程模型。
+
+## 2026-07-30 RPC 分段诊断：已定位为串行等待发送，不是队列容量或“需要新线程”
+
+报告目录为 `~/AndroidBenchmark/20260729_161352/`；目录名使用 UTC，等价于北京时间 `2026-07-30 00:13:52`。三种传输均零失败、零未收、零拒绝，说明本轮仅用于定位性能，不存在可靠性回归。
+
+| 传输 | 端到端 P50 | 客户端出站排队平均 | 客户端传输 `SendAsync` 平均 | 服务端出站排队平均 | 服务端传输 `SendAsync` 平均 | 入站队列平均等待 | 结论 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| TCP | `2,911.708 ms` | `642.259 ms` | `52.057 ms` | `0.023 ms` | `51.871 ms` | `1,003.050 ms` | 客户端发送泵排队与入站主线程等待均严重；`SendAsync` 完成路径约 52 ms，不能在入站循环中逐包等待。 |
+| KCP | `66.825 ms` | `0.005 ms` | `0.021 ms` | `0.004 ms` | `0.013 ms` | `22.064 ms` | 所有出站段接近零，证明固定队列、缓冲池和 64 并发控制容量不是当前瓶颈。 |
+| UDP | `364.990 ms` | `303.620 ms` | `19.381 ms` | `0.008 ms` | `0.167 ms` | `25.556 ms` | 首要慢点是客户端发送泵逐包等待，服务端回包和入站队列不是主因。 |
+
+代码路径给出了可验证的因果关系：`ProcessQueueAsync` 逐包 `await HandleIncoming`；RPC 请求的 `HandleIncoming` 又在主线程入站处理循环中 `await session.SendOwnedAsync(...)`，直到底层传输 `SendAsync` 完成才处理下一包。TCP 服务端单包处理最大值为 `69.130 ms`，与其服务端发送完成路径 `51.871 ms` 同量级，直接佐证该等待阻塞了入站消费。客户端的 `NetworkOutboundQueue.DrainAsync` 同样逐包等待 `transport.SendAsync`，所以 TCP/UDP 的完成路径分别约 `52 ms` / `19 ms` 时，64 个并发请求会在客户端队列中形成约 `642 ms` / `304 ms` 的等待。
+
+因此，下一项修改不是增加线程或复制 KCP 缓冲，而是让 RPC 响应在已成功进入可靠出站队列后立刻释放入站处理循环；若可靠队列已满或会话断开，必须明确记录并按现有拥堵/断线语义失败，不能静默丢弃。该修改后只重跑 3 条 RPC 快速回归，重点观察 TCP/UDP 的客户端出站排队、入站队列等待与端到端延迟是否下降；KCP 不应回退。

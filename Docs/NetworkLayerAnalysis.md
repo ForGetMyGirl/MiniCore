@@ -201,3 +201,9 @@ Global.RegisterAppService<INetworkService, NetworkService>()
 4. RPC Response 保留 `Code`、`Msg` 字段，且 `RpcId` 没有加入 Proto Body。
 5. Protobuf、完整入站包、RPC 相关性能测试仍可从 `Assets/Tests/Editor` 执行。
 6. 构建前校验通过；HotUpdate DLL 与所需 AOT 元数据均已进入 YooAsset 包。
+
+## 7. 高频发送与固定容量队列
+
+正式收包路径使用预分配数组、`lock` 保护的固定环形队列，而不是运行期可扩容的并发容器：普通队列全局上限为 `4096` 包或 `4 MiB`，单会话上限为 `1024` 包或 `1 MiB`；Ping/Pong 与带 `RpcId` 的包使用独立的 `256` 包 / `64 KiB` 控制保留容量。拒绝时不复制也不租用缓冲；快照会分别记录控制与普通队列拒绝数；同一会话持续满载三秒会被断开，重连策略由业务决定。
+
+每个 `NetworkSession` 还有唯一的出站发送器。`SendAsync`、RPC 和心跳进入可靠保留队列并等待底层写入；高频状态同步调用 `TrySend`，它只尝试进入数据队列并返回 `Accepted`、`QueueFull`、`Disconnected` 或 `SessionNotFound`，不等待 socket。Protobuf 直接写入发送器拥有的租用数组，发送、拒绝、异常和断线清理都会归还数组。`NetworkSession.GetOutboundQueueSnapshot()` 提供两条队列的当前包数、字节数与累计拒绝数，供压测执行器依据可靠队列余量进行背压调度；它不暴露或转移待发送缓冲区。

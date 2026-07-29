@@ -131,6 +131,7 @@ HotUpdateScene
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
+| HybridCLR、YooAsset 首包构建与在线热更新发布 | [打包与热更新流程](Docs/BuildAndHotUpdateWorkflow.md) |
 | 性能基线、测试方法和优化路线 | [性能测试指南](Docs/PerformanceTestingGuide.md) / [优化路线图](Docs/OptimizationRoadmap.md) |
 | AI 或自动化修改前应遵循的边界与验证 | [AI 项目上下文](Docs/AI_CONTEXT.md) |
 

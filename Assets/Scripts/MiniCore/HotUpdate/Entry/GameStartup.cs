@@ -30,6 +30,12 @@ namespace MiniCore.HotUpdate
                 return;
             }
 
+            if (NetworkBenchmarkRunner.HasCommandLineArgument(NetworkBenchmarkRunner.RunArgument))
+            {
+                CreateNetworkBenchmarkRunnerIfRequested();
+                return;
+            }
+
             CreateScenePanel();
             CreateNetworkSmokeTestRunnerIfRequested();
             CreateDedicatedClientSmokeTestRunnerIfRequested();
@@ -70,6 +76,21 @@ namespace MiniCore.HotUpdate
             GameObject testObject = new GameObject("NetworkSmokeTestRunner");
             UnityEngine.Object.DontDestroyOnLoad(testObject);
             testObject.AddComponent<NetworkSmokeTestRunner>();
+        }
+
+        /// <summary>
+        /// 当客户端以网络压测参数启动时创建无测试面板的自动化压测组件。
+        /// </summary>
+        private static void CreateNetworkBenchmarkRunnerIfRequested()
+        {
+            if (!NetworkBenchmarkRunner.HasCommandLineArgument(NetworkBenchmarkRunner.RunArgument) || UnityEngine.Object.FindObjectOfType<NetworkBenchmarkRunner>() != null)
+            {
+                return;
+            }
+
+            GameObject testObject = new GameObject("NetworkBenchmarkRunner");
+            UnityEngine.Object.DontDestroyOnLoad(testObject);
+            testObject.AddComponent<NetworkBenchmarkRunner>();
         }
 
         /// <summary>
