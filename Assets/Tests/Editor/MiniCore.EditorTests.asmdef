@@ -8,6 +8,7 @@
     "MiniCore.Network",
     "MiniCore.Unity",
     "MiniCore.HotUpdate",
+    "MiniCore.Editor",
     "Unity.PerformanceTesting"
   ],
   "includePlatforms": [

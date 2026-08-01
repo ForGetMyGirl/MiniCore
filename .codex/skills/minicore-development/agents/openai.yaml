@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniCore Development Navigator"
+  short_description: "快速定位 MiniCore 架构、模块与开发入口。"
+  default_prompt: "Use $minicore-development to locate the right MiniCore module and implement this task."
