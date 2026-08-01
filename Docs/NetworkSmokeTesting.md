@@ -42,9 +42,14 @@
 | 剩余普通消息快速回归 | `-networkBenchmarkRemainingNormalQuick` | `6` | 只复查未冻结的 TCP/UDP `1000/s`、`5000/s` 各 1 轮及各自主线程停顿；预计约 5 分钟。 |
 | TCP 普通消息专项快速回归 | `-networkBenchmarkTcpNormalQuick` | `2` | 只复查 TCP `1000/s`、`5000/s` 各 1 轮；适用于仅改动 TCP 传输收发或拆包路径，不运行 UDP、KCP、RPC 或主线程停顿。预计约 3 分钟。 |
 | UDP 普通消息专项快速回归 | `-networkBenchmarkUdpNormalQuick` | `1` | 复查 UDP `5000/s` 一轮；当前该条目已通过，后续仅在 UDP 传输或 `TrySend` 合包路径变更时运行。不会重复已冻结的 `1000/s`，也不运行 TCP、KCP、RPC 或主线程停顿。预计约 90 秒。 |
+| 三协议中负载分段诊断 | `-networkBenchmarkMediumNormalDiagnostic` | `3` | TCP/KCP/UDP 各运行 `1000/s` 一轮，仅定位共同端到端 P99；不运行 `100/s`、`5000/s`、RPC 或主线程停顿，预计约 4 分钟。 |
 | 完整基线 | 无额外范围参数 | `39` | 发布前，或改动共享网络核心、Protobuf 封包、正式入站/出站队列、传输实现时。 |
 
 报告包含设备/系统/Unity/构建类型、发送/接收/失败/未收数量、吞吐、P50/P95/P99、队列消息与字节积压峰值、入站队列拒绝数、单包主线程处理峰值、`GC Allocated In Frame` 峰值、断连数及停顿恢复耗时。TCP 专项还会记录 `ServerTransportFramedPacketCount`、`ServerTransportDispatchedPacketCount`、`ServerTransportReceiveOperation*` 和 `ClientSocketSendOperation*`，用于定位粘包拆包、Socket I/O 与发送泵等待的边界；UDP `TrySend` 合包生效时，`ClientTransportWriteCount` 应小于逻辑 `SentCount`，两者比值用于验证减少了实际 datagram 写入，而不是改变投递负载。这些计时只在压测开启。任一样本只要出现失败、未收、出站/入站拒绝或断线，仍会写出完整报告，但最终状态为 `NETWORK_BENCHMARK: FAIL`，不能进入基线；主线程停顿样本恢复超过 `50 ms` 同样失败。每次运行后应将目录从设备取回，并将三次重复样本的中位数补入性能测试指南；它是决定是否引入有界入站队列和主线程处理预算的依据，不替代真实服务端和公网链路压测。
+
+中负载分段诊断额外导出两组固定时间桶百分位：网络线程入队到主线程开始处理的等待时间，以及主线程开始处理到 `HandleIncoming` 完成的单包处理时间。两组均为 P50/P95/P99，桶精度 `0.25 ms`、覆盖到 `1024 ms`，更大值记入溢出桶；仅在压测采样开启时记录，不写逐包字符串、不创建逐包对象，也不改变收发或队列调度。若其中一组 P99 接近端到端 P99，即定位到相应边界；若两组都低，下一轮才补充发送后、传输写入后与接收入队前的同序列号时间戳。
+
+当前正式性能基线为 `~/AndroidBenchmark/20260801_124241/`（UTC `2026-08-01 12:42:41` / 北京时间 `20:42:41`）：Editor 三协议回环和 Android `39` 条均通过。正常消息 `1000/s` 的三轮 P99 为 TCP `39.038–39.315 ms`、KCP `48.600–48.784 ms`、UDP `38.661–38.907 ms`；所有样本零失败、零未收、零拒绝和零断线。该基线取代 `20260801_110649` 的失败候选；后者仍保留为“曾出现但当前未复现”的诊断历史，而不是被删除或改写。
 
 ## 范围
 

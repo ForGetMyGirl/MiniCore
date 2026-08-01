@@ -51,6 +51,8 @@ namespace MiniCore.Service
         private long incomingQueueWaitSampleCount; // 当前统计周期内完成入站队列等待采样的包数量。
         private long totalIncomingQueueWaitTicks; // 网络线程入队到主线程开始处理的累计 Stopwatch tick。
         private long maxIncomingQueueWaitTicks; // 网络线程入队到主线程开始处理的最大 Stopwatch tick。
+        private readonly NetworkTimingHistogram incomingQueueWaitHistogram = new NetworkTimingHistogram(); // 仅压测启用的入站等待百分位时间桶。
+        private readonly NetworkTimingHistogram incomingPacketProcessHistogram = new NetworkTimingHistogram(); // 仅压测启用的主线程单包处理百分位时间桶。
         private long incomingControlRejectedPacketCount; // 统计周期内控制保留入站队列或单会话预算拒绝的包数量。
         private long incomingDataRejectedPacketCount; // 统计周期内普通数据入站队列或单会话预算拒绝的包数量。
         private int processingQueue; // 收包队列处理任务的互斥标志。
@@ -538,6 +540,8 @@ namespace MiniCore.Service
         {
             long maxProcessTicks = Interlocked.Read(ref maxIncomingPacketProcessTicks);
             long queueWaitSamples = Interlocked.Read(ref incomingQueueWaitSampleCount);
+            NetworkTimingPercentileSummary queueWait = incomingQueueWaitHistogram.GetSummary();
+            NetworkTimingPercentileSummary packetProcess = incomingPacketProcessHistogram.GetSummary();
             return new NetworkIncomingQueueSnapshot(
                 Interlocked.Read(ref incomingPacketCount),
                 Interlocked.Read(ref incomingPacketBytes),
@@ -545,9 +549,15 @@ namespace MiniCore.Service
                 Interlocked.Read(ref peakIncomingPacketBytes),
                 Interlocked.Read(ref processedIncomingPacketCount),
                 maxProcessTicks * 1000d / Stopwatch.Frequency,
+                packetProcess.P50Milliseconds,
+                packetProcess.P95Milliseconds,
+                packetProcess.P99Milliseconds,
                 queueWaitSamples,
                 ToAverageMilliseconds(Interlocked.Read(ref totalIncomingQueueWaitTicks), queueWaitSamples),
                 ToMilliseconds(Interlocked.Read(ref maxIncomingQueueWaitTicks)),
+                queueWait.P50Milliseconds,
+                queueWait.P95Milliseconds,
+                queueWait.P99Milliseconds,
                 Interlocked.Read(ref incomingControlRejectedPacketCount),
                 Interlocked.Read(ref incomingDataRejectedPacketCount));
         }
@@ -1791,6 +1801,10 @@ namespace MiniCore.Service
                         long elapsedTicks = Stopwatch.GetTimestamp() - startedTicks;
                         Interlocked.Increment(ref processedIncomingPacketCount);
                         UpdateMaximum(ref maxIncomingPacketProcessTicks, elapsedTicks);
+                        if (Volatile.Read(ref incomingTimingMetricsEnabled) != 0)
+                        {
+                            incomingPacketProcessHistogram.Record(elapsedTicks);
+                        }
                         ByteBufferPool.Shared.Return(packet.Buffer);
                     }
                 }
@@ -1836,6 +1850,7 @@ namespace MiniCore.Service
             Interlocked.Increment(ref incomingQueueWaitSampleCount);
             Interlocked.Add(ref totalIncomingQueueWaitTicks, elapsedTicks);
             UpdateMaximum(ref maxIncomingQueueWaitTicks, elapsedTicks);
+            incomingQueueWaitHistogram.Record(elapsedTicks);
         }
 
         /// <summary>
@@ -1846,6 +1861,8 @@ namespace MiniCore.Service
             Interlocked.Exchange(ref incomingQueueWaitSampleCount, 0);
             Interlocked.Exchange(ref totalIncomingQueueWaitTicks, 0);
             Interlocked.Exchange(ref maxIncomingQueueWaitTicks, 0);
+            incomingQueueWaitHistogram.Reset();
+            incomingPacketProcessHistogram.Reset();
         }
 
         /// <summary>
