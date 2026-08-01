@@ -1128,7 +1128,12 @@ namespace MiniCore.Service
                         LogSwitch.Info($"[{sendTime}] 发送RPC响应内容: {payloadText}");
                     }
                     byte[] packet = BuildPacket(respOpcode, rpcId, response, out int packetLength);
-                    await session.SendOwnedAsync(packet, packetLength);
+                    NetworkSendResult sendResult = session.TrySendReliableOwned(packet, packetLength);
+                    if (sendResult != NetworkSendResult.Accepted)
+                    {
+                        LogSwitch.Error($"RPC响应未能进入可靠出站队列，opcode:{respOpcode} 会话:{session.SessionId} 原因:{sendResult}。");
+                        session.Close();
+                    }
                 }
                 catch (Exception ex)
                 {

@@ -137,6 +137,30 @@ namespace MiniCore.Model
         }
 
         /// <summary>
+        /// 尝试读取最早入队的数据包但不将其移出队列。
+        /// 该方法用于单一消费者在组装有界批量前确认下一包大小，不会触发扩容或改变队列统计。
+        /// </summary>
+        /// <param name="packet">成功时返回当前队首数据包。</param>
+        /// <param name="byteLength">成功时返回队首数据包的有效字节数。</param>
+        /// <returns>队列非空时返回 true。</returns>
+        public bool TryPeek(out TPacket packet, out int byteLength)
+        {
+            lock (syncRoot)
+            {
+                if (count == 0)
+                {
+                    packet = default;
+                    byteLength = 0;
+                    return false;
+                }
+
+                packet = packets[head];
+                byteLength = packetLengths[head];
+                return true;
+            }
+        }
+
+        /// <summary>
         /// 获取不改变队列状态的当前计数和统计峰值。
         /// </summary>
         /// <param name="packetCount">返回当前包数量。</param>

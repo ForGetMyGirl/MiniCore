@@ -46,6 +46,28 @@ namespace MiniCore.EditorTests
             Assert.IsTrue(queue.TryEnqueue(3, 16));
         }
 
+        /// <summary>
+        /// 验证读取队首不会改变 FIFO 顺序、计数或字节预算，供 TCP 有界批量在决定是否继续取包前安全判断长度。
+        /// </summary>
+        [Test]
+        public void TryPeek_ReturnsHeadWithoutRemovingPacket()
+        {
+            var queue = new FixedCapacityPacketQueue<int>(2, 128);
+            Assert.IsTrue(queue.TryEnqueue(10, 16));
+            Assert.IsTrue(queue.TryEnqueue(20, 24));
+
+            Assert.IsTrue(queue.TryPeek(out int peekedPacket, out int peekedLength));
+            Assert.AreEqual(10, peekedPacket);
+            Assert.AreEqual(16, peekedLength);
+
+            Assert.IsTrue(queue.TryDequeue(out int dequeuedPacket, out int dequeuedLength));
+            Assert.AreEqual(10, dequeuedPacket);
+            Assert.AreEqual(16, dequeuedLength);
+            Assert.IsTrue(queue.TryDequeue(out int secondPacket, out int secondLength));
+            Assert.AreEqual(20, secondPacket);
+            Assert.AreEqual(24, secondLength);
+        }
+
         #endregion
     }
 }

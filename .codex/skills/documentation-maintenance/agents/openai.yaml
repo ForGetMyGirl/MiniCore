@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation Maintenance"
+  short_description: "Keep MiniCore documentation ordered and consistent."
+  default_prompt: "Use $documentation-maintenance to update MiniCore documentation consistently."

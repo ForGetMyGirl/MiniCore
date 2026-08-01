@@ -53,6 +53,43 @@ namespace MiniCore.Model
         }
 
         /// <summary>
+        /// 启用或关闭当前会话底层传输的收发边界诊断。
+        /// 非支持该诊断的传输会安全忽略本调用。
+        /// </summary>
+        /// <param name="enabled">为 true 时记录 Socket 收发、完整帧读取与收包回调完成数量。</param>
+        public void SetTransportDiagnosticsEnabled(bool enabled)
+        {
+            if (Transport is ITransportDiagnosticsNetworkTransport diagnosticsTransport)
+            {
+                diagnosticsTransport.SetTransportDiagnosticsEnabled(enabled);
+            }
+        }
+
+        /// <summary>
+        /// 获取当前会话底层传输的收包边界诊断快照。
+        /// 非支持该诊断的传输返回零计数快照。
+        /// </summary>
+        /// <returns>当前会话完整帧读取和收包回调派发完成数量。</returns>
+        public NetworkTransportReceiveSnapshot GetTransportReceiveSnapshot()
+        {
+            return Transport is ITransportDiagnosticsNetworkTransport diagnosticsTransport
+                ? diagnosticsTransport.CaptureReceiveDiagnostics()
+                : default;
+        }
+
+        /// <summary>
+        /// 获取当前会话底层传输的 Socket 发送操作诊断快照。
+        /// 非支持该诊断的传输返回零计数快照。
+        /// </summary>
+        /// <returns>当前会话 Socket 发送操作的完成次数与等待时间。</returns>
+        public NetworkTransportSendSnapshot GetTransportSendSnapshot()
+        {
+            return Transport is ITransportDiagnosticsNetworkTransport diagnosticsTransport
+                ? diagnosticsTransport.CaptureSendDiagnostics()
+                : default;
+        }
+
+        /// <summary>
         /// 使用给定标识和传输实现创建逻辑会话。
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
@@ -92,6 +129,18 @@ namespace MiniCore.Model
         internal MTask SendOwnedAsync(byte[] buffer, int length)
         {
             return outboundQueue.EnqueueReliableAsync(buffer, length, true);
+        }
+
+        /// <summary>
+        /// 尝试将已封装的可靠业务包放入保留出站队列，但不等待底层传输完成写入。
+        /// 该方法仅适合调用方已有明确的队满/断线失败处理时使用。
+        /// </summary>
+        /// <param name="buffer">由会话发送器在所有结果路径归还的完整业务包数组。</param>
+        /// <param name="length">数组中有效业务包长度。</param>
+        /// <returns>本次尝试的会话与可靠队列状态。</returns>
+        internal NetworkSendResult TrySendReliableOwned(byte[] buffer, int length)
+        {
+            return outboundQueue.TryEnqueueReliable(buffer, length, true);
         }
 
         /// <summary>

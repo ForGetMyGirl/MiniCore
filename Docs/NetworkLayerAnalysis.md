@@ -144,17 +144,27 @@ public sealed class EnterBattleHandler
 
 | Transport | 业务包承载方式 |
 | --- | --- |
-| TCP | `length int32 big-endian + packet`，由 `LengthPrefixedTcpTransportBase` 处理粘包/半包 |
-| UDP | 一个 datagram 对应一个业务 packet |
+| TCP | `length int32 big-endian + packet`，由 `LengthPrefixedTcpTransportBase` 的连续接收缓冲处理粘包/半包；一次 Socket 接收可解析多个完整帧。 |
+| UDP | `SendAsync`、RPC、心跳为一个 datagram 对应一个业务 packet；`TrySend` 高频普通数据在已有多个待发包时可使用 `MCUB` 批量 datagram，接收端拆回原业务 packet。 |
 | KCP | UDP 承载 KCP 分片，KCP 重组后向上交付完整业务 packet |
 
 `NetworkService` 缓存 Type 到 Opcode 的结果、使用入站并发队列接收数据，并在主线程 Tick 中完成反序列化和业务 Handler 派发。网络线程不调用 Unity API，也不直接执行业务 Handler。
+
+TCP 不按“每包读一次包头、再读一次正文”发起两次异步接收。传输保持一个初始 `64 KiB` 的连续接收缓冲，每次 `Socket.ReceiveAsync` 后从头解析所有可用完整帧；只有一个大帧跨越当前容量时才扩容到该帧所需容量。每个完整业务正文仍复制进独立租用数组，直到 `OnDataReceived` 全部回调完成后归还，因此不会把可重用的连续缓冲暴露给异步订阅者。该设计既保留 TCP 半包/粘包语义，又避免小包高频场景的每包双 I/O 等待。
+
+UDP 的 `TrySend` 数据队列可将已经入队的多个小业务包编码为 `MCUB` v1 datagram：最多 `16` 个业务包、总 datagram 不超过 `1200 B`。发送器不会为了凑满批次等待；当只有一个包或包过大时仍发送原始单包。可靠/控制语义不参与该机制：`SendAsync`、RPC、心跳始终单包并等待写入完成。接收端仅在整个批量格式与每个长度均通过校验后才按原顺序拆包交付；批量 datagram 的 UDP 丢失会丢失其中全部易失性状态消息。`MCUB` 为传输层协议扩展，批量通信要求客户端与服务端同步升级。
 
 ### 执行器与退出
 
 `NetworkService` 在启动时创建并持有自己的网络专用执行器；它不是全局按名称临时开线程的入口。收发、协议拆包和线程安全数据阶段在该执行器上运行，业务 Handler 始终回到 Unity 主线程队列。序列化、AI 或数据库等其他模块若需要线程亲和性，也应分别创建、持有和释放各自的 `MDedicatedThreadExecutor`；短时后台计算则使用共享的 `MTaskExecutors.ThreadPool`。
 
 运行期释放网络组件时，`NetworkSessionComponent.OnDisposing()` 会先关闭监听器、Socket 和会话，解除阻塞 I/O；随后任务域取消，`OnDispose()` 才进行最终回收并正常等待网络线程退出。应用退出或停止 Play Mode 属于快速退出：只发出取消和执行器停止信号，不在 Unity 主线程 Join 网络线程，也不保证未完成收发或 finally 全部完成。
+
+### 客户端与专用服务器的执行边界
+
+当前客户端的 Unity 主线程负责最终 Handler、游戏状态和轻量封包；网络专用执行器负责收包、拆包与线程安全协议阶段；每个会话唯一的出站发送泵在共享 `MTaskExecutors.ThreadPool` 中串行等待底层异步写入。该线程池切换不创建专用线程，也不改变会话内发送顺序：同一会话任意时刻仍仅有一个泵处理一个包；不同会话不应因全局单发送线程而相互排队。
+
+专用服务器连接规模增大后，应按会话稳定分配到有限数量的 I/O 分片，由所属分片负责该会话收包和有序写出；不要把所有会话串到一条全局发送线程。大型快照、压缩或昂贵序列化只能在主线程生成不可变快照后交给后台工作池，并在会话内按顺序提交发送；是否引入以多会话压测证明线程池或编码成为瓶颈为前提。
 
 ## 5. 调用方式
 
@@ -206,4 +216,4 @@ Global.RegisterAppService<INetworkService, NetworkService>()
 
 正式收包路径使用预分配数组、`lock` 保护的固定环形队列，而不是运行期可扩容的并发容器：普通队列全局上限为 `4096` 包或 `4 MiB`，单会话上限为 `1024` 包或 `1 MiB`；Ping/Pong 与带 `RpcId` 的包使用独立的 `256` 包 / `64 KiB` 控制保留容量。拒绝时不复制也不租用缓冲；快照会分别记录控制与普通队列拒绝数；同一会话持续满载三秒会被断开，重连策略由业务决定。
 
-每个 `NetworkSession` 还有唯一的出站发送器。`SendAsync`、RPC 和心跳进入可靠保留队列并等待底层写入；高频状态同步调用 `TrySend`，它只尝试进入数据队列并返回 `Accepted`、`QueueFull`、`Disconnected` 或 `SessionNotFound`，不等待 socket。Protobuf 直接写入发送器拥有的租用数组，发送、拒绝、异常和断线清理都会归还数组。`NetworkSession.GetOutboundQueueSnapshot()` 提供两条队列的当前包数、字节数与累计拒绝数，供压测执行器依据可靠队列余量进行背压调度；它不暴露或转移待发送缓冲区。
+每个 `NetworkSession` 还有唯一的出站发送器。业务侧 `SendAsync`、客户端 `CallAsync` 和心跳进入可靠保留队列并等待底层写入；高频状态同步调用 `TrySend`，它只尝试进入数据队列并返回 `Accepted`、`QueueFull`、`Disconnected` 或 `SessionNotFound`，不等待 socket。服务端处理 RPC 请求时，响应仅在成功进入可靠保留队列后就释放主线程入站循环，不等待底层写入；队满或断线会记录错误并关闭该会话，绝不静默丢弃。Protobuf 直接写入发送器拥有的租用数组，发送、拒绝、异常和断线清理都会归还数组。`NetworkSession.GetOutboundQueueSnapshot()` 提供两条队列的当前包数、字节数与累计拒绝数，供压测执行器依据可靠队列余量进行背压调度；它不暴露或转移待发送缓冲区。

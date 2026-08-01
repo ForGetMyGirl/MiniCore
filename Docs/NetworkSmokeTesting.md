@@ -33,21 +33,26 @@
 
 每种传输会运行正常消息 `100`、`1,000`、`5,000` 条/秒三个档位（每档 `10` 秒预热、`60` 秒正式测量、重复三次）、`64` 并发 RPC（`60` 秒、重复三次）和一次 `2` 秒主线程停顿诊断。RPC 每次最多补发 `8` 个请求，且至少等待 `1 ms` 再补下一次；每次补发前读取可靠出站队列，达到 `16` 包高水位就暂停，始终为心跳和响应保留至少一半的 `32` 槽容量。这样既避免自定义 `MTask.Yield()` 在同一轮执行器 Drain 中被立即再次调度，也能维持 `64` 并发目标。压测开始时关闭普通与 Payload 日志，避免 UI 面板与手工日志影响样本；结果会导出 JSON/CSV 到 `Application.persistentDataPath/NetworkBenchmark/<UTC 时间戳>/`。
 
-不要在每次修改后都运行完整 `39` 条样本。三个启动范围如下：
+不要在每次修改后都运行完整 `39` 条样本。启动范围如下：
 
 | 目的 | Unity 参数（均需同时传入 `-networkBenchmark`） | 预计结果数 | 适用时机 |
 | --- | --- | ---: | --- |
 | RPC 快速回归 | `-networkBenchmarkRpcQuick` | `3` | 改动 RPC 发起节奏、可靠出站队列或 RPC 超时处理后；三种传输各 1 轮、15 秒。 |
 | RPC 专项基线 | `-networkBenchmarkRpcOnly` | `9` | RPC 快速回归通过后，需要三种传输各 3 轮、60 秒的可比较 RPC 数据时。 |
+| 剩余普通消息快速回归 | `-networkBenchmarkRemainingNormalQuick` | `6` | 只复查未冻结的 TCP/UDP `1000/s`、`5000/s` 各 1 轮及各自主线程停顿；预计约 5 分钟。 |
+| TCP 普通消息专项快速回归 | `-networkBenchmarkTcpNormalQuick` | `2` | 只复查 TCP `1000/s`、`5000/s` 各 1 轮；适用于仅改动 TCP 传输收发或拆包路径，不运行 UDP、KCP、RPC 或主线程停顿。预计约 3 分钟。 |
+| UDP 普通消息专项快速回归 | `-networkBenchmarkUdpNormalQuick` | `1` | 复查 UDP `5000/s` 一轮；当前该条目已通过，后续仅在 UDP 传输或 `TrySend` 合包路径变更时运行。不会重复已冻结的 `1000/s`，也不运行 TCP、KCP、RPC 或主线程停顿。预计约 90 秒。 |
 | 完整基线 | 无额外范围参数 | `39` | 发布前，或改动共享网络核心、Protobuf 封包、正式入站/出站队列、传输实现时。 |
 
-报告包含设备/系统/Unity/构建类型、发送/接收/失败/未收数量、吞吐、P50/P95/P99、队列消息与字节积压峰值、入站队列拒绝数、单包主线程处理峰值、`GC Allocated In Frame` 峰值、断连数及停顿恢复耗时。RPC 样本只要出现失败、丢失或入站拒绝，仍会写出完整报告，但最终状态为 `NETWORK_BENCHMARK: FAIL`，不能进入基线。每次运行后应将目录从设备取回，并将三次重复样本的中位数补入性能测试指南；它是决定是否引入有界入站队列和主线程处理预算的依据，不替代真实服务端和公网链路压测。
+报告包含设备/系统/Unity/构建类型、发送/接收/失败/未收数量、吞吐、P50/P95/P99、队列消息与字节积压峰值、入站队列拒绝数、单包主线程处理峰值、`GC Allocated In Frame` 峰值、断连数及停顿恢复耗时。TCP 专项还会记录 `ServerTransportFramedPacketCount`、`ServerTransportDispatchedPacketCount`、`ServerTransportReceiveOperation*` 和 `ClientSocketSendOperation*`，用于定位粘包拆包、Socket I/O 与发送泵等待的边界；UDP `TrySend` 合包生效时，`ClientTransportWriteCount` 应小于逻辑 `SentCount`，两者比值用于验证减少了实际 datagram 写入，而不是改变投递负载。这些计时只在压测开启。任一样本只要出现失败、未收、出站/入站拒绝或断线，仍会写出完整报告，但最终状态为 `NETWORK_BENCHMARK: FAIL`，不能进入基线；主线程停顿样本恢复超过 `50 ms` 同样失败。每次运行后应将目录从设备取回，并将三次重复样本的中位数补入性能测试指南；它是决定是否引入有界入站队列和主线程处理预算的依据，不替代真实服务端和公网链路压测。
 
 ## 范围
 
 该测试验证客户端 HotUpdate 启动后的本机回环。Dedicated Server 仍需通过独立 Server Player 与 Client Player 的 KCP 测试覆盖。
 
-高频普通消息压测使用 `TrySend`，报告必须区分尝试投递、成功入队、队列拒绝和 Handler 已接收。流程通过仅表示链路功能完成，不代表达到目标吞吐；TCP/UDP/KCP 的吞吐、P99、队列峰值与 GC 必须结合报告判读。
+高频普通消息压测使用 `TrySend`，报告必须区分尝试投递、成功入队、队列拒绝和 Handler 已接收。UDP 的 `TrySend` 可在不等待凑包的前提下自动合并已有小包；`SendAsync`、RPC、心跳不合包。流程通过仅表示链路功能完成，不代表达到目标吞吐；TCP/UDP/KCP 的吞吐、P99、队列峰值与 GC 必须结合报告判读。
+
+正常消息 `1000/s` 的自动质量门禁同时要求零拒绝、零失败、零未收、零入站拒绝、零断线且 P99 不高于 `50 ms`；`5000/s` 不设固定 P99 阈值，但仍要求零拒绝、零失败、零未收、零入站拒绝和零断线。主线程停顿场景以停顿后的队列恢复不高于 `50 ms` 判定，刻意注入的停顿本身不计入正常延迟失败。
 
 ## Dedicated Server + Client KCP
 

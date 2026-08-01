@@ -1,6 +1,6 @@
 # MiniCore AI 项目上下文
 
-这是一份给 AI、新成员和自动化工具的快速上下文。处理代码任务前先读本文件，再按需要阅读 [架构总览](Architecture.md)、[强类型事件中心](Eventing.md) 与 [网络与协议](NetworkLayerAnalysis.md)。当代码与本文冲突时，以当前代码和程序集配置为准，并同步修正文档。
+这是一份给 AI、新成员和自动化工具的快速上下文。处理代码任务前先读本文件，再按需要阅读 [架构总览](Architecture.md)、[强类型事件中心](Eventing.md) 与 [网络与协议](NetworkLayerAnalysis.md)。更新 `Docs/` 时同时遵守 [文档维护约定](DocumentationConventions.md)。当代码与本文冲突时，以当前代码和程序集配置为准，并同步修正文档。
 
 ## 项目一句话
 
@@ -101,6 +101,7 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 | Unity 生命周期与 UI 适配 | `Unity/Driver`、`Unity/Mono`、`Unity/UI` |
 | 热更启动/打包 | `Project/Bootstrap/UpdateMainWindow.cs`、`HotUpdate/Entry`、`Editor/HybridCLR` |
 | 性能测试 | `Assets/Tests/Editor`、[性能测试指南](PerformanceTestingGuide.md) |
+| 文档维护 | [文档维护约定](DocumentationConventions.md) |
 
 ## 禁止的“省事”做法
 

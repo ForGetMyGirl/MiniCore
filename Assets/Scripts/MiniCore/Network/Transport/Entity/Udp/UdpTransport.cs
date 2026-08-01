@@ -9,8 +9,10 @@ namespace MiniCore.Model
     /// <summary>
     /// 基于无连接数据报的客户端 UDP 传输实现。
     /// </summary>
-    public class UdpTransport : INetworkTransport
+    public class UdpTransport : INetworkTransport, IDatagramBatchNetworkTransport
     {
+        #region Private 私有成员
+
         private const int MaxDatagramSize = 65507; // UDP 数据报理论最大长度。
         private static readonly TimeSpan DefaultInitTimeout = TimeSpan.FromSeconds(3); // 解析远端地址的默认超时。
 
@@ -18,6 +20,10 @@ namespace MiniCore.Model
         private EndPoint remoteEndPoint; // 发送数据报的远端终结点。
         private CancellationTokenSource receiveCts; // 接收循环取消令牌源。
         private int disconnected; // 断开状态的原子标志。
+
+        #endregion
+
+        #region Public 公共成员
 
         /// <summary>
         /// UDP 套接字是否已建立。
@@ -81,6 +87,10 @@ namespace MiniCore.Model
             await socket.SendToAsync(data, SocketFlags.None, remoteEndPoint).ConfigureAwait(false);
         }
 
+        #endregion
+
+        #region Private 私有成员
+
         /// <summary>
         /// 执行 ReceiveLoopAsync 相关处理。
         /// </summary>
@@ -112,7 +122,7 @@ namespace MiniCore.Model
                             continue;
                         }
 
-                        await InvokeDataReceivedAsync(new ReadOnlyMemory<byte>(buffer, 0, received));
+                        await DispatchReceivedDatagramAsync(new ReadOnlyMemory<byte>(buffer, 0, received));
                     }
                     finally
                     {
@@ -148,6 +158,10 @@ namespace MiniCore.Model
                 Disconnect();
             }
         }
+
+        #endregion
+
+        #region Public 公共成员
 
         /// <summary>
         /// 取消接收循环、关闭套接字并通知断开事件。
@@ -188,6 +202,25 @@ namespace MiniCore.Model
             Disconnect();
         }
 
+        #endregion
+
+        #region Interface 接口实现
+
+        /// <summary>
+        /// 将已封装多个业务包的完整 UDP 数据报写入远端。
+        /// 此实现与普通单包写入共用同一 Socket，确保数据报边界不被拆分。
+        /// </summary>
+        /// <param name="datagram">由会话发送器构造的完整 UDP 批量数据报。</param>
+        /// <returns>底层 UDP Socket 接受数据报或发生异常时完成的任务。</returns>
+        MTask IDatagramBatchNetworkTransport.SendDatagramBatchAsync(ArraySegment<byte> datagram)
+        {
+            return SendAsync(datagram);
+        }
+
+        #endregion
+
+        #region Private 私有成员
+
         /// <summary>
         /// 执行 TryCloseSocket 相关处理。
         /// </summary>
@@ -208,6 +241,33 @@ namespace MiniCore.Model
 
             socket = null;
             remoteEndPoint = null;
+        }
+
+        /// <summary>
+        /// 根据数据报格式将普通 UDP 单包或批量数据报依次派发给上层。
+        /// 批量格式非法时丢弃整条数据报，避免向业务层投递部分不可信消息。
+        /// </summary>
+        /// <param name="datagram">从远端收到的完整 UDP 数据报。</param>
+        /// <returns>全部逻辑业务包完成上层派发或非法数据报被丢弃时完成的任务。</returns>
+        private async MTask DispatchReceivedDatagramAsync(ReadOnlyMemory<byte> datagram)
+        {
+            if (!UdpBatchDatagramCodec.TryValidateBatchDatagram(datagram, out bool isBatchDatagram, out int packetCount))
+            {
+                return;
+            }
+
+            if (!isBatchDatagram)
+            {
+                await InvokeDataReceivedAsync(datagram);
+                return;
+            }
+
+            int offset = UdpBatchDatagramCodec.HeaderByteCount;
+            for (int index = 0; index < packetCount; index++)
+            {
+                UdpBatchDatagramCodec.TryReadPacket(datagram, ref offset, out ReadOnlyMemory<byte> packet);
+                await InvokeDataReceivedAsync(packet);
+            }
         }
 
         /// <summary>
@@ -301,6 +361,8 @@ namespace MiniCore.Model
                 || ex.SocketErrorCode == SocketError.ConnectionReset
                 || ex.SocketErrorCode == SocketError.NotSocket;
         }
+
+        #endregion
 
     }
 }

@@ -39,6 +39,12 @@ namespace MiniCore.Model
         public long TimingSampleCount { get; }
 
         /// <summary>
+        /// 获取当前统计周期内实际调用底层传输写入的次数。
+        /// TCP 普通消息批量时该值可小于参与耗时采样的数据包数量。
+        /// </summary>
+        public long TransportWriteCount { get; }
+
+        /// <summary>
         /// 获取包进入出站队列到开始调用传输发送的平均等待时间，单位为毫秒。
         /// 未启用诊断或没有样本时为零。
         /// </summary>
@@ -71,6 +77,7 @@ namespace MiniCore.Model
         /// <param name="reliableByteCount">可靠保留队列当前有效字节数。</param>
         /// <param name="rejectedPacketCount">两条队列累计拒绝包数量。</param>
         /// <param name="timingSampleCount">参与耗时统计的数据包数量。</param>
+        /// <param name="transportWriteCount">实际调用底层传输写入的次数。</param>
         /// <param name="averageQueueWaitMilliseconds">出站队列平均等待时间。</param>
         /// <param name="maxQueueWaitMilliseconds">出站队列最大等待时间。</param>
         /// <param name="averageTransportSendMilliseconds">底层传输平均发送等待时间。</param>
@@ -82,6 +89,7 @@ namespace MiniCore.Model
             long reliableByteCount,
             long rejectedPacketCount,
             long timingSampleCount,
+            long transportWriteCount,
             double averageQueueWaitMilliseconds,
             double maxQueueWaitMilliseconds,
             double averageTransportSendMilliseconds,
@@ -93,6 +101,7 @@ namespace MiniCore.Model
             ReliableByteCount = reliableByteCount;
             RejectedPacketCount = rejectedPacketCount;
             TimingSampleCount = timingSampleCount;
+            TransportWriteCount = transportWriteCount;
             AverageQueueWaitMilliseconds = averageQueueWaitMilliseconds;
             MaxQueueWaitMilliseconds = maxQueueWaitMilliseconds;
             AverageTransportSendMilliseconds = averageTransportSendMilliseconds;

@@ -16,6 +16,8 @@
     <type fullname="MiniCore.Model.NetworkOutboundQueueSnapshot" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSendResult" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSession" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkTransportReceiveSnapshot" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkTransportSendSnapshot" preserve="all" />
     <type fullname="MiniCore.Model.UdpServerConfig" preserve="all" />
     <type fullname="MiniCore.Service.INetworkService" preserve="all" />
     <type fullname="MiniCore.Service.NetworkService" preserve="all" />

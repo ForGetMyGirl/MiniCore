@@ -42,6 +42,9 @@ namespace MiniCore.HotUpdate
         private const int RpcReliableQueueHighWatermark = 16; // RPC 补发时可靠队列允许占用的最大包数，始终为心跳和响应留出半数槽位。
         private const double RpcProgressLogIntervalSeconds = 5d; // RPC 阶段输出进度日志的最短间隔。
         private const int MainThreadHitchMilliseconds = 2000; // 主线程积压诊断的人为停顿时间。
+        private const int MediumNormalMessageRate = 1000; // 正常消息中负载档的目标发送速率。
+        private const double MaximumMediumNormalMessageP99Milliseconds = 50d; // 正常消息中负载档允许的端到端 P99 上限。
+        private const double WarmupDrainTimeoutSeconds = 30d; // 预热停止后等待已接受预热消息抵达 Handler 的最长时间，避免污染正式样本。
         private const int MaxNormalMessagesPerRun = 300000; // 5000 条每秒、60 秒时单轮正常消息的最大样本数。
         private const int MaxRpcRequestsPerRun = 500000; // 单轮 RPC 饱和压测允许记录的最大延迟样本数。
         private const int NormalSequenceDigits = 6; // 正常消息序号使用的固定十进制宽度。
@@ -53,6 +56,8 @@ namespace MiniCore.HotUpdate
         private const string RpcPrefix = "MCBENCH-R|"; // RPC 消息基准标记，避免被正常消息统计误识别。
         private const string FixedPayload = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"; // 固定长度的业务正文，保持每条正常消息负载大小一致。
         private static readonly int[] NormalMessageRates = { 100, 1000, 5000 }; // 需要依次执行的正常消息发送速率。
+        private static readonly int[] RemainingNormalMessageRates = { 1000, 5000 }; // 尚未冻结的高频普通消息发送速率。
+        private static readonly int[] HighNormalMessageRate = { 5000 }; // 仅用于已冻结中低负载后复查单个高负载条目的发送速率。
         private static readonly TimeSpan TransportTimeout = TimeSpan.FromSeconds(5); // 建连与服务器会话出现的超时。
 
         private readonly MTaskCompletionSource<bool> completionSource = new MTaskCompletionSource<bool>(); // 对外公开的单次压测完成通知。
@@ -73,7 +78,7 @@ namespace MiniCore.HotUpdate
         private bool isCompleted; // 基准流程是否已经结束。
         private bool isPassed; // 所有传输和负载均完成，且 RPC 样本未出现可靠性质量失败。
         private string failureMessage = string.Empty; // 首个导致流程终止的失败信息。
-        private string rpcQualityFailureMessage = string.Empty; // RPC 流程可结束但存在失败、丢失或入站拒绝时的质量失败摘要。
+        private string qualityFailureMessage = string.Empty; // 任一压测样本完成但存在拒绝、丢失、断线或恢复超限时的质量失败摘要。
         private string statusMessage = "等待网络压测启动。"; // 展示给操作者的当前进度。
         private int serverSessionCreatedCount; // 已观察到的本机服务端会话创建数量。
         private int normalSentCount; // 当前正常消息样本成功发送数量。
@@ -81,6 +86,14 @@ namespace MiniCore.HotUpdate
         private int normalRejectedCount; // 当前正常消息样本被有界出站队列拒绝的数量。
         private int normalReceivedCount; // 当前正常消息样本收到首个业务回调的数量。
         private int normalFailureCount; // 当前正常消息样本的发送失败数量。
+        private int normalEventObservedCount; // 当前样本观察到的全部 DemoMessageReceivedEvent 数量。
+        private int normalEventRecognizedCount; // 当前样本被识别为 MCBENCH-N 普通消息的事件数量。
+        private int normalEventUnrecognizedCount; // 当前样本不包含 MCBENCH-N 序号的业务事件数量。
+        private int normalEventOutOfRangeCount; // 当前样本序号尚未登记或超出已发送范围的普通消息事件数量。
+        private int normalEventDuplicateCount; // 当前样本已被计入过一次的普通消息事件数量。
+        private int normalEventMissingTimestampCount; // 当前样本序号已登记但发送时间戳尚未写入的普通消息事件数量。
+        private int warmupAcceptedCount; // 当前预热阶段成功进入出站队列的消息数量。
+        private int warmupReceivedCount; // 当前预热阶段已到达 DemoNormalHandler 事件观察点的消息数量。
         private int disconnectCount; // 当前样本观察到的服务端逻辑会话断开次数。
         private int rpcSentCount; // 当前 RPC 样本已发起请求数量。
         private int rpcReceivedCount; // 当前 RPC 样本已成功收到响应数量。
@@ -91,7 +104,7 @@ namespace MiniCore.HotUpdate
         private ProfilerRecorder gcAllocatedRecorder; // Unity Profiler 的 GC Allocated In Frame 采样器。
         private bool gcAllocatedRecorderRunning; // GC 采样器是否已成功启动。
         private GUIStyle statusStyle; // Player 状态文字样式缓存。
-        private BenchmarkRunProfile runProfile; // 本次启动选择的完整、RPC 专项或 RPC 快速执行范围。
+        private BenchmarkRunProfile runProfile; // 本次启动选择的完整、RPC 专项、RPC 快速、剩余普通消息、TCP 或 UDP 专项快速执行范围。
 
         /// <summary>
         /// 表示本次真机压测需要覆盖的场景范围。
@@ -100,7 +113,10 @@ namespace MiniCore.HotUpdate
         {
             Full,
             RpcOnly,
-            RpcQuick
+            RpcQuick,
+            RemainingNormalQuick,
+            TcpNormalQuick,
+            UdpNormalQuick
         }
 
         #endregion
@@ -128,6 +144,24 @@ namespace MiniCore.HotUpdate
         /// 必须与 RunArgument 一起传入，用于修改 RPC 或可靠出站队列后的先行验证。
         /// </summary>
         public const string RpcQuickArgument = "-networkBenchmarkRpcQuick";
+
+        /// <summary>
+        /// 只运行 TCP/UDP 尚未冻结的 1000/5000 条每秒普通消息各一轮，并包含对应主线程停顿诊断的快速回归命令行参数。
+        /// 必须与 RunArgument 一起传入；它不运行 KCP、RPC 和已冻结的 100 条每秒样本。
+        /// </summary>
+        public const string RemainingNormalQuickArgument = "-networkBenchmarkRemainingNormalQuick";
+
+        /// <summary>
+        /// 只运行 TCP 的 1000/5000 条每秒普通消息各一轮的快速回归命令行参数。
+        /// 必须与 RunArgument 一起传入；用于仅改动 TCP 写出路径后验证吞吐，不运行 UDP、KCP、RPC 或主线程停顿诊断。
+        /// </summary>
+        public const string TcpNormalQuickArgument = "-networkBenchmarkTcpNormalQuick";
+
+        /// <summary>
+        /// 只运行 UDP 的 5000 条每秒普通消息一轮的快速回归命令行参数。
+        /// 必须与 RunArgument 一起传入；用于仅改动 UDP 传输路径后验证尚未通过的高负载条目，不运行已冻结的 UDP 1000/s、TCP、KCP、RPC 或主线程停顿诊断。
+        /// </summary>
+        public const string UdpNormalQuickArgument = "-networkBenchmarkUdpNormalQuick";
 
         /// <summary>
         /// 获取压测流程是否已经完成。
@@ -247,7 +281,7 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
-        /// 执行三种传输、三档正常消息速率、饱和 RPC 和主线程停顿诊断，并导出最终报告。
+        /// 根据命令行选择执行完整压测、RPC 回归、剩余普通消息、TCP 或 UDP 专项普通消息回归，并导出最终报告。
         /// </summary>
         /// <returns>完整压测流程的异步任务。</returns>
         private async MTask RunInternalAsync()
@@ -268,12 +302,25 @@ namespace MiniCore.HotUpdate
                 networkMessageSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(HandleNetworkMessage);
                 subscribedToNetworkEvents = true;
 
-                await RunTcpAsync();
-                await RunKcpAsync();
-                await RunUdpAsync();
+                if (runProfile != BenchmarkRunProfile.UdpNormalQuick)
+                {
+                    await RunTcpAsync();
+                }
+
+                if (runProfile != BenchmarkRunProfile.RemainingNormalQuick
+                    && runProfile != BenchmarkRunProfile.TcpNormalQuick
+                    && runProfile != BenchmarkRunProfile.UdpNormalQuick)
+                {
+                    await RunKcpAsync();
+                }
+
+                if (runProfile != BenchmarkRunProfile.TcpNormalQuick)
+                {
+                    await RunUdpAsync();
+                }
 
                 string reportDirectory = NetworkBenchmarkReportWriter.Write(results);
-                if (string.IsNullOrEmpty(rpcQualityFailureMessage))
+                if (string.IsNullOrEmpty(qualityFailureMessage))
                 {
                     isPassed = true;
                     statusMessage = $"NETWORK_BENCHMARK: PASS results:{results.Count} directory:{reportDirectory}";
@@ -282,7 +329,7 @@ namespace MiniCore.HotUpdate
                 else
                 {
                     isPassed = false;
-                    failureMessage = rpcQualityFailureMessage;
+                    failureMessage = qualityFailureMessage;
                     statusMessage = $"NETWORK_BENCHMARK: FAIL {failureMessage} directory:{reportDirectory}";
                     Debug.LogError(statusMessage);
                 }
@@ -350,7 +397,7 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
-        /// 建立一种本机传输并执行该传输的全部正式压测样本。
+        /// 建立一种本机传输并按当前范围执行对应压测样本。
         /// </summary>
         /// <param name="transport">报告使用的传输名称。</param>
         /// <param name="sessionId">客户端逻辑会话标识。</param>
@@ -371,26 +418,40 @@ namespace MiniCore.HotUpdate
                 Ensure(connected, transport, "connect", "连接探测未收到心跳响应。");
                 await WaitForConditionAsync(() => serverSessionCreatedCount > serverCountBefore, transport, "server-session-created", TransportTimeout);
 
-                if (runProfile == BenchmarkRunProfile.Full)
+                if (runProfile == BenchmarkRunProfile.Full
+                    || runProfile == BenchmarkRunProfile.RemainingNormalQuick
+                    || runProfile == BenchmarkRunProfile.TcpNormalQuick
+                    || runProfile == BenchmarkRunProfile.UdpNormalQuick)
                 {
-                    for (int rateIndex = 0; rateIndex < NormalMessageRates.Length; rateIndex++)
+                    int[] normalRates = runProfile == BenchmarkRunProfile.Full
+                        ? NormalMessageRates
+                        : runProfile == BenchmarkRunProfile.UdpNormalQuick
+                            ? HighNormalMessageRate
+                            : RemainingNormalMessageRates;
+                    int normalRepeatCount = runProfile == BenchmarkRunProfile.Full ? RepeatCount : 1;
+                    for (int rateIndex = 0; rateIndex < normalRates.Length; rateIndex++)
                     {
-                        int rate = NormalMessageRates[rateIndex];
-                        for (int repeat = 1; repeat <= RepeatCount; repeat++)
+                        int rate = normalRates[rateIndex];
+                        for (int repeat = 1; repeat <= normalRepeatCount; repeat++)
                         {
                             await RunNormalBenchmarkAsync(transport, sessionId, rate, repeat);
                         }
                     }
                 }
 
-                int rpcRepeatCount = runProfile == BenchmarkRunProfile.RpcQuick ? 1 : RepeatCount;
-                int rpcMeasurementSeconds = runProfile == BenchmarkRunProfile.RpcQuick ? RpcQuickMeasurementSeconds : MeasurementSeconds;
-                for (int repeat = 1; repeat <= rpcRepeatCount; repeat++)
+                if (runProfile != BenchmarkRunProfile.RemainingNormalQuick
+                    && runProfile != BenchmarkRunProfile.TcpNormalQuick
+                    && runProfile != BenchmarkRunProfile.UdpNormalQuick)
                 {
-                    await RunRpcBenchmarkAsync(transport, sessionId, repeat, rpcMeasurementSeconds);
+                    int rpcRepeatCount = runProfile == BenchmarkRunProfile.RpcQuick ? 1 : RepeatCount;
+                    int rpcMeasurementSeconds = runProfile == BenchmarkRunProfile.RpcQuick ? RpcQuickMeasurementSeconds : MeasurementSeconds;
+                    for (int repeat = 1; repeat <= rpcRepeatCount; repeat++)
+                    {
+                        await RunRpcBenchmarkAsync(transport, sessionId, repeat, rpcMeasurementSeconds);
+                    }
                 }
 
-                if (runProfile == BenchmarkRunProfile.Full)
+                if (runProfile == BenchmarkRunProfile.Full || runProfile == BenchmarkRunProfile.RemainingNormalQuick)
                 {
                     await RunMainThreadHitchBenchmarkAsync(transport, sessionId);
                 }
@@ -412,9 +473,11 @@ namespace MiniCore.HotUpdate
         /// <returns>正常消息样本完成任务。</returns>
         private async MTask RunNormalBenchmarkAsync(string transport, string sessionId, int rate, int repeat)
         {
+            ResetWarmupSample();
             ReportStage(transport, $"normal-warmup-{rate}-r{repeat}");
             await SendNormalMessagesForDurationAsync(sessionId, rate, WarmupSeconds, false);
-            await WaitForQueueToDrainAsync(NormalDrainTimeoutSeconds);
+            ReportStage(transport, $"normal-warmup-drain-{rate}-r{repeat}");
+            await WaitForWarmupMessagesAsync(transport, rate, repeat);
 
             ResetNormalSample();
             ResetTimingMetrics(sessionId);
@@ -436,7 +499,7 @@ namespace MiniCore.HotUpdate
                 normalLatency.CalculateSummary());
             StopFrameMetrics();
             results.Add(result);
-            RecordRpcQualityFailure(transport, repeat, result);
+            RecordQualityFailure(transport, result);
         }
 
         /// <summary>
@@ -488,6 +551,7 @@ namespace MiniCore.HotUpdate
                 rpcLatency.CalculateSummary());
             StopFrameMetrics();
             results.Add(result);
+            RecordQualityFailure(transport, result);
         }
 
         /// <summary>
@@ -525,6 +589,7 @@ namespace MiniCore.HotUpdate
             result.QueueRecoveryMilliseconds = recoveryTicks * 1000d / Stopwatch.Frequency;
             StopFrameMetrics();
             results.Add(result);
+            RecordQualityFailure(transport, result);
         }
 
         /// <summary>
@@ -582,7 +647,11 @@ namespace MiniCore.HotUpdate
                     {
                         try
                         {
-                            network.TrySend(sessionId, new DemoNormalMessage { Content = BuildNormalContent(WarmupPrefix, warmupSequence) });
+                            NetworkSendResult sendResult = network.TrySend(sessionId, new DemoNormalMessage { Content = BuildNormalContent(WarmupPrefix, warmupSequence) });
+                            if (sendResult == NetworkSendResult.Accepted)
+                            {
+                                warmupAcceptedCount++;
+                            }
                             warmupSequence = (warmupSequence + 1) % MaxNormalMessagesPerRun;
                         }
                         catch (Exception)
@@ -663,11 +732,26 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
-        /// 根据命令行参数解析本次压测的场景范围；快速 RPC 优先于完整 RPC 专项。
+        /// 根据命令行参数解析本次压测的场景范围；TCP、UDP 专项和剩余普通消息快速回归优先于 RPC 范围。
         /// </summary>
         /// <returns>当前启动应执行的压测范围。</returns>
         private static BenchmarkRunProfile ResolveRunProfile()
         {
+            if (HasCommandLineArgument(TcpNormalQuickArgument))
+            {
+                return BenchmarkRunProfile.TcpNormalQuick;
+            }
+
+            if (HasCommandLineArgument(UdpNormalQuickArgument))
+            {
+                return BenchmarkRunProfile.UdpNormalQuick;
+            }
+
+            if (HasCommandLineArgument(RemainingNormalQuickArgument))
+            {
+                return BenchmarkRunProfile.RemainingNormalQuick;
+            }
+
             if (HasCommandLineArgument(RpcQuickArgument))
             {
                 return BenchmarkRunProfile.RpcQuick;
@@ -731,6 +815,12 @@ namespace MiniCore.HotUpdate
                 IncomingQueueWaitSampleCount = queue.QueueWaitSampleCount,
                 IncomingQueueWaitAverageMilliseconds = queue.AverageQueueWaitMilliseconds,
                 IncomingQueueWaitMaxMilliseconds = queue.MaxQueueWaitMilliseconds,
+                NormalEventObservedCount = normalEventObservedCount,
+                NormalEventRecognizedCount = normalEventRecognizedCount,
+                NormalEventUnrecognizedCount = normalEventUnrecognizedCount,
+                NormalEventOutOfRangeCount = normalEventOutOfRangeCount,
+                NormalEventDuplicateCount = normalEventDuplicateCount,
+                NormalEventMissingTimestampCount = normalEventMissingTimestampCount,
                 MaxGcAllocatedBytesPerFrame = maxGcAllocatedBytesPerFrame
             };
             ApplyOutboundTimingMetrics(result, sessionId);
@@ -748,11 +838,13 @@ namespace MiniCore.HotUpdate
 
             NetworkSession clientSession = network.GetSession(sessionId);
             clientSession?.SetOutboundTimingMetricsEnabled(true);
+            clientSession?.SetTransportDiagnosticsEnabled(true);
 
             List<NetworkSession> serverSessions = network.GetServerSessionsSnapshot();
             for (int index = 0; index < serverSessions.Count; index++)
             {
                 serverSessions[index].SetOutboundTimingMetricsEnabled(true);
+                serverSessions[index].SetTransportDiagnosticsEnabled(true);
             }
         }
 
@@ -767,11 +859,16 @@ namespace MiniCore.HotUpdate
             if (clientSession != null)
             {
                 NetworkOutboundQueueSnapshot client = clientSession.GetOutboundQueueSnapshot();
+                NetworkTransportSendSnapshot clientTransport = clientSession.GetTransportSendSnapshot();
                 result.ClientOutboundTimingSampleCount = client.TimingSampleCount;
+                result.ClientTransportWriteCount = client.TransportWriteCount;
                 result.ClientOutboundQueueWaitAverageMilliseconds = client.AverageQueueWaitMilliseconds;
                 result.ClientOutboundQueueWaitMaxMilliseconds = client.MaxQueueWaitMilliseconds;
                 result.ClientTransportSendAverageMilliseconds = client.AverageTransportSendMilliseconds;
                 result.ClientTransportSendMaxMilliseconds = client.MaxTransportSendMilliseconds;
+                result.ClientSocketSendOperationCount = clientTransport.SendOperationCount;
+                result.ClientSocketSendOperationAverageMilliseconds = clientTransport.AverageSendOperationMilliseconds;
+                result.ClientSocketSendOperationMaxMilliseconds = clientTransport.MaxSendOperationMilliseconds;
             }
 
             long serverSampleCount = 0;
@@ -779,12 +876,26 @@ namespace MiniCore.HotUpdate
             double serverTransportSendTotalMilliseconds = 0d;
             double serverQueueWaitMaxMilliseconds = 0d;
             double serverTransportSendMaxMilliseconds = 0d;
+            long serverFramedPacketCount = 0;
+            long serverDispatchedPacketCount = 0;
+            long serverReceiveOperationCount = 0;
+            double serverReceiveOperationTotalMilliseconds = 0d;
+            double serverReceiveOperationMaxMilliseconds = 0d;
             List<NetworkSession> serverSessions = network.GetServerSessionsSnapshot();
             for (int index = 0; index < serverSessions.Count; index++)
             {
-                NetworkOutboundQueueSnapshot server = serverSessions[index].GetOutboundQueueSnapshot();
+                NetworkSession serverSession = serverSessions[index];
+                NetworkOutboundQueueSnapshot server = serverSession.GetOutboundQueueSnapshot();
+                NetworkTransportReceiveSnapshot receive = serverSession.GetTransportReceiveSnapshot();
                 long samples = server.TimingSampleCount;
                 serverSampleCount += samples;
+                serverFramedPacketCount += receive.FramedPacketCount;
+                serverDispatchedPacketCount += receive.DispatchedPacketCount;
+                serverReceiveOperationCount += receive.ReceiveOperationCount;
+                serverReceiveOperationTotalMilliseconds += receive.AverageReceiveOperationMilliseconds * receive.ReceiveOperationCount;
+                serverReceiveOperationMaxMilliseconds = Math.Max(
+                    serverReceiveOperationMaxMilliseconds,
+                    receive.MaxReceiveOperationMilliseconds);
                 serverQueueWaitTotalMilliseconds += server.AverageQueueWaitMilliseconds * samples;
                 serverTransportSendTotalMilliseconds += server.AverageTransportSendMilliseconds * samples;
                 serverQueueWaitMaxMilliseconds = Math.Max(serverQueueWaitMaxMilliseconds, server.MaxQueueWaitMilliseconds);
@@ -796,6 +907,13 @@ namespace MiniCore.HotUpdate
             result.ServerOutboundQueueWaitMaxMilliseconds = serverQueueWaitMaxMilliseconds;
             result.ServerTransportSendAverageMilliseconds = serverSampleCount == 0 ? 0d : serverTransportSendTotalMilliseconds / serverSampleCount;
             result.ServerTransportSendMaxMilliseconds = serverTransportSendMaxMilliseconds;
+            result.ServerTransportFramedPacketCount = serverFramedPacketCount;
+            result.ServerTransportDispatchedPacketCount = serverDispatchedPacketCount;
+            result.ServerTransportReceiveOperationCount = serverReceiveOperationCount;
+            result.ServerTransportReceiveOperationAverageMilliseconds = serverReceiveOperationCount == 0
+                ? 0d
+                : serverReceiveOperationTotalMilliseconds / serverReceiveOperationCount;
+            result.ServerTransportReceiveOperationMaxMilliseconds = serverReceiveOperationMaxMilliseconds;
         }
 
         /// <summary>
@@ -808,10 +926,25 @@ namespace MiniCore.HotUpdate
             normalRejectedCount = 0;
             normalReceivedCount = 0;
             normalFailureCount = 0;
+            normalEventObservedCount = 0;
+            normalEventRecognizedCount = 0;
+            normalEventUnrecognizedCount = 0;
+            normalEventOutOfRangeCount = 0;
+            normalEventDuplicateCount = 0;
+            normalEventMissingTimestampCount = 0;
             disconnectCount = 0;
             normalLatency.Reset();
             Array.Clear(normalSentTicks, 0, normalSentTicks.Length);
             Array.Clear(normalReceivedFlags, 0, normalReceivedFlags.Length);
+        }
+
+        /// <summary>
+        /// 清空当前正常消息预热阶段的接受与业务到达计数。
+        /// </summary>
+        private void ResetWarmupSample()
+        {
+            warmupAcceptedCount = 0;
+            warmupReceivedCount = 0;
         }
 
         /// <summary>
@@ -828,20 +961,29 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
-        /// 记录一轮 RPC 的可靠性质量失败，但不中断后续传输采样，使导出的报告保留完整诊断证据。
+        /// 记录一轮压测的质量失败，但不中断后续传输采样，使导出的报告保留完整诊断证据。
         /// </summary>
         /// <param name="transport">当前报告使用的传输名称。</param>
-        /// <param name="repeat">当前 RPC 重复序号。</param>
-        /// <param name="result">已汇总的当前 RPC 样本。</param>
-        private void RecordRpcQualityFailure(string transport, int repeat, NetworkBenchmarkRunResult result)
+        /// <param name="result">已汇总的当前压测样本。</param>
+        private void RecordQualityFailure(string transport, NetworkBenchmarkRunResult result)
         {
-            if (!string.IsNullOrEmpty(rpcQualityFailureMessage)
-                || (result.FailureCount == 0 && result.DroppedCount == 0 && result.QueueRejectedPacketCount == 0))
+            bool hitchRecoveryExceeded = result.Scenario == "MainThreadHitch" && result.QueueRecoveryMilliseconds > 50d;
+            bool mediumLatencyExceeded = result.Scenario == "NormalMessage"
+                && result.TargetRateOrConcurrency == MediumNormalMessageRate
+                && result.P99Milliseconds > MaximumMediumNormalMessageP99Milliseconds;
+            if (!string.IsNullOrEmpty(qualityFailureMessage)
+                || (result.FailureCount == 0
+                    && result.DroppedCount == 0
+                    && result.RejectedCount == 0
+                    && result.QueueRejectedPacketCount == 0
+                    && result.DisconnectCount == 0
+                    && !hitchRecoveryExceeded
+                    && !mediumLatencyExceeded))
             {
                 return;
             }
 
-            rpcQualityFailureMessage = $"transport:{transport} stage:rpc-r{repeat} sent:{result.SentCount} received:{result.ReceivedCount} failed:{result.FailureCount} dropped:{result.DroppedCount} incomingRejected:{result.QueueRejectedPacketCount}";
+            qualityFailureMessage = $"transport:{transport} scenario:{result.Scenario} repeat:{result.Repeat} sent:{result.SentCount} received:{result.ReceivedCount} failed:{result.FailureCount} dropped:{result.DroppedCount} rejected:{result.RejectedCount} incomingRejected:{result.QueueRejectedPacketCount} disconnect:{result.DisconnectCount} p99:{result.P99Milliseconds:F3}ms recovery:{result.QueueRecoveryMilliseconds:F3}ms";
         }
 
         /// <summary>
@@ -886,6 +1028,29 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
+        /// 等待当前预热阶段所有已接受的消息抵达真实 Handler 观察点，避免仍在 TCP 或应用链路中的预热流量进入正式样本。
+        /// </summary>
+        /// <param name="transport">当前报告使用的传输名称。</param>
+        /// <param name="rate">当前正式样本的目标每秒发送消息数。</param>
+        /// <param name="repeat">当前速率的重复序号。</param>
+        /// <returns>全部预热消息完成业务处理时完成的任务。</returns>
+        private async MTask WaitForWarmupMessagesAsync(string transport, int rate, int repeat)
+        {
+            double deadline = Time.realtimeSinceStartupAsDouble + WarmupDrainTimeoutSeconds;
+            while (warmupReceivedCount < warmupAcceptedCount && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                await MTask.Yield();
+            }
+
+            if (warmupReceivedCount < warmupAcceptedCount)
+            {
+                throw new TimeoutException($"transport:{transport} stage:normal-warmup-drain-{rate}-r{repeat} accepted:{warmupAcceptedCount} received:{warmupReceivedCount} timeout:{WarmupDrainTimeoutSeconds:0.###}s");
+            }
+
+            await WaitForQueueToDrainAsync(NormalDrainTimeoutSeconds);
+        }
+
+        /// <summary>
         /// 等待 NetworkService 的当前收包队列归零，超时后保留快照供报告诊断。
         /// </summary>
         /// <param name="timeoutSeconds">等待队列排空的最长时间。</param>
@@ -927,19 +1092,43 @@ namespace MiniCore.HotUpdate
         /// <param name="@event">业务 Handler 已处理普通消息后发布的事件。</param>
         private void HandleNetworkMessage(DemoMessageReceivedEvent @event)
         {
-            if (@event == null || !TryReadNormalSequence(@event.Message, out int sequence))
+            normalEventObservedCount++;
+            if (@event == null)
             {
+                normalEventUnrecognizedCount++;
                 return;
             }
 
-            if (sequence < 0 || sequence >= normalSentCount || normalReceivedFlags[sequence] != 0)
+            if (TryReadBenchmarkSequence(@event.Message, WarmupPrefix, out _))
             {
+                warmupReceivedCount++;
+                normalEventUnrecognizedCount++;
+                return;
+            }
+
+            if (!TryReadBenchmarkSequence(@event.Message, NormalPrefix, out int sequence))
+            {
+                normalEventUnrecognizedCount++;
+                return;
+            }
+
+            normalEventRecognizedCount++;
+            if (sequence < 0 || sequence >= normalSentCount)
+            {
+                normalEventOutOfRangeCount++;
+                return;
+            }
+
+            if (normalReceivedFlags[sequence] != 0)
+            {
+                normalEventDuplicateCount++;
                 return;
             }
 
             long sentTicks = normalSentTicks[sequence];
             if (sentTicks <= 0)
             {
+                normalEventMissingTimestampCount++;
                 return;
             }
 
@@ -949,26 +1138,27 @@ namespace MiniCore.HotUpdate
         }
 
         /// <summary>
-        /// 从 Handler 格式化后的文本中查找正常消息基准标记并读取固定宽度序号。
+        /// 从 Handler 格式化后的文本中查找指定基准标记并读取固定宽度序号。
         /// </summary>
         /// <param name="message">DemoNormalHandler 生成的业务事件文本。</param>
+        /// <param name="prefix">需要匹配的正式或预热消息基准标记。</param>
         /// <param name="sequence">解析成功时得到的零基序号。</param>
-        /// <returns>文本包含有效正常消息基准标记时返回 true。</returns>
-        private static bool TryReadNormalSequence(string message, out int sequence)
+        /// <returns>文本包含有效指定基准标记时返回 true。</returns>
+        private static bool TryReadBenchmarkSequence(string message, string prefix, out int sequence)
         {
             sequence = 0;
-            if (string.IsNullOrEmpty(message))
+            if (string.IsNullOrEmpty(message) || string.IsNullOrEmpty(prefix))
             {
                 return false;
             }
 
-            int start = message.IndexOf(NormalPrefix, StringComparison.Ordinal);
+            int start = message.IndexOf(prefix, StringComparison.Ordinal);
             if (start < 0)
             {
                 return false;
             }
 
-            int digitStart = start + NormalPrefix.Length;
+            int digitStart = start + prefix.Length;
             if (digitStart + NormalSequenceDigits >= message.Length)
             {
                 return false;
@@ -1174,10 +1364,55 @@ namespace MiniCore.HotUpdate
         /// 网络线程入队到主线程开始处理的最大等待时间，单位为毫秒；包含本机客户端与服务端两个方向。
         /// </summary>
         public double IncomingQueueWaitMaxMilliseconds;
+        /// <summary>本机服务端 TCP 已完成完整长度帧读取的包数量；非 TCP 传输为零。</summary>
+        public long ServerTransportFramedPacketCount;
+        /// <summary>本机服务端 TCP 已完成收包回调派发的包数量；非 TCP 传输为零。</summary>
+        public long ServerTransportDispatchedPacketCount;
+        /// <summary>
+        /// 本机服务端 TCP 底层 Socket 接收操作完成次数；一个完整长度帧通常至少对应包头和正文两次接收操作。
+        /// 非 TCP 传输为零。
+        /// </summary>
+        public long ServerTransportReceiveOperationCount;
+        /// <summary>
+        /// 本机服务端 TCP 单次底层 Socket 接收操作平均等待时间，单位为毫秒；非 TCP 传输为零。
+        /// </summary>
+        public double ServerTransportReceiveOperationAverageMilliseconds;
+        /// <summary>
+        /// 本机服务端 TCP 单次底层 Socket 接收操作最大等待时间，单位为毫秒；非 TCP 传输为零。
+        /// </summary>
+        public double ServerTransportReceiveOperationMaxMilliseconds;
+        /// <summary>样本期间压测订阅者观察到的全部业务事件数量。</summary>
+        public int NormalEventObservedCount;
+        /// <summary>样本期间被识别为 MCBENCH-N 普通消息的业务事件数量。</summary>
+        public int NormalEventRecognizedCount;
+        /// <summary>样本期间未包含 MCBENCH-N 固定序号的业务事件数量。</summary>
+        public int NormalEventUnrecognizedCount;
+        /// <summary>样本期间序号未登记或超过已发送范围的普通消息事件数量。</summary>
+        public int NormalEventOutOfRangeCount;
+        /// <summary>样本期间已被记入接收结果的重复普通消息事件数量。</summary>
+        public int NormalEventDuplicateCount;
+        /// <summary>样本期间序号已登记但发送时间尚未写入的普通消息事件数量。</summary>
+        public int NormalEventMissingTimestampCount;
         /// <summary>
         /// 客户端会话出站分段耗时的有效样本数量。
         /// </summary>
         public long ClientOutboundTimingSampleCount;
+        /// <summary>
+        /// 客户端实际调用底层传输写入的次数；TCP 普通消息批量时小于已发送包数量。
+        /// </summary>
+        public long ClientTransportWriteCount;
+        /// <summary>
+        /// 客户端底层 Socket 发送操作完成次数；一个传输写入在部分写入时可能对应多次 Socket 操作。
+        /// </summary>
+        public long ClientSocketSendOperationCount;
+        /// <summary>
+        /// 客户端单次底层 Socket 发送操作平均等待时间，单位为毫秒。
+        /// </summary>
+        public double ClientSocketSendOperationAverageMilliseconds;
+        /// <summary>
+        /// 客户端单次底层 Socket 发送操作最大等待时间，单位为毫秒。
+        /// </summary>
+        public double ClientSocketSendOperationMaxMilliseconds;
         /// <summary>
         /// 客户端包进入出站队列到开始调用传输发送的平均等待时间，单位为毫秒。
         /// </summary>
@@ -1273,7 +1508,7 @@ namespace MiniCore.HotUpdate
         private static string BuildCsv(IList<NetworkBenchmarkRunResult> results)
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Transport,Scenario,TargetRateOrConcurrency,Repeat,DurationMilliseconds,SentCount,OfferedCount,RejectedCount,ReceivedCount,FailureCount,DroppedCount,DisconnectCount,ThroughputPerSecond,LatencySampleCount,P50Milliseconds,P95Milliseconds,P99Milliseconds,MaxLatencyMilliseconds,PeakQueuePacketCount,PeakQueueByteCount,QueueProcessedPacketCount,QueueRejectedPacketCount,MaxPacketProcessMilliseconds,IncomingQueueWaitSampleCount,IncomingQueueWaitAverageMilliseconds,IncomingQueueWaitMaxMilliseconds,ClientOutboundTimingSampleCount,ClientOutboundQueueWaitAverageMilliseconds,ClientOutboundQueueWaitMaxMilliseconds,ClientTransportSendAverageMilliseconds,ClientTransportSendMaxMilliseconds,ServerOutboundTimingSampleCount,ServerOutboundQueueWaitAverageMilliseconds,ServerOutboundQueueWaitMaxMilliseconds,ServerTransportSendAverageMilliseconds,ServerTransportSendMaxMilliseconds,MaxGcAllocatedBytesPerFrame,HitchMilliseconds,QueueRecoveryMilliseconds");
+            builder.AppendLine("Transport,Scenario,TargetRateOrConcurrency,Repeat,DurationMilliseconds,SentCount,OfferedCount,RejectedCount,ReceivedCount,FailureCount,DroppedCount,DisconnectCount,ThroughputPerSecond,LatencySampleCount,P50Milliseconds,P95Milliseconds,P99Milliseconds,MaxLatencyMilliseconds,PeakQueuePacketCount,PeakQueueByteCount,QueueProcessedPacketCount,QueueRejectedPacketCount,MaxPacketProcessMilliseconds,IncomingQueueWaitSampleCount,IncomingQueueWaitAverageMilliseconds,IncomingQueueWaitMaxMilliseconds,ServerTransportFramedPacketCount,ServerTransportDispatchedPacketCount,ServerTransportReceiveOperationCount,ServerTransportReceiveOperationAverageMilliseconds,ServerTransportReceiveOperationMaxMilliseconds,NormalEventObservedCount,NormalEventRecognizedCount,NormalEventUnrecognizedCount,NormalEventOutOfRangeCount,NormalEventDuplicateCount,NormalEventMissingTimestampCount,ClientOutboundTimingSampleCount,ClientTransportWriteCount,ClientSocketSendOperationCount,ClientSocketSendOperationAverageMilliseconds,ClientSocketSendOperationMaxMilliseconds,ClientOutboundQueueWaitAverageMilliseconds,ClientOutboundQueueWaitMaxMilliseconds,ClientTransportSendAverageMilliseconds,ClientTransportSendMaxMilliseconds,ServerOutboundTimingSampleCount,ServerOutboundQueueWaitAverageMilliseconds,ServerOutboundQueueWaitMaxMilliseconds,ServerTransportSendAverageMilliseconds,ServerTransportSendMaxMilliseconds,MaxGcAllocatedBytesPerFrame,HitchMilliseconds,QueueRecoveryMilliseconds");
             for (int index = 0; index < results.Count; index++)
             {
                 NetworkBenchmarkRunResult result = results[index];
@@ -1303,7 +1538,22 @@ namespace MiniCore.HotUpdate
                     .Append(result.IncomingQueueWaitSampleCount).Append(',')
                     .Append(result.IncomingQueueWaitAverageMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
                     .Append(result.IncomingQueueWaitMaxMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
+                    .Append(result.ServerTransportFramedPacketCount).Append(',')
+                    .Append(result.ServerTransportDispatchedPacketCount).Append(',')
+                    .Append(result.ServerTransportReceiveOperationCount).Append(',')
+                    .Append(result.ServerTransportReceiveOperationAverageMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
+                    .Append(result.ServerTransportReceiveOperationMaxMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
+                    .Append(result.NormalEventObservedCount).Append(',')
+                    .Append(result.NormalEventRecognizedCount).Append(',')
+                    .Append(result.NormalEventUnrecognizedCount).Append(',')
+                    .Append(result.NormalEventOutOfRangeCount).Append(',')
+                    .Append(result.NormalEventDuplicateCount).Append(',')
+                    .Append(result.NormalEventMissingTimestampCount).Append(',')
                     .Append(result.ClientOutboundTimingSampleCount).Append(',')
+                    .Append(result.ClientTransportWriteCount).Append(',')
+                    .Append(result.ClientSocketSendOperationCount).Append(',')
+                    .Append(result.ClientSocketSendOperationAverageMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
+                    .Append(result.ClientSocketSendOperationMaxMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
                     .Append(result.ClientOutboundQueueWaitAverageMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
                     .Append(result.ClientOutboundQueueWaitMaxMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
                     .Append(result.ClientTransportSendAverageMilliseconds.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
