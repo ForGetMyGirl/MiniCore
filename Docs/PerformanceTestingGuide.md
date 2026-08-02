@@ -213,6 +213,14 @@ Android Development Player 可传入 `-networkBenchmark` 启动完整本机回�
 
 详细的长期优化顺序见 [优化路线图](OptimizationRoadmap.md)。
 
+## 2026-08-02 网络 GC 后期归因任务：正式基线峰值已归档，尚不直接优化
+
+正式基线 `~/AndroidBenchmark/20260801_124241/` 的 `MaxGcAllocatedBytesPerFrame` 为单个 `60` 秒样本期间观察到的**最大** Unity 帧托管分配，不是平均值、累计分配量或网络模块专属计数。当前可重复峰值包括 TCP `1000/s` 的 `1.095–1.103 MB`、TCP `5000/s` 的 `1.630–1.654 MB`、TCP `64` 并发 RPC 的 `2.515–2.644 MB`、KCP `5000/s` 的 `1.770–1.786 MB` 和 UDP `5000/s` 的 `0.651–0.680 MB`。这些数值是后续归因输入，不是现阶段网络质量门禁，也不能推断每帧都发生同等分配。
+
+已验证的稳定框架 GC 问题仍保持解决：旧 `ConcurrentStack<byte[]>` 缓冲池归还节点分配和日志关闭时的收包字符串分配均已消除。当前帧峰值还混合了压测生成的 Demo 消息/字符串、反序列化对象和 Protobuf 编码器等来源，尚不能归因于合包、队列或缓冲池。
+
+该任务安排在 UI 主干完成后、真实多人房间协议的 Dedicated Server 多会话压测之前。届时先采集空载帧基线，再按“消息构造 → Protobuf 封包与 `TrySend` 入队 → TCP/UDP 合包 → 入站反序列化与 Handler”分段记录累计分配、平均/P95/P99/最大每帧分配和超阈值帧数；只有最大来源被数据确认后才优化并复跑专项与完整基线。
+
 ## 2026-08-01 完整 39 条回归：全部通过，冻结为正式性能基线
 
 本轮先通过 Editor `NetworkLoopback_AllTransports_UseActualHandlersAndProtobuf`，随后在 Android Development Player 上运行无专项参数的完整 `39` 条本机回环。报告目录为 `~/AndroidBenchmark/20260801_124241/`，UTC 生成时间 `2026-08-01 12:42:41`，对应北京时间 `20:42:41`。全部 `39` 条均为零失败、零未收、零出站拒绝、零入站拒绝和零断线；该目录现冻结为当前网络实现的正式性能基线。
