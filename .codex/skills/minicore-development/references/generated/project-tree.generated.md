@@ -22,7 +22,11 @@
 - `Assets/Scripts/MiniCore/Editor/Protocol/ProtoCodeGenerator.cs`
 - `Assets/Scripts/MiniCore/Editor/ReferenceCollectorEditor.cs`
 - `Assets/Scripts/MiniCore/Editor/TouchInputEditor.cs`
-- `Assets/Scripts/MiniCore/Editor/UIWindowGeneratorWindow.cs`
+- `Assets/Scripts/MiniCore/Editor/UI/UIAuthoringUtility.cs`
+- `Assets/Scripts/MiniCore/Editor/UI/UIFrameworkAssetGenerator.cs`
+- `Assets/Scripts/MiniCore/Editor/UI/UIWindowCreationWindow.cs`
+- `Assets/Scripts/MiniCore/Editor/UI/UIWindowRegistryGenerator.cs`
+- `Assets/Scripts/MiniCore/Editor/UI/UIWindowViewEditor.cs`
 - `Assets/Scripts/MiniCore/Editor/Windows/FileComponent.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Client/Configuration/ConfigurationService.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Client/Configuration/ExcelTool.cs`
@@ -42,18 +46,21 @@
 - `Assets/Scripts/MiniCore/HotUpdate/Network/Handler/TestHandler.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Service/AssetService.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Service/HotUpdateServiceContracts.cs`
-- `Assets/Scripts/MiniCore/HotUpdate/Service/SceneBindingService.cs`
-- `Assets/Scripts/MiniCore/HotUpdate/Service/UIService.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetResourceService.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetResourceServiceInitArgs.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/DedicatedClientSmokeTestRunner.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/NetworkBenchmarkLatencyCollector.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/NetworkBenchmarkRunner.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/NetworkSmokeTestRunner.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/UI/Generated/UIWindowRegistry.Generated.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/UI/Generated/UIWindowRoutes.Generated.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/UI/Registry/UIWindowRegistry.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/UI/Service/UIService.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/UI/Service/UIServiceInitArgs.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/UI/Test/Presenter/KcpTestWindowPresenter.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/UI/Test/Presenter/MultiProtocolTestPanel.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/UI/Test/View/KcpTestWindowView.cs`
-- `Assets/Scripts/MiniCore/HotUpdate/UI/UIAssetPaths.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/UI/Window/UIWindowSession.cs`
 - `Assets/Scripts/MiniCore/Network/Core/NetworkMessageComponent.cs`
 - `Assets/Scripts/MiniCore/Network/Core/NetworkSessionComponent.cs`
 - `Assets/Scripts/MiniCore/Network/Handler/AMHandler.cs`
@@ -177,11 +184,25 @@
 - `Assets/Scripts/MiniCore/Unity/Threading/AMTaskBehaviour.cs`
 - `Assets/Scripts/MiniCore/Unity/Threading/YooAssetMTaskExtensions.cs`
 - `Assets/Scripts/MiniCore/Unity/Time/UnityTimeProvider.cs`
-- `Assets/Scripts/MiniCore/Unity/UI/Attribute/UIWindowAttribute.cs`
-- `Assets/Scripts/MiniCore/Unity/UI/Entity/UICanvasLayer.cs`
-- `Assets/Scripts/MiniCore/Unity/UI/Interface/APresenter.cs`
-- `Assets/Scripts/MiniCore/Unity/UI/Interface/AUIBase.cs`
-- `Assets/Scripts/MiniCore/Unity/UI/Interface/IPresenter.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Animation/UIAnimatorTransition.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Animation/UIPresetTransition.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Animation/UITransitions.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Configuration/UIProjectProfile.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Core/UIContracts.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Core/UIWindowLifecycle.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Core/UIWindowStateMachine.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Feedback/UILoadingOverlay.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Input/UIKeyboardAvoidance.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Input/UISubCanvas.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Input/UIWindowDragHandler.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Input/UIWindowInteraction.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Layout/UIAdaptationComponents.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Layout/UIContentConstraint.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Layout/UIResponsiveLayout.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Layout/UISafeAreaService.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Rendering/ApplicationUIRoot.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Rendering/UILayerHost.cs`
+- `Assets/Scripts/MiniCore/Unity/UI/Rendering/UIResolutionService.cs`
 
 ## Assets/Scripts/Project/Bootstrap
 - `Assets/Scripts/Project/Bootstrap/Generated/HybridClrAotMetadata.Generated.cs`
@@ -211,6 +232,7 @@
 - `Assets/Tests/Editor/ProtobufRpcPerformanceTests.cs`
 - `Assets/Tests/Editor/ProtobufSerializationPerformanceTests.cs`
 - `Assets/Tests/Editor/ServiceMigrationTests.cs`
+- `Assets/Tests/Editor/UIFrameworkTests.cs`
 
 ## Proto
 - `Proto/.DS_Store`
@@ -251,6 +273,7 @@
 - `Docs/OptimizationRoadmap.md`
 - `Docs/PerformanceTestingGuide.md`
 - `Docs/StartupModules.md`
+- `Docs/UIFramework.md`
 
 ## Tools/MTaskCodeGen
 - `Tools/MTaskCodeGen/BuildMTaskCodeGen.sh`
@@ -265,6 +288,15 @@
 - `Tools/EventAnalyzer/Tests/AnalyzerFixture.cs`
 
 ## Assets/Settings
+- `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_CameraSpace.preset`
+- `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_Landscape_1920x1080.preset`
+- `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_Portrait_1080x1920.preset`
+- `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_Tablet_2048x1536.preset`
+- `Assets/Settings/MiniCore/UI/Presets/Transition_Fade.preset`
+- `Assets/Settings/MiniCore/UI/Presets/Transition_PopupScale.preset`
+- `Assets/Settings/MiniCore/UI/Presets/Transition_SlideLeft.preset`
+- `Assets/Settings/MiniCore/UI/Presets/Transition_SlideRight.preset`
+- `Assets/Settings/MiniCore/UI/Presets/Transition_Toast.preset`
 - `Assets/Settings/MiniCoreStartupSettings.asset`
 
 ## Packages

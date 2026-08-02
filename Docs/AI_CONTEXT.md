@@ -1,6 +1,6 @@
 # MiniCore AI 项目上下文
 
-这是一份给 AI、新成员和自动化工具的快速上下文。处理代码任务前先读本文件，再按需要阅读 [架构总览](Architecture.md)、[强类型事件中心](Eventing.md) 与 [网络与协议](NetworkLayerAnalysis.md)。更新 `Docs/` 时同时遵守 [文档维护约定](DocumentationConventions.md)。当代码与本文冲突时，以当前代码和程序集配置为准，并同步修正文档。
+这是一份给 AI、新成员和自动化工具的快速上下文。处理代码任务前先读本文件，再按需要阅读 [架构总览](Architecture.md)、[UI 框架](UIFramework.md)、[强类型事件中心](Eventing.md) 与 [网络与协议](NetworkLayerAnalysis.md)。更新 `Docs/` 时同时遵守 [文档维护约定](DocumentationConventions.md)。当代码与本文冲突时，以当前代码和程序集配置为准，并同步修正文档。
 
 ## 项目一句话
 
@@ -30,7 +30,7 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 - 每个 owner 获取一次，就必须释放一次；不要用静态字段或隐式单例绕开引用计数。
 - Unity 每帧由 `UnityGlobalDriver.Update -> Global.Tick()` 驱动。不得在此链路每帧 new Context 或分配临时集合。
 - 系统级能力使用 `AAppService + [AppService]`，调用方只能通过 `Global.GetService<TInterface>(owner)` 取得接口；不要用 `Global.Get<TConcreteService>` 绕过服务接口。
-- `IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`ISceneBindingService` / `SceneBindingService`、`IUIService` / `UIService` 已替换并删除旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`UIFactoryComponent`；不得重新引入这些旧类型或兼容包装。
+- `IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`MiniCore.UI.IUIService` / `UIService` 已替换并删除旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`SceneBindingService`、`UIFactoryComponent` 和旧 UI API；不得重新引入这些旧类型或兼容包装。
 - 普通 `AComponent` 不在启动配置左侧登记。需要让开发者发现时使用 `[ComponentCatalog("名称", Description = "具体职责")]`；不要把框架内部装配组件标为目录能力。
 
 ## MTask 规则
@@ -63,7 +63,8 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 2. 修改/新增/删除 HotUpdate Handler 后，等待脚本编译完成；Opcode 与 Handler 注册表自动同步，**没有 Opcode 手动菜单**。
 3. 生成流程使用 `Proto/Tools/protoc-29.5` 中随仓库提交的 Windows x64、macOS x64、macOS arm64 工具。
 4. 删除 Handler 时，Editor 先写安全空 Handler 表，使首轮编译不会被旧的直接 `new Handler()` 引用阻断；下一轮自动写入正确表。
-5. 打包前必须让 Console 无 C# 编译错误；Proto、Opcode、HybridCLR、YooAsset 与 Dedicated Server 边界由构建校验器验证。
+5. 修改窗口 Prefab 或 UI View/Presenter 后等待二阶段 `UIWindowRegistry.Generated` 自动生成；Player 不扫描程序集或使用 `Activator` 创建窗口逻辑。
+6. 打包前必须让 Console 无 C# 编译错误；Proto、Opcode、UI Registry、HybridCLR、YooAsset 与 Dedicated Server 边界由构建校验器验证。
 
 ## 热更新与启动规则
 
@@ -98,7 +99,7 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 | 网络收发、RPC、传输 | `Network/Core`、`Network/Transport`、[网络与协议](NetworkLayerAnalysis.md) |
 | 新协议与 Proto | `Proto/`、`Editor/Protocol/ProtoCodeGenerator.cs`、[网络与协议](NetworkLayerAnalysis.md#2-proto-与生成流程) |
 | Opcode/Handler 生成 | `Editor/Opcode*.cs`、`Protocol/Generated/Registry`、`HotUpdate/Generated/Network` |
-| Unity 生命周期与 UI 适配 | `Unity/Driver`、`Unity/Mono`、`Unity/UI` |
+| UI 窗口、Root、分辨率、安全区域和动画 | `Unity/UI`、`HotUpdate/UI`、`Editor/UI`、[UI 框架](UIFramework.md) |
 | 热更启动/打包 | `Project/Bootstrap/UpdateMainWindow.cs`、`HotUpdate/Entry`、`Editor/HybridCLR` |
 | 性能测试 | `Assets/Tests/Editor`、[性能测试指南](PerformanceTestingGuide.md) |
 | 文档维护 | [文档维护约定](DocumentationConventions.md) |

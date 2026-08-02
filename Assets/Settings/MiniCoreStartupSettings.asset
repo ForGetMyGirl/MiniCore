@@ -30,7 +30,10 @@ MonoBehaviour:
   - AssemblyQualifiedTypeName: MiniCore.Service.UIService, MiniCore.HotUpdate, Version=0.0.0.0,
       Culture=neutral, PublicKeyToken=null
     Enabled: 1
-    Arguments: []
+    Arguments:
+    - MemberName: ProfileAddress
+      UseCodeDefault: 0
+      Value: UIProjectProfile
   - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetResourceService, MiniCore.HotUpdate,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1
@@ -45,10 +48,6 @@ MonoBehaviour:
     - MemberName: EncryptionKey
       UseCodeDefault: 0
       Value: wnm9527
-  - AssemblyQualifiedTypeName: MiniCore.Service.SceneBindingService, MiniCore.HotUpdate,
-      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    Enabled: 1
-    Arguments: []
   - AssemblyQualifiedTypeName: MiniCore.Service.SettingsService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1

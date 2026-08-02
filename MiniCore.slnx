@@ -2,11 +2,12 @@
   <Project Path="MiniCore.Network.csproj" />
   <Project Path="MiniCore.HotUpdate.csproj" />
   <Project Path="MiniCore.Runtime.csproj" />
-  <Project Path="MiniCore.Unity.csproj" />
   <Project Path="MiniCore.Serialization.csproj" />
+  <Project Path="MiniCore.Unity.csproj" />
   <Project Path="MiniCore.Protocol.csproj" />
   <Project Path="Project.Bootstrap.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="MiniCore.UI.PlayModeTests.csproj" />
   <Project Path="MiniCore.Editor.csproj" />
   <Project Path="MiniCore.EditorTests.csproj" />
   <Project Path="MiniCore.Performance.Editor.csproj" />

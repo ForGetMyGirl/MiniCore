@@ -1,15 +1,18 @@
-using System;
 using MiniCore.Threading;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using MiniCore.Model;
+using MiniCore.UI;
 
 namespace MiniCore.HotUpdate
 {
-    [UIWindow(typeof(KcpTestWindowPresenter))]
-    public class KcpTestWindowView : AUIBase
+    /// <summary>
+    /// KCP 网络功能测试窗口的被动 View 示例。
+    /// </summary>
+    public sealed class KcpTestWindowView : AUIWindowView
     {
+        #region UnityProperty Unity 引用属性
+
         public Button startServerBtn;
         public Button stopServerBtn;
         public Button connectClientBtn;
@@ -22,23 +25,14 @@ namespace MiniCore.HotUpdate
         public TMP_InputField convInput;
         public TMP_InputField messageInput;
 
-        public event Action OnStartServerClicked;
-        public event Action OnStopServerClicked;
-        public event Action OnConnectClientClicked;
-        public event Action OnDisconnectClientClicked;
-        public event Action OnSendRpcClicked;
-        public event Action OnSendNormalClicked;
+        #endregion
 
-        private void Awake()
-        {
-            startServerBtn.onClick.AddListener(() => OnStartServerClicked?.Invoke());
-            stopServerBtn.onClick.AddListener(() => OnStopServerClicked?.Invoke());
-            connectClientBtn.onClick.AddListener(() => OnConnectClientClicked?.Invoke());
-            disconnectClientBtn.onClick.AddListener(() => OnDisconnectClientClicked?.Invoke());
-            sendRpcBtn.onClick.AddListener(() => OnSendRpcClicked?.Invoke());
-            sendNormalBtn.onClick.AddListener(() => OnSendNormalClicked?.Invoke());
-        }
+        #region Public 公共成员
 
+        /// <summary>
+        /// 追加一行窗口诊断文本。
+        /// </summary>
+        /// <param name="prompt">待显示文本。</param>
         public void UpdatePrompt(string prompt)
         {
             if (promptText != null)
@@ -47,6 +41,11 @@ namespace MiniCore.HotUpdate
             }
         }
 
+        /// <summary>
+        /// 获取主机输入；空值时返回回退地址。
+        /// </summary>
+        /// <param name="fallback">回退主机地址。</param>
+        /// <returns>有效主机地址。</returns>
         public string GetHostOrDefault(string fallback)
         {
             if (hostInput == null)
@@ -57,6 +56,12 @@ namespace MiniCore.HotUpdate
             return string.IsNullOrWhiteSpace(text) ? fallback : text.Trim();
         }
 
+        /// <summary>
+        /// 读取端口输入。
+        /// </summary>
+        /// <param name="fallback">空输入使用的默认端口。</param>
+        /// <param name="port">解析后的端口。</param>
+        /// <returns>输入为空或解析成功时返回 true。</returns>
         public bool TryGetPort(int fallback, out int port)
         {
             port = fallback;
@@ -72,6 +77,12 @@ namespace MiniCore.HotUpdate
             return int.TryParse(text.Trim(), out port);
         }
 
+        /// <summary>
+        /// 读取 KCP Conv 输入。
+        /// </summary>
+        /// <param name="fallback">空输入使用的默认 Conv。</param>
+        /// <param name="conv">解析后的 Conv。</param>
+        /// <returns>输入为空或解析成功时返回 true。</returns>
         public bool TryGetConv(uint fallback, out uint conv)
         {
             conv = fallback;
@@ -87,6 +98,11 @@ namespace MiniCore.HotUpdate
             return uint.TryParse(text.Trim(), out conv);
         }
 
+        /// <summary>
+        /// 获取消息输入；空值时返回回退文本。
+        /// </summary>
+        /// <param name="fallback">回退消息。</param>
+        /// <returns>有效消息文本。</returns>
         public string GetMessageOrDefault(string fallback)
         {
             if (messageInput == null)
@@ -97,15 +113,28 @@ namespace MiniCore.HotUpdate
             return string.IsNullOrWhiteSpace(text) ? fallback : text.Trim();
         }
 
+        #endregion
+
+        #region Protected 受保护成员
+
+        /// <summary>
+        /// 窗口进入 Staging 时保持现有控件状态。
+        /// </summary>
+        /// <returns>同步完成任务。</returns>
         protected override MTask OnOpenAsync()
         {
-            gameObject.SetActive(true);
             return MTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 窗口关闭时不执行额外异步操作。
+        /// </summary>
+        /// <returns>同步完成任务。</returns>
         protected override MTask OnCloseAsync()
         {
             return MTask.CompletedTask;
         }
+
+        #endregion
     }
 }

@@ -4,6 +4,7 @@ using MiniCore.Core;
 using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Service;
+using MiniCore.UI;
 using UnityEngine;
 
 namespace MiniCore.HotUpdate
@@ -36,9 +37,11 @@ namespace MiniCore.HotUpdate
                 return;
             }
 
-            CreateScenePanel();
-            CreateNetworkSmokeTestRunnerIfRequested();
-            CreateDedicatedClientSmokeTestRunnerIfRequested();
+            MiniCore.UI.IUIService ui = Global.GetService<MiniCore.UI.IUIService>(this);
+            await ui.OpenAsync<KcpTestWindow>();
+            // CreateScenePanel();
+            // CreateNetworkSmokeTestRunnerIfRequested();
+            // CreateDedicatedClientSmokeTestRunnerIfRequested();
         }
 
         #endregion

@@ -1,9 +1,18 @@
-using MiniCore.Model;
+using MiniCore.UI;
 
-public class {PRESENTER_CLASS} : APresenter<{VIEW_CLASS}>
+/// <summary>
+/// {PRESENTER_CLASS} 的业务 Presenter。
+/// </summary>
+public sealed class {PRESENTER_CLASS} : AUIWindowPresenter<{VIEW_CLASS}>
 {
+    #region Protected 受保护成员
+
+    /// <summary>
+    /// 登记控件和业务事件绑定，并完成首次渲染。
+    /// </summary>
     protected override void OnBind()
     {
-        // TODO: 初始化 Presenter 逻辑
     }
+
+    #endregion
 }

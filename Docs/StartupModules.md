@@ -1,6 +1,6 @@
 # 项目启动与服务配置
 
-MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项目的初始化。资源、资产、场景绑定和 UI 已统一迁移到 `MiniCore.Service`；旧组件类型不再保留兼容包装。
+MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项目的初始化。资源、通用资产和 UI 已完成 AppService 化；旧场景绑定和旧 UI API 不保留兼容包装。UI 的窗口开发规则见 [UI 框架](UIFramework.md)。
 
 ## 项目启动流程
 
@@ -48,9 +48,9 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 通过 `Global.GetService<T>` 获取未启用服务会抛出“未注册应用服务接口”异常。服务本身是可选能力时，应改用 `Global.TryGetService<T>` 并根据返回值决定是否使用：
 
 ```csharp
-if (Global.TryGetService<IUIService>(this, out IUIService ui))
+if (Global.TryGetService<MiniCore.UI.IUIService>(this, out MiniCore.UI.IUIService ui))
 {
-    await ui.OpenAsync<LoginWindow, LoginPresenter>("UI/Login", UICanvasLayer.Main);
+    await ui.OpenAsync<LoginWindow>();
 }
 ```
 
@@ -61,23 +61,23 @@ if (Global.TryGetService<IUIService>(this, out IUIService ui))
 | 旧类型（已删除） | 当前实现 | 对外接口 | 依赖 |
 | --- | --- | --- | --- |
 | `YooAssetResourceComponent` | `YooAssetResourceService` | `IResourceService` | 无 |
-| `AssetsComponent` | `AssetService` | `IAssetService` | `IResourceService`、`ISceneBindingService` |
-| `TagsComponent` | `SceneBindingService` | `ISceneBindingService` | 无 |
-| `UIFactoryComponent` | `UIService` | `IUIService` | `IAssetService`、`ISceneBindingService` |
+| `AssetsComponent` | `AssetService` | `IAssetService` | `IResourceService` |
+| `TagsComponent` / `SceneBindingService` | 已删除 | 无 | UI Root 不查找场景 Tag |
+| `UIFactoryComponent` 和旧 UIService | `UIService` | `MiniCore.UI.IUIService` | `IResourceService` |
 
 ```csharp
 IResourceService resources = Global.GetService<IResourceService>(this);
 IAssetService assets = Global.GetService<IAssetService>(this);
-IUIService ui = Global.GetService<IUIService>(this);
+MiniCore.UI.IUIService ui = Global.GetService<MiniCore.UI.IUIService>(this);
 
 await resources.PreloadAssetAsync<GameObject>("Prefabs/Login");
-await ui.OpenAsync<LoginWindow, LoginPresenter>("UI/Login", UICanvasLayer.Main);
+await ui.OpenAsync<LoginWindow>();
 
 // 在当前 owner 不再需要服务时统一归还引用。
 Global.ReleaseAll(this);
 ```
 
-`SceneBindingService` 继续提供主 Canvas、弹窗 Canvas、顶层 Canvas、底层 Canvas、预加载池和可复用对象池等约定场景节点。`AssetService` 与 `UIService` 只依赖上述接口，不依赖具体实现。
+`UIService` 从 `UIProjectProfile` 指定的地址自动加载持久化 `ApplicationUIRoot`。Root 只包含 Overlay/Camera 两个渲染根、固定 Layer Canvas、UICamera 和 EventSystem；窗口直接挂到目标 Layer，业务场景不再放应用 Canvas。World Space UI 由场景/对象锚点体系独立管理。`AssetService` 只保留通用资产能力；`UIService` 直接管理窗口资源租约。完整规则与 KCP 示例见 [UI 框架](UIFramework.md)。
 
 ## 内置服务速查
 
@@ -86,9 +86,8 @@ Global.ReleaseAll(this);
 | 显示名 | 接口 | 用途 |
 | --- | --- | --- |
 | YooAsset 资源 | `IResourceService` | 加载、预加载、实例化和释放 YooAsset 资源。 |
-| 资产管理 | `IAssetService` | 整合资源加载与场景绑定，管理资产预加载和实例化。 |
-| 场景绑定 | `ISceneBindingService` | 提供 Canvas 与对象池根节点。 |
-| UI | `IUIService` | 创建、显示、缓存和回收窗口，并绑定 Presenter。 |
+| 资产管理 | `IAssetService` | 管理通用资产预加载、实例化和释放。 |
+| UI 框架 | `MiniCore.UI.IUIService` | 加载 Profile/Root，并管理强类型窗口、导航、缓存和资源租约。 |
 | 网络 | `INetworkService` | 管理多会话收发包、RPC、心跳和 Handler 派发。 |
 | 计时器 | `ITimerService` | 管理由 `Global.Tick` 驱动的计时任务。 |
 | 配置 | `IConfigurationService` | 加载并缓存 JSON、Protobuf 配置。 |

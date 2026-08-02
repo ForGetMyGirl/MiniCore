@@ -22,7 +22,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 | `MiniCore.Serialization` | Protobuf 序列化和 JSON 对照实现 |
 | `MiniCore.Network` | TCP / KCP / UDP、Session、RPC、心跳、Handler 派发 |
 | `MiniCore.Unity` | Unity 生命周期、时间、日志、Mono/UI 适配，以及存档、HTTP、音频、设备和运行数据服务 |
-| `MiniCore.HotUpdate` | 资源、资产、场景绑定、UI 服务、业务 Handler 与项目启动逻辑 |
+| `MiniCore.HotUpdate` | 资源、通用资产、UI 运行时、业务 Handler 与项目启动逻辑 |
 | `Project.Bootstrap` | YooAsset、HybridCLR、HotUpdate DLL 加载与 Player 启动 |
 | `MiniCore.Editor` | 启动模块、Proto、Opcode、HybridCLR 与构建工具 |
 
@@ -72,10 +72,10 @@ public sealed class GameStartup : AGameStartup
 
 ```csharp
 IResourceService resources = Global.GetService<IResourceService>(this);
-IUIService ui = Global.GetService<IUIService>(this);
+MiniCore.UI.IUIService ui = Global.GetService<MiniCore.UI.IUIService>(this);
 
 await resources.PreloadAssetAsync<GameObject>("UI/Login");
-await ui.OpenAsync<LoginWindow, LoginPresenter>("UI/Login", UICanvasLayer.Main);
+await ui.OpenAsync<LoginWindow>();
 
 Global.ReleaseAll(this);
 
@@ -130,6 +130,7 @@ HotUpdateScene
 | 强类型事件、应用/局部频道、订阅生命周期与编辑器诊断 | [强类型事件中心](Docs/Eventing.md) |
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
+| UI Root、窗口生命周期、强类型 API、Authoring 与 KCP 示例 | [UI 框架](Docs/UIFramework.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
 | HybridCLR、YooAsset 首包构建与在线热更新发布 | [打包与热更新流程](Docs/BuildAndHotUpdateWorkflow.md) |
 | 性能基线、测试方法和优化路线 | [性能测试指南](Docs/PerformanceTestingGuide.md) / [优化路线图](Docs/OptimizationRoadmap.md) |

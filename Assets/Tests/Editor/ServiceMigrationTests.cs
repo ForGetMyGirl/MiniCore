@@ -2,12 +2,13 @@ using System;
 using System.Linq;
 using MiniCore.Core;
 using MiniCore.Service;
+using MiniCore.UI;
 using NUnit.Framework;
 
 namespace MiniCore.EditorTests
 {
     /// <summary>
-    /// 验证资源、场景绑定、资产与 UI 服务化迁移后的公开契约和依赖关系。
+    /// 验证资源、通用资产与 UI 服务化迁移后的公开契约和依赖关系。
     /// </summary>
     public sealed class ServiceMigrationTests
     {
@@ -39,9 +40,8 @@ namespace MiniCore.EditorTests
         public void MigratedServices_ExposeExpectedContractsAndDependencies()
         {
             AssertServiceContract<YooAssetResourceService, IResourceService>();
-            AssertServiceContract<SceneBindingService, ISceneBindingService>();
-            AssertServiceContract<AssetService, IAssetService>(typeof(IResourceService), typeof(ISceneBindingService));
-            AssertServiceContract<UIService, IUIService>(typeof(IAssetService), typeof(ISceneBindingService));
+            AssertServiceContract<AssetService, IAssetService>(typeof(IResourceService));
+            AssertServiceContract<UIService, MiniCore.UI.IUIService>(typeof(IResourceService));
             AssertServiceContract<StoragePathService, IStoragePathService>();
             AssertServiceContract<EncryptedSaveService, ISaveService>(typeof(IStoragePathService));
             AssertServiceContract<LocalTelemetryFileService, ITelemetryService>(typeof(IStoragePathService));
@@ -55,23 +55,19 @@ namespace MiniCore.EditorTests
         {
             object owner = new object();
             TestResourceService resource = Global.RegisterAppService<ITestResourceService, TestResourceService>();
-            TestSceneBindingService sceneBindings = Global.RegisterAppService<ITestSceneBindingService, TestSceneBindingService>();
             TestAssetService asset = Global.RegisterAppService<ITestAssetService, TestAssetService>();
             TestUIService ui = Global.RegisterAppService<ITestUIService, TestUIService>();
 
             Assert.AreSame(resource, Global.GetService<ITestResourceService>(owner));
-            Assert.AreSame(sceneBindings, Global.GetService<ITestSceneBindingService>(owner));
             Assert.AreSame(asset, Global.GetService<ITestAssetService>(owner));
             Assert.AreSame(ui, Global.GetService<ITestUIService>(owner));
 
             Global.ReleaseAll(owner);
             Global.Unpin<TestUIService>();
             Global.Unpin<TestAssetService>();
-            Global.Unpin<TestSceneBindingService>();
             Global.Unpin<TestResourceService>();
 
             Assert.IsTrue(resource.IsDisposed);
-            Assert.IsTrue(sceneBindings.IsDisposed);
             Assert.IsTrue(asset.IsDisposed);
             Assert.IsTrue(ui.IsDisposed);
         }
@@ -104,13 +100,6 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
-        /// 用于验证场景绑定服务注册生命周期的测试接口。
-        /// </summary>
-        private interface ITestSceneBindingService : IAppService
-        {
-        }
-
-        /// <summary>
         /// 用于验证资产服务注册生命周期的测试接口。
         /// </summary>
         private interface ITestAssetService : IAppService
@@ -128,13 +117,6 @@ namespace MiniCore.EditorTests
         /// 资源服务的最小测试实现。
         /// </summary>
         private sealed class TestResourceService : AAppService, ITestResourceService
-        {
-        }
-
-        /// <summary>
-        /// 场景绑定服务的最小测试实现。
-        /// </summary>
-        private sealed class TestSceneBindingService : AAppService, ITestSceneBindingService
         {
         }
 

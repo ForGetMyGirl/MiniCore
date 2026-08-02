@@ -25,13 +25,39 @@ MonoBehaviour:
     AutoCollectShaders: 1
     IgnoreRuleName: NormalIgnoreRule
     Groups:
-    - GroupName: UIWindow
-      GroupDesc: "UI\u7A97\u4F53"
+    - GroupName: UIFramework
+      GroupDesc: "UI \u6846\u67B6\u8D44\u6E90"
       AssetTags: 
       ActiveRuleName: EnableGroup
       Collectors:
-      - CollectPath: Assets/AssetRes/Prefabs/UI
-        CollectorGUID: 4ad9e8e09ff08fe4da6bc0a33eaa1f4c
+      - CollectPath: Assets/AssetRes/UI/Framework
+        CollectorGUID: 27a8aba145ec64e9a935c1d54c0b502d
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags:
+        UserData:
+    - GroupName: UIProfiles
+      GroupDesc: "UI \u9879\u76EE\u914D\u7F6E"
+      AssetTags:
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRes/UI/Profiles
+        CollectorGUID: 88e8ab2bb1d5343918bcec2eb8ff407e
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags:
+        UserData:
+    - GroupName: UIWindows
+      GroupDesc: "UI \u7A97\u4F53"
+      AssetTags:
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRes/UI/Windows
+        CollectorGUID: 08552053f2bf64625843c08b06a5f97d
         CollectorType: 0
         AddressRuleName: AddressByFileName
         PackRuleName: PackSeparately
