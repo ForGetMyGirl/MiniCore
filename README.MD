@@ -132,7 +132,7 @@ HotUpdateScene
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
 | HybridCLR、YooAsset 首包构建与在线热更新发布 | [打包与热更新流程](Docs/BuildAndHotUpdateWorkflow.md) |
-| 性能基线、测试方法和优化路线 | [性能测试指南](Docs/PerformanceTestingGuide.md) / [优化路线图](Docs/OptimizationRoadmap.md) |
+| 性能基线、测试方法和优化路线 | [性能测试指南](Docs/PerformanceTestingGuide.md) / [优化路线图](Docs/OptimizationRoadmap.md) / [阶段性优化总结](Docs/PhaseOptimizationSummary.md) |
 | AI 或自动化修改前应遵循的边界与验证 | [AI 项目上下文](Docs/AI_CONTEXT.md) |
 
 服务化迁移、加密存档、HTTP 绝对地址规则和“本地运行数据记录”的行为，均以 [项目启动与服务配置](Docs/StartupModules.md) 为准。
