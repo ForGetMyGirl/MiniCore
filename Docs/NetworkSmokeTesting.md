@@ -15,7 +15,7 @@
 
 ## Player
 
-1. 按[打包与热更新流程](BuildAndHotUpdateWorkflow.md)执行 HybridCLR 产物准备与 `MiniCore > Build > Prepare DefaultPackage`，随后构建普通客户端 Player。
+1. 按[打包与热更新流程](BuildAndHotUpdateWorkflow.md)执行对应的 DefaultPackage“完整生成”或“热更编译”菜单，随后构建普通客户端 Player。
 2. 给 Player 追加 `-networkSmokeTest` 启动参数。它会在 HotUpdate DLL 加载、`MiniCoreStartup` 注册 Handler 且 `GameStartup` 完成后自动运行。
 3. Player 左上角与日志会显示阶段状态；通过时输出 `NETWORK_SMOKE: PASS (TCP / KCP / UDP)`，失败时输出 `NETWORK_SMOKE: FAIL`，并包含 `protocol`、`stage`、`sessionId` 和错误摘要。
 
@@ -63,7 +63,7 @@
 
 该验证使用同一份 Player 的两个独立进程：`-batchmode` 进程由 `MiniCoreStartup` 启动 Server 模块列表，普通进程启动 Client 模块列表。macOS 请直接执行 `.app/Contents/MacOS/MiniCore`，不要双击同一个 `.app`，否则系统会激活已有实例。
 
-1. 按[打包与热更新流程](BuildAndHotUpdateWorkflow.md)执行 HybridCLR 产物准备与 `MiniCore > Build > Prepare DefaultPackage`，然后构建 Player。
+1. 按[打包与热更新流程](BuildAndHotUpdateWorkflow.md)执行对应的 DefaultPackage“完整生成”或“热更编译”菜单，然后构建 Player。
 2. 在终端 A 启动服务端，并等待 READY 日志：
 
 ```text

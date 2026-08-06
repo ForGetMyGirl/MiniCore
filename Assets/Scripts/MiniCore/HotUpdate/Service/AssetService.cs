@@ -8,18 +8,17 @@ namespace MiniCore.Service
 {
     /// <summary>
     /// 项目资产加载与实例化服务。
-    /// 服务通过资源服务和场景绑定服务完成资源实例化与 UI 层级放置。
+    /// 服务只封装通用资源能力，不感知任何 UI 层级。
     /// </summary>
     [AppService(
         "资产管理",
         typeof(IAssetService),
-        Description = "整合资源加载与场景绑定，管理项目资产预加载和实例化。",
-        RequiresServices = new[] { typeof(IResourceService), typeof(ISceneBindingService) })]
+        Description = "管理项目通用资产预加载、实例化和释放。",
+        RequiresServices = new[] { typeof(IResourceService) })]
     public sealed class AssetService : AAppService, IAssetService
     {
         #region Private 私有成员
 
-        private ISceneBindingService sceneBindings; // 场景绑定服务。
         private IResourceService resourceService; // YooAsset 资源服务。
         private readonly System.Collections.Generic.Dictionary<string, Object> preloadAssets = new System.Collections.Generic.Dictionary<string, Object>(); // 已预加载资源缓存。
 
@@ -28,11 +27,10 @@ namespace MiniCore.Service
         #region Override 重写实现
 
         /// <summary>
-        /// 获取资产服务所需的资源与场景绑定服务。
+        /// 获取资产服务所需的资源服务。
         /// </summary>
         public override void Awake()
         {
-            sceneBindings = Global.GetService<ISceneBindingService>(this);
             resourceService = Global.GetService<IResourceService>(this);
         }
 
@@ -42,6 +40,7 @@ namespace MiniCore.Service
         protected override void OnDispose()
         {
             preloadAssets.Clear();
+            Global.ReleaseAll(this);
         }
 
         #endregion
@@ -89,37 +88,6 @@ namespace MiniCore.Service
         }
 
         /// <summary>
-        /// 异步实例化顶层 UI。
-        /// </summary>
-        /// <param name="key">UI 资源地址或资源键。</param>
-        /// <returns>实例化完成的游戏对象。</returns>
-        public MTask<GameObject> InstantiateTopUIAsync(string key)
-        {
-            return ResourceService.InstantiateAsync(key, SceneBindings.TopCanvas);
-        }
-
-
-        /// <summary>
-        /// 异步实例化主 UI。
-        /// </summary>
-        /// <param name="key">UI 资源地址或资源键。</param>
-        /// <returns>实例化完成的游戏对象。</returns>
-        public MTask<GameObject> InstantiateMainUIAsync(string key)
-        {
-            return ResourceService.InstantiateAsync(key, SceneBindings.MainCanvas);
-        }
-
-        /// <summary>
-        /// 异步实例化底层 UI。
-        /// </summary>
-        /// <param name="key">UI 资源地址或资源键。</param>
-        /// <returns>实例化完成的游戏对象。</returns>
-        public MTask<GameObject> InstantiateBottomUIAsync(string key)
-        {
-            return ResourceService.InstantiateAsync(key, SceneBindings.BottomCanvas);
-        }
-
-        /// <summary>
         /// 异步加载图集。
         /// </summary>
         /// <param name="key">图集资源地址或资源键。</param>
@@ -164,12 +132,6 @@ namespace MiniCore.Service
         #endregion
 
         #region Private 私有成员
-
-        /// <summary>
-        /// 获取已初始化的场景绑定服务。
-        /// </summary>
-        /// <returns>场景绑定服务。</returns>
-        private ISceneBindingService SceneBindings => sceneBindings ?? throw new System.InvalidOperationException("场景绑定服务尚未初始化。");
 
         /// <summary>
         /// 获取已初始化的资源服务。

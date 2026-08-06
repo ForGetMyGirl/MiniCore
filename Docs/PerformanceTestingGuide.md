@@ -96,6 +96,14 @@ MTask 的功能回归测试位于 `Assets/Tests/Editor/MTaskTests.cs`，覆盖�
 
 首次遇到某个 async 状态机类型、对象池扩容、异常、`.Share()` 共享状态，以及 BCL/第三方内部 `Task` 的分配必须单独记录，不可混入稳态成功路径。压测、场景反复进入退出和网络重连后，使用 `MTaskDiagnostics.Capture()` 对比 `ActiveNodes`、`ActiveTimers`、池命中、扩容和回收失败计数是否回到基线。应用快速退出只记录快照而不等待收敛；泄露判断应以运行期正常 Owner 释放后的稳定计数为准。
 
+### 2026-08-05 独占执行器计时器唤醒回归
+
+MiniBomber 本机回环测试中，准备、取消准备、房间设置和离开房间等 RPC 多次出现约 `979~1,018 ms` 的额外等待，也存在约 `13 ms` 的正常样本。服务端 Handler 没有等待战斗 Tick，KCP 更新间隔为 `10 ms`；进一步定位到 `MDedicatedThreadExecutor`：到期计时器被转移到就绪队列后，事件循环仍按“没有下一枚计时器”的旧兜底值等待 `1,000 ms`，到期续体只能在下一轮执行。
+
+修复后，事件循环用三种返回值表达状态：已有到期续体时返回 `0` 并立即继续；存在未来计时器时返回距最近到期时间的正毫秒数；真正空闲时返回 `Timeout.Infinite` 并等待 `Post`、`Schedule` 或 `Dispose` 信号。该方案不增加轮询、线程或热路径分配，并保留单执行器内的顺序执行语义。
+
+回归用例新增到 `MTaskTests`，分别覆盖“独占执行器短延迟不得落入空闲等待周期”“无限空闲仍可被新续体唤醒”和“独占线程释放自身后不再访问已释放的等待句柄”。`MiniCore.Runtime` 的 Player/Editor 编译、Player/Editor 的 Network、Unity、HotUpdate 依赖程序集以及 `MiniCore.EditorTests` 均编译通过。另用本次编译出的同一份 `MiniCore.Runtime.dll` 直接执行调度冒烟测试：两次运行中，请求 `10 ms` 的底层计时器在 `19~20 ms` 完成，经过 `MTask.SwitchTo → MTask.Delay(10) → SwitchTo` 的完整路径在 `27~28 ms` 完成，进入无限空闲后的新续体在记录精度内 `0 ms` 唤醒，自释放路径正常退出；计时项均低于回归上限 `500 ms`。完整 EditMode 套件仍应在 Unity Test Runner 中作为合入前例行检查运行。
+
 ## 第二项测试：Protobuf 正式路径与 JSON 对比基线
 
 `NetworkService` 在未显式设置 serializer 时默认使用 `ProtobufSerializer`，这是当前正式网络路径。`NewtonsoftJsonSerializer` 仅保留为迁移和性能对比实现；JSON 测试不代表当前客户端或 Dedicated Server 的默认配置。

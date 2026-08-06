@@ -6,10 +6,14 @@ using MiniCore.Eventing;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
+using MiniCore.UI;
 
 namespace MiniCore.HotUpdate
 {
-    public class KcpTestWindowPresenter : APresenter<KcpTestWindowView>
+    /// <summary>
+    /// 将 KCP 测试业务与被动 View 解耦的 Presenter 示例。
+    /// </summary>
+    public sealed class KcpTestWindowPresenter : AUIWindowPresenter<KcpTestWindowView>
     {
         private const string ClientSessionId = "kcp-client";
         private const uint DefaultConv = 1001;
@@ -25,17 +29,23 @@ namespace MiniCore.HotUpdate
         private Action clientDisconnectedHandler;
         private EventSubscription messageSubscription;
 
+        #region Protected 受保护成员
+
+        /// <summary>
+        /// 获取业务服务并通过 WindowSession 绑定集合登记控件监听。
+        /// </summary>
         protected override void OnBind()
         {
             net = Global.GetService<INetworkService>(this);
             eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
             messageSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(OnDemoMessageReceived);
-            View.OnStartServerClicked += StartServer;
-            View.OnStopServerClicked += () => StopServerAsync().Forget();
-            View.OnConnectClientClicked += ConnectClient;
-            View.OnDisconnectClientClicked += () => DisconnectClientAsync().Forget();
-            View.OnSendRpcClicked += SendRpc;
-            View.OnSendNormalClicked += SendNormal;
+            Bindings.Add(messageSubscription);
+            Bindings.Add(View.startServerBtn, StartServer);
+            Bindings.Add(View.stopServerBtn, StopServer);
+            Bindings.Add(View.connectClientBtn, ConnectClient);
+            Bindings.Add(View.disconnectClientBtn, DisconnectClient);
+            Bindings.Add(View.sendRpcBtn, SendRpc);
+            Bindings.Add(View.sendNormalBtn, SendNormal);
 
             if (net != null)
             {
@@ -44,9 +54,11 @@ namespace MiniCore.HotUpdate
             }
         }
 
-        public override void UnbindView()
+        /// <summary>
+        /// 解除网络服务和活动传输回调；UI 与事件总线绑定由 UIBindingSet 自动释放。
+        /// </summary>
+        protected override void OnDispose()
         {
-            messageSubscription.Dispose();
             eventBus = null;
 
             if (net != null)
@@ -61,13 +73,31 @@ namespace MiniCore.HotUpdate
                 session.Transport.OnDisconnected -= clientDisconnectedHandler;
             }
 
-            Global.ReleaseAll(this);
-            base.UnbindView();
         }
+
+        #endregion
+
+        #region Private 私有成员
 
         private void StartServer()
         {
             StartServerAsync().Forget();
+        }
+
+        /// <summary>
+        /// 从同步 Button 回调启动停止服务任务。
+        /// </summary>
+        private void StopServer()
+        {
+            StopServerAsync().Forget();
+        }
+
+        /// <summary>
+        /// 从同步 Button 回调启动断开客户端任务。
+        /// </summary>
+        private void DisconnectClient()
+        {
+            DisconnectClientAsync().Forget();
         }
 
         /// <summary>
@@ -388,5 +418,7 @@ namespace MiniCore.HotUpdate
                 View.UpdatePrompt(message);
             }
         }
+
+        #endregion
     }
 }

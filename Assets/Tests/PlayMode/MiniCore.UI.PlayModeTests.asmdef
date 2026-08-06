@@ -1,0 +1,15 @@
+{
+  "name": "MiniCore.UI.PlayModeTests",
+  "rootNamespace": "",
+  "references": ["MiniCore.Runtime", "MiniCore.Unity"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}

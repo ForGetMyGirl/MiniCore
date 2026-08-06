@@ -22,6 +22,46 @@ namespace MiniCore.Model
         /// </summary>
         public const uint TestNetworkData = 100003u;
         /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLobbyChangedNotice 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLobbyChangedNotice = 100004u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberRoomSnapshotNotice 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberRoomSnapshotNotice = 100005u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberMatchPrepareNotice 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberMatchPrepareNotice = 100006u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberMatchCountdownNotice 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberMatchCountdownNotice = 100007u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberBattleSnapshot 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberBattleSnapshot = 100008u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberBattleEventBatch 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberBattleEventBatch = 100009u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberMatchResultNotice 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberMatchResultNotice = 100010u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberDisconnectNotice 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberDisconnectNotice = 100011u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberBattleInputBatch 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberBattleInputBatch = 100012u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberBattleDelta 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberBattleDelta = 100013u;
+        /// <summary>
         /// MiniCore.Protocol.Generated.DemoRpcRequest 的稳定协议号。
         /// </summary>
         public const uint DemoRpcRequest = 200001u;
@@ -29,6 +69,102 @@ namespace MiniCore.Model
         /// MiniCore.Protocol.Generated.DemoRpcResponse 的稳定协议号。
         /// </summary>
         public const uint DemoRpcResponse = 200002u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberRegisterRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberRegisterRequest = 200003u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberRegisterResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberRegisterResponse = 200004u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLoginRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLoginRequest = 200005u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLoginResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLoginResponse = 200006u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberResumeSessionRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberResumeSessionRequest = 200007u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberResumeSessionResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberResumeSessionResponse = 200008u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLobbySnapshotRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLobbySnapshotRequest = 200009u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLobbySnapshotResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLobbySnapshotResponse = 200010u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberCreateRoomRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberCreateRoomRequest = 200011u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberCreateRoomResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberCreateRoomResponse = 200012u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberJoinRoomRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberJoinRoomRequest = 200013u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberJoinRoomResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberJoinRoomResponse = 200014u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLeaveRoomRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLeaveRoomRequest = 200015u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberLeaveRoomResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberLeaveRoomResponse = 200016u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberUpdateRoomRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberUpdateRoomRequest = 200017u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberUpdateRoomResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberUpdateRoomResponse = 200018u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberSetReadyRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberSetReadyRequest = 200019u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberSetReadyResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberSetReadyResponse = 200020u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberStartMatchRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberStartMatchRequest = 200021u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberStartMatchResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberStartMatchResponse = 200022u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberSceneReadyRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberSceneReadyRequest = 200023u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberSceneReadyResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberSceneReadyResponse = 200024u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberBattleResyncRequest 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberBattleResyncRequest = 200025u;
+        /// <summary>
+        /// MiniCore.Protocol.Generated.MiniBomberBattleResyncResponse 的稳定协议号。
+        /// </summary>
+        public const uint MiniBomberBattleResyncResponse = 200026u;
 
         /// <summary>
         /// 注册自动生成的处理器和协议类型映射。
@@ -41,16 +177,94 @@ namespace MiniCore.Model
             handlerToOpcode["MiniCore.HotUpdate.DemoNormalHandler"] = 100001;
             handlerToOpcode["MiniCore.HotUpdate.DisconnectNoticeHandler"] = 100002;
             handlerToOpcode["MiniCore.HotUpdate.TestHandler"] = 100003;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberLobbyChangedHandler"] = 100004;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberRoomSnapshotHandler"] = 100005;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberMatchPrepareHandler"] = 100006;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberMatchCountdownHandler"] = 100007;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberBattleSnapshotHandler"] = 100008;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberBattleEventHandler"] = 100009;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberMatchResultHandler"] = 100010;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberDisconnectHandler"] = 100011;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberBattleInputHandler"] = 100012;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberBattleDeltaHandler"] = 100013;
             handlerToOpcode["MiniCore.HotUpdate.DemoRpcHandler"] = 200001;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberRegisterHandler"] = 200003;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberLoginHandler"] = 200005;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberResumeSessionHandler"] = 200007;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberLobbySnapshotHandler"] = 200009;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberCreateRoomHandler"] = 200011;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberJoinRoomHandler"] = 200013;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberLeaveRoomHandler"] = 200015;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberUpdateRoomHandler"] = 200017;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberSetReadyHandler"] = 200019;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberStartMatchHandler"] = 200021;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberSceneReadyHandler"] = 200023;
+            handlerToOpcode["MiniCore.Demo.MiniBomber.MiniBomberBattleResyncHandler"] = 200025;
             opcodeToHandler[100001] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DemoNormalHandler", RequestType = "MiniCore.Protocol.Generated.DemoNormalMessage", ResponseType = "", IsRpc = false };
             opcodeToHandler[100002] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DisconnectNoticeHandler", RequestType = "MiniCore.Protocol.Generated.DisconnectNotice", ResponseType = "", IsRpc = false };
             opcodeToHandler[100003] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.TestHandler", RequestType = "MiniCore.Protocol.Generated.TestNetworkData", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100004] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberLobbyChangedHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberLobbyChangedNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100005] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberRoomSnapshotHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberRoomSnapshotNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100006] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberMatchPrepareHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberMatchPrepareNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100007] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberMatchCountdownHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberMatchCountdownNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100008] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberBattleSnapshotHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberBattleSnapshot", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100009] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberBattleEventHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberBattleEventBatch", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100010] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberMatchResultHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberMatchResultNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100011] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberDisconnectHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberDisconnectNotice", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100012] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberBattleInputHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberBattleInputBatch", ResponseType = "", IsRpc = false };
+            opcodeToHandler[100013] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberBattleDeltaHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberBattleDelta", ResponseType = "", IsRpc = false };
             opcodeToHandler[200001] = new HandlerInfo { HandlerType = "MiniCore.HotUpdate.DemoRpcHandler", RequestType = "MiniCore.Protocol.Generated.DemoRpcRequest", ResponseType = "MiniCore.Protocol.Generated.DemoRpcResponse", IsRpc = true };
+            opcodeToHandler[200003] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberRegisterHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberRegisterRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberRegisterResponse", IsRpc = true };
+            opcodeToHandler[200005] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberLoginHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberLoginRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberLoginResponse", IsRpc = true };
+            opcodeToHandler[200007] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberResumeSessionHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberResumeSessionRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberResumeSessionResponse", IsRpc = true };
+            opcodeToHandler[200009] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberLobbySnapshotHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberLobbySnapshotRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberLobbySnapshotResponse", IsRpc = true };
+            opcodeToHandler[200011] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberCreateRoomHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberCreateRoomRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberCreateRoomResponse", IsRpc = true };
+            opcodeToHandler[200013] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberJoinRoomHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberJoinRoomRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberJoinRoomResponse", IsRpc = true };
+            opcodeToHandler[200015] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberLeaveRoomHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberLeaveRoomRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberLeaveRoomResponse", IsRpc = true };
+            opcodeToHandler[200017] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberUpdateRoomHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberUpdateRoomRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberUpdateRoomResponse", IsRpc = true };
+            opcodeToHandler[200019] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberSetReadyHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberSetReadyRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberSetReadyResponse", IsRpc = true };
+            opcodeToHandler[200021] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberStartMatchHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberStartMatchRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberStartMatchResponse", IsRpc = true };
+            opcodeToHandler[200023] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberSceneReadyHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberSceneReadyRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberSceneReadyResponse", IsRpc = true };
+            opcodeToHandler[200025] = new HandlerInfo { HandlerType = "MiniCore.Demo.MiniBomber.MiniBomberBattleResyncHandler", RequestType = "MiniCore.Protocol.Generated.MiniBomberBattleResyncRequest", ResponseType = "MiniCore.Protocol.Generated.MiniBomberBattleResyncResponse", IsRpc = true };
             messageToOpcode["MiniCore.Protocol.Generated.DemoNormalMessage"] = 100001;
             messageToOpcode["MiniCore.Protocol.Generated.DisconnectNotice"] = 100002;
             messageToOpcode["MiniCore.Protocol.Generated.TestNetworkData"] = 100003;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLobbyChangedNotice"] = 100004;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberRoomSnapshotNotice"] = 100005;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberMatchPrepareNotice"] = 100006;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberMatchCountdownNotice"] = 100007;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberBattleSnapshot"] = 100008;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberBattleEventBatch"] = 100009;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberMatchResultNotice"] = 100010;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberDisconnectNotice"] = 100011;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberBattleInputBatch"] = 100012;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberBattleDelta"] = 100013;
             messageToOpcode["MiniCore.Protocol.Generated.DemoRpcRequest"] = 200001;
             messageToOpcode["MiniCore.Protocol.Generated.DemoRpcResponse"] = 200002;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberRegisterRequest"] = 200003;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberRegisterResponse"] = 200004;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLoginRequest"] = 200005;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLoginResponse"] = 200006;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberResumeSessionRequest"] = 200007;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberResumeSessionResponse"] = 200008;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLobbySnapshotRequest"] = 200009;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLobbySnapshotResponse"] = 200010;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberCreateRoomRequest"] = 200011;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberCreateRoomResponse"] = 200012;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberJoinRoomRequest"] = 200013;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberJoinRoomResponse"] = 200014;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLeaveRoomRequest"] = 200015;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberLeaveRoomResponse"] = 200016;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberUpdateRoomRequest"] = 200017;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberUpdateRoomResponse"] = 200018;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberSetReadyRequest"] = 200019;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberSetReadyResponse"] = 200020;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberStartMatchRequest"] = 200021;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberStartMatchResponse"] = 200022;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberSceneReadyRequest"] = 200023;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberSceneReadyResponse"] = 200024;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberBattleResyncRequest"] = 200025;
+            messageToOpcode["MiniCore.Protocol.Generated.MiniBomberBattleResyncResponse"] = 200026;
         }
     }
 }

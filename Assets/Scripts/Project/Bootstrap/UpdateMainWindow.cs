@@ -56,11 +56,6 @@ public class UpdateMainWindow : AMTaskBehaviour
     /// </summary>
     public int failedTryAgain;
 
-    /// <summary>
-    /// 客户端热更新完成后进入的 YooAsset 场景地址。
-    /// </summary>
-    public string mainSceneName;
-
     #endregion
 
     #region Private 私有成员
@@ -101,8 +96,8 @@ public class UpdateMainWindow : AMTaskBehaviour
     {
         await VersionCheckAsync();
         await DownloadAssetsAsync();
+        UnityEngineTypePreserver.ProtectDynamicContentTypes();
         await LoadAssembliesAsync();
-        await EnterGameAsync();
         await StartHotUpdateAsync();
     }
 
@@ -434,22 +429,6 @@ public class UpdateMainWindow : AMTaskBehaviour
         }
 
         await startTask;
-    }
-
-    /// <summary>
-    /// 在客户端模式下加载热更新业务场景。
-    /// </summary>
-    /// <returns>场景加载完成任务。</returns>
-    private async MTask EnterGameAsync()
-    {
-        if (Application.isBatchMode)
-        {
-            return;
-        }
-
-        SetPromptInfo("即将进入游戏...");
-        var handle = package.LoadSceneAsync(mainSceneName, UnityEngine.SceneManagement.LoadSceneMode.Single, UnityEngine.SceneManagement.LocalPhysicsMode.None, false);
-        await handle.ToMTask();
     }
 
     /// <summary>

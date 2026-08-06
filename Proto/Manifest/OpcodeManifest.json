@@ -19,6 +19,142 @@
             "Opcode": 100002
         },
         {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberBattleDelta",
+            "Opcode": 100013
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberBattleEventBatch",
+            "Opcode": 100009
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberBattleInputBatch",
+            "Opcode": 100012
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberBattleResyncRequest",
+            "Opcode": 200025
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberBattleResyncResponse",
+            "Opcode": 200026
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberBattleSnapshot",
+            "Opcode": 100008
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberCreateRoomRequest",
+            "Opcode": 200011
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberCreateRoomResponse",
+            "Opcode": 200012
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberDisconnectNotice",
+            "Opcode": 100011
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberJoinRoomRequest",
+            "Opcode": 200013
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberJoinRoomResponse",
+            "Opcode": 200014
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLeaveRoomRequest",
+            "Opcode": 200015
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLeaveRoomResponse",
+            "Opcode": 200016
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLobbyChangedNotice",
+            "Opcode": 100004
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLobbySnapshotRequest",
+            "Opcode": 200009
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLobbySnapshotResponse",
+            "Opcode": 200010
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLoginRequest",
+            "Opcode": 200005
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberLoginResponse",
+            "Opcode": 200006
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberMatchCountdownNotice",
+            "Opcode": 100007
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberMatchPrepareNotice",
+            "Opcode": 100006
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberMatchResultNotice",
+            "Opcode": 100010
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberRegisterRequest",
+            "Opcode": 200003
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberRegisterResponse",
+            "Opcode": 200004
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberResumeSessionRequest",
+            "Opcode": 200007
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberResumeSessionResponse",
+            "Opcode": 200008
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberRoomSnapshotNotice",
+            "Opcode": 100005
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberSceneReadyRequest",
+            "Opcode": 200023
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberSceneReadyResponse",
+            "Opcode": 200024
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberSetReadyRequest",
+            "Opcode": 200019
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberSetReadyResponse",
+            "Opcode": 200020
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberStartMatchRequest",
+            "Opcode": 200021
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberStartMatchResponse",
+            "Opcode": 200022
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberUpdateRoomRequest",
+            "Opcode": 200017
+        },
+        {
+            "TypeName": "MiniCore.Protocol.Generated.MiniBomberUpdateRoomResponse",
+            "Opcode": 200018
+        },
+        {
             "TypeName": "MiniCore.Protocol.Generated.TestNetworkData",
             "Opcode": 100003
         }

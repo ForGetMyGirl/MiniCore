@@ -104,7 +104,7 @@ public sealed class BattleFlow : IDisposable
 
 AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.Get<TConcreteService>` 绕过接口会抛出诊断。Dedicated Server 是 Unity Player，不存在“框架层禁止资源、Canvas 或物理加载”的规则；项目启动配置只校验已启用服务、依赖与 Provider 是否完整。
 
-资源、资产、场景绑定与 UI 已完成 AppService 化：`IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`ISceneBindingService` / `SceneBindingService`、`IUIService` / `UIService`。它们必须通过 `Global.GetService<TInterface>(owner)` 获取，旧的 `YooAssetResourceComponent`、`AssetsComponent`、`TagsComponent`、`UIFactoryComponent` 已删除且没有兼容包装。完整迁移映射和使用示例见 [项目启动与服务配置](StartupModules.md#已迁移的资源与-ui-服务)。
+资源、资产与 UI 已完成 AppService 化：`IResourceService` / `YooAssetResourceService`、`IAssetService` / `AssetService`、`MiniCore.UI.IUIService` / `UIService`。它们必须通过 `Global.GetService<TInterface>(owner)` 获取；旧场景 Tag/Canvas 绑定和旧 UI API 已删除且没有兼容包装。UIService 只依赖资源接口，通过 Profile 创建持久 Root；完整规则见 [UI 框架](UIFramework.md) 和 [项目启动与服务配置](StartupModules.md#已迁移的资源与-ui-服务)。
 
 普通 `AComponent` 不属于启动配置左侧列表。若它是开发者可直接调用的能力，可用 `[ComponentCatalog("名称", Description = "具体职责")]` 将其只读展示在右侧项目能力目录；未标记类型和框架内部装配类型不会显示。
 
@@ -162,7 +162,7 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 
 ### AppService、GameStartup 与生成代码
 
-通过 `MiniCore > 项目启动配置` 的“启用”勾选选择 AppService Provider，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
+通过 `MiniCore > 项目启动配置` 按 AppService 接口分组单选 Provider，并填写非敏感 Args 参数。多接口实现会整体同步选择，具体实现的 Args 在切换后仍独立保留。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
 
 右侧只读能力目录按 Service、AppModule 和带 `ComponentCatalogAttribute` 的普通 `AComponent` 分组，可折叠显示描述、接口和完整命名空间。`Description` 是 `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 的统一元数据；它不参与启动逻辑。
 
@@ -201,7 +201,8 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 | 通用序列化器 | `Serialization/Interface`、`Serialization/Protobuf`、`Serialization/NewtonsoftJson` |
 | 网络会话、收发、Handler 基类、传输实现 | `Network/Core`、`Network/Handler`、`Network/Transport` |
 | Unity 生命周期、输入、UI 契约、Unity serializer、平台服务 | `Unity/Driver`、`Unity/Mono`、`Unity/UI`、`Unity/Serialization`、`Unity/Service` |
-| 热更新资源、资产、场景绑定和 UI 服务 | `HotUpdate/Service` |
+| 热更新资源、通用资产服务 | `HotUpdate/Service` |
+| UI 运行时、窗口逻辑和生成注册表 | `HotUpdate/UI`、[UI 框架](UIFramework.md) |
 | 客户端对象池与其他业务 | `HotUpdate/Client` |
 | HotUpdate 项目启动入口 | `HotUpdate/Entry` |
 | 业务网络 Handler | `HotUpdate/Network/Handler` |

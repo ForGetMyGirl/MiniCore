@@ -86,6 +86,12 @@ namespace MiniCore.Service
         public Type InitArgsType { get; set; }
 
         /// <summary>
+        /// 获取或设置服务是否在 BatchMode 中参与启动装配。
+        /// 默认为 true；依赖图形设备或交互界面的客户端服务可显式关闭。
+        /// </summary>
+        public bool RunInBatchMode { get; set; } = true;
+
+        /// <summary>
         /// 创建应用服务标记。
         /// </summary>
         /// <param name="displayName">编辑器中显示的服务名称。</param>

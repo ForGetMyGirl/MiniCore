@@ -224,6 +224,59 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
+        /// 验证独占执行器上的短延迟到期后会立即恢复，不会进入空闲等待兜底周期。
+        /// </summary>
+        [Test]
+        public void Delay_DedicatedExecutor_ResumesWithoutIdleFallbackDelay()
+        {
+            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.Delay");
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            Run(DelayOnDedicatedExecutorAsync(worker, mainExecutor));
+
+            Assert.Less(stopwatch.Elapsed, TimeSpan.FromMilliseconds(500));
+        }
+
+        /// <summary>
+        /// 验证独占执行器无限空闲时仍会被新投递的续体立即唤醒。
+        /// </summary>
+        [Test]
+        public void Post_DedicatedExecutor_WakesInfiniteIdleWait()
+        {
+            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.IdleWake");
+            using ManualResetEventSlim entered = new ManualResetEventSlim(false);
+            using ManualResetEventSlim completed = new ManualResetEventSlim(false);
+            worker.Post(entered.Set);
+            Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(1)));
+            Thread.Sleep(25);
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            worker.Post(completed.Set);
+
+            Assert.IsTrue(completed.Wait(TimeSpan.FromMilliseconds(500)));
+            Assert.Less(stopwatch.Elapsed, TimeSpan.FromMilliseconds(500));
+        }
+
+        /// <summary>
+        /// 验证独占线程可以释放自身执行器，事件循环不会继续访问已经释放的等待句柄。
+        /// </summary>
+        [Test]
+        public void Dispose_DedicatedExecutor_FromOwnedThread_ExitsCleanly()
+        {
+            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.SelfDispose");
+            using ManualResetEventSlim disposeReturned = new ManualResetEventSlim(false);
+
+            worker.Post(() =>
+            {
+                worker.Dispose();
+                disposeReturned.Set();
+            });
+
+            Assert.IsTrue(disposeReturned.Wait(TimeSpan.FromSeconds(1)));
+            Thread.Sleep(25);
+        }
+
+        /// <summary>
         /// 验证组件同步停机钩子在任务域取消前执行。
         /// </summary>
         [Test]
@@ -496,6 +549,21 @@ namespace MiniCore.EditorTests
             int firstThreadId = Thread.CurrentThread.ManagedThreadId;
             await MTask.SwitchTo(second);
             return (firstThreadId, Thread.CurrentThread.ManagedThreadId);
+        }
+
+        /// <summary>
+        /// 切换到独占执行器执行短延迟，再返回主执行器。
+        /// </summary>
+        /// <param name="worker">执行延迟的独占执行器。</param>
+        /// <param name="main">测试线程持有的主执行器。</param>
+        /// <returns>完成延迟并切回主执行器的任务。</returns>
+        private static async MTask DelayOnDedicatedExecutorAsync(
+            IMTaskExecutor worker,
+            IMTaskExecutor main)
+        {
+            await MTask.SwitchTo(worker);
+            await MTask.Delay(10);
+            await MTask.SwitchTo(main);
         }
 
         #endregion

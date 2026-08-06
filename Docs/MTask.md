@@ -84,6 +84,8 @@ CalculateWithoutUnityAccess();
 
 `MTaskExecutors.Unity` 由 `UnityGlobalDriver.Update` 抽取；`NetworkService` 创建并持有自己的独占执行器。`CreateDedicated` 每次调用才创建一条长期工作线程，调用模块必须在释放时 Dispose；`ThreadPool` 复用 CLR 线程池而不创建固定线程。`SwitchTo` 只改变当前任务后续代码的执行位置，等待它的父任务仍回到父方捕获的执行器。
 
+独占执行器使用信号驱动的事件循环。存在下一枚计时器时只等待到它的到期时间；已经有计时器到期时立即处理就绪续体；没有计时器和普通续体时使用无限等待，不做固定周期轮询。`Post`、`Schedule` 和 `Dispose` 都会发出唤醒信号，`AutoResetEvent` 会保留发生在进入等待之前的信号，因此新工作不会被空闲等待遗漏。`MTask.Delay` 仍受操作系统线程调度影响，不保证精确到指定毫秒，但不会再额外叠加空闲轮询周期。
+
 Promise、状态机 Runner、队列工作项、计时节点和共享等待者均使用有容量上限的池。Release 编译下预热后的 Completed 和 Yield 成功路径不产生托管分配。可以在压测、场景退出和网络重连后检查：
 
 ```csharp

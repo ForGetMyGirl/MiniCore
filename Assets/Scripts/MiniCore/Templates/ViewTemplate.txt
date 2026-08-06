@@ -1,17 +1,13 @@
-using MiniCore.Model;
-using MiniCore.Threading;
-using UnityEngine;
+using MiniCore.UI;
 
-[UIWindow(typeof({PRESENTER_CLASS}))]
-public class {VIEW_CLASS} : AUIBase
+/// <summary>
+/// {VIEW_CLASS} 的被动 Unity View。
+/// </summary>
+public sealed class {VIEW_CLASS} : AUIWindowView
 {
-    protected override MTask OnOpenAsync()
-    {
-        return MTask.CompletedTask;
-    }
+    #region UnityProperty Unity 引用属性
 
-    protected override MTask OnCloseAsync()
-    {
-        return MTask.CompletedTask;
-    }
+    // 在此声明并由 Prefab 绑定 UGUI 控件。
+
+    #endregion
 }

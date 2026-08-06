@@ -8,7 +8,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 
 - **小而可组合**：系统级能力使用可替换的 AppService，普通 `AComponent` 负责局部业务能力。
 - **边界清晰**：Runtime、Protocol、Serialization 和 Network 保持纯 C#；Unity API 集中在适配层与业务层。
-- **启动简单**：编辑器以统一“启用”开关选择 AppService Provider，自动按依赖顺序生成初始化代码；项目只维护一个 `GameStartup`。
+- **启动简单**：编辑器按 AppService 接口分组单选 Provider，自动按依赖顺序生成初始化代码；项目只维护一个 `GameStartup`，复杂玩法可委托给玩法目录内的普通 Startup Component。
 - **异步结构化**：业务统一使用零第三方依赖的 `MTask`；任务自动继承父链与 Owner 生命周期，通常无需逐层传递取消令牌。
 - **业务可热更新**：Bootstrap 通过 YooAsset 和 HybridCLR 加载 `MiniCore.HotUpdate.dll`，Player 与业务程序集解耦。
 - **网络可验证**：内置 TCP、KCP、UDP、RPC、Protobuf、Handler 生成和本机/跨进程网络冒烟测试。
@@ -22,7 +22,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 | `MiniCore.Serialization` | Protobuf 序列化和 JSON 对照实现 |
 | `MiniCore.Network` | TCP / KCP / UDP、Session、RPC、心跳、Handler 派发 |
 | `MiniCore.Unity` | Unity 生命周期、时间、日志、Mono/UI 适配，以及存档、HTTP、音频、设备和运行数据服务 |
-| `MiniCore.HotUpdate` | 资源、资产、场景绑定、UI 服务、业务 Handler 与项目启动逻辑 |
+| `MiniCore.HotUpdate` | 资源、通用资产、UI 运行时、业务 Handler 与项目启动逻辑 |
 | `Project.Bootstrap` | YooAsset、HybridCLR、HotUpdate DLL 加载与 Player 启动 |
 | `MiniCore.Editor` | 启动模块、Proto、Opcode、HybridCLR 与构建工具 |
 
@@ -36,14 +36,14 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 
 打开 `MiniCore > 项目启动配置`：
 
-1. 在 **AppService** 区勾选“启用模块”需要的服务。同一接口只能启用一个 Provider；新服务默认关闭。
+1. 在 **AppService** 区按接口选择一个 Provider，或选择“不启用”；新接口默认关闭。
 2. 仅为服务填写非敏感启动参数，例如超时、重试次数或对象池大小。
 3. 在右侧“项目能力目录”查看可用的 Service、AppModule 与已标注职责的普通 `AComponent`。
 4. 点击“保存启动参数并生成代码”，等待 Unity 编译完成。
 
 配置保存于 `Assets/Settings/MiniCoreStartupSettings.asset`，生成代码位于 `Assets/Scripts/MiniCore/HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`。
 
-未启用模块不会自动注册或启动；它的代码、程序集和资源仍会保留在项目及最终包体中。通过 `Global.GetService<T>` 获取未启用服务会报错；可选服务请使用 `Global.TryGetService<T>` 判断。
+未选择 Provider 的服务不会自动注册或启动；它的代码、程序集和资源仍会保留在项目及最终包体中。通过 `Global.GetService<T>` 获取未启用服务会报错；可选服务请使用 `Global.TryGetService<T>` 判断。
 
 ### 3. 编写项目入口
 
@@ -72,10 +72,10 @@ public sealed class GameStartup : AGameStartup
 
 ```csharp
 IResourceService resources = Global.GetService<IResourceService>(this);
-IUIService ui = Global.GetService<IUIService>(this);
+MiniCore.UI.IUIService ui = Global.GetService<MiniCore.UI.IUIService>(this);
 
 await resources.PreloadAssetAsync<GameObject>("UI/Login");
-await ui.OpenAsync<LoginWindow, LoginPresenter>("UI/Login", UICanvasLayer.Main);
+await ui.OpenAsync<LoginWindow>();
 
 Global.ReleaseAll(this);
 
@@ -130,6 +130,8 @@ HotUpdateScene
 | 强类型事件、应用/局部频道、订阅生命周期与编辑器诊断 | [强类型事件中心](Docs/Eventing.md) |
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
+| UI Root、窗口生命周期、强类型 API、Authoring 与 KCP 示例 | [UI 框架](Docs/UIFramework.md) |
+| 登录、大厅、房间、状态同步战斗、三端构建与热更新实战 | [MiniBomber 全链路 Demo](Docs/Demos/MiniBomber.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
 | HybridCLR、YooAsset 首包构建与在线热更新发布 | [打包与热更新流程](Docs/BuildAndHotUpdateWorkflow.md) |
 | 性能基线、测试方法和优化路线 | [性能测试指南](Docs/PerformanceTestingGuide.md) / [优化路线图](Docs/OptimizationRoadmap.md) / [阶段性优化总结](Docs/PhaseOptimizationSummary.md) |
