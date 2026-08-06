@@ -50,6 +50,27 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
+        /// 验证窗口句柄使用引用类型承载身份，同时保留基于实例身份的值相等语义和空值安全比较。
+        /// </summary>
+        [Test]
+        public void WindowHandle_IsReferenceTypeAndPreservesIdentityEquality()
+        {
+            UIWindowId id = UIWindowId.FromGuid(Guid.NewGuid());
+            UIWindowInstanceId instanceId = new UIWindowInstanceId(id, new UIWindowInstanceKey(7L), 3U);
+            UIWindowHandle first = new UIWindowHandle(instanceId);
+            UIWindowHandle second = new UIWindowHandle(instanceId);
+            UIWindowHandle empty = null;
+
+            Assert.IsFalse(typeof(UIWindowHandle).IsValueType);
+            Assert.AreNotSame(first, second);
+            Assert.AreEqual(first, second);
+            Assert.IsTrue(first == second);
+            Assert.IsTrue(empty == null);
+            Assert.IsFalse(first == empty);
+            Assert.IsTrue(first != empty);
+        }
+
+        /// <summary>
         /// 验证固定状态机允许正常和提前关闭路径并拒绝生命周期倒退。
         /// </summary>
         [Test]
@@ -60,6 +81,20 @@ namespace MiniCore.EditorTests
             Assert.IsTrue(UIWindowStateMachine.CanTransition(UIWindowState.Closing, UIWindowState.Cached));
             Assert.IsFalse(UIWindowStateMachine.CanTransition(UIWindowState.Active, UIWindowState.Loading));
             Assert.IsFalse(UIWindowStateMachine.CanTransition(UIWindowState.Destroyed, UIWindowState.Active));
+        }
+
+        /// <summary>
+        /// 验证自动 Modal 遮罩使用足以突出弹窗的百分之八十不透明度。
+        /// </summary>
+        [Test]
+        public void ModalMask_UsesEightyPercentOpacity()
+        {
+            Type sessionType = typeof(MiniCore.Service.UIService).Assembly.GetType("MiniCore.UI.UIWindowSession");
+            Assert.IsNotNull(sessionType);
+            System.Reflection.FieldInfo alphaField = sessionType.GetField("DefaultModalMaskAlpha", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+
+            Assert.IsNotNull(alphaField);
+            Assert.AreEqual(0.8f, (float)alphaField.GetRawConstantValue(), 0.0001f);
         }
 
         /// <summary>
@@ -199,6 +234,27 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
+        /// 验证窗口自定义 Inspector 能识别派生 View 的控件引用且不会重复绘制框架字段。
+        /// </summary>
+        [Test]
+        public void WindowInspector_RecognizesDerivedViewBindings()
+        {
+            GameObject root = new GameObject("InspectorWindow", typeof(RectTransform), typeof(CanvasGroup), typeof(KcpTestWindowView));
+            try
+            {
+                SerializedObject serialized = new SerializedObject(root.GetComponent<KcpTestWindowView>());
+
+                Assert.IsTrue(UIWindowViewEditor.HasViewBindingProperties(serialized));
+                Assert.IsTrue(UIWindowViewEditor.IsViewBindingProperty("startServerBtn"));
+                Assert.IsFalse(UIWindowViewEditor.IsViewBindingProperty("routeName"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        /// <summary>
         /// 验证 Transition 原生 Preset 只复制动画参数，不覆盖窗口对象引用。
         /// </summary>
         [Test]
@@ -295,6 +351,27 @@ namespace MiniCore.EditorTests
                 UnityEngine.Object.DestroyImmediate(viewObject);
                 UnityEngine.Object.DestroyImmediate(layerObject);
             }
+        }
+
+        /// <summary>
+        /// 验证关闭导航组会清除当前 Screen 句柄，使场景流程可以暂时不显示全屏窗口。
+        /// </summary>
+        [Test]
+        public void UIService_CloseNavigationClearsCurrentScreen()
+        {
+            MiniCore.Service.UIService service = new MiniCore.Service.UIService();
+            System.Reflection.FieldInfo initializedField = typeof(MiniCore.Service.UIService).GetField("initialized", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            System.Reflection.FieldInfo navigationField = typeof(MiniCore.Service.UIService).GetField("navigationGroups", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(initializedField);
+            Assert.IsNotNull(navigationField);
+
+            initializedField.SetValue(service, true);
+            Dictionary<string, UIWindowHandle> navigationGroups = (Dictionary<string, UIWindowHandle>)navigationField.GetValue(service);
+            navigationGroups.Add("Main", new UIWindowHandle(new UIWindowInstanceId(UIWindowId.FromGuid(Guid.NewGuid()), default, 1U)));
+
+            service.CloseNavigationAsync("Main").GetAwaiter().GetResult();
+
+            Assert.IsFalse(navigationGroups.ContainsKey("Main"));
         }
 
         /// <summary>

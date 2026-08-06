@@ -4,6 +4,10 @@
 
 ## Assets/Scripts/MiniCore
 - `Assets/Scripts/MiniCore/Editor/AI/MiniCoreDevelopmentNavigationGenerator.cs`
+- `Assets/Scripts/MiniCore/Editor/AppServiceProviderConfiguration.cs`
+- `Assets/Scripts/MiniCore/Editor/AssemblyInfo.cs`
+- `Assets/Scripts/MiniCore/Editor/Demos/MiniBomber/BomberMapDefinitionEditor.cs`
+- `Assets/Scripts/MiniCore/Editor/Demos/MiniBomber/MiniBomberDemoAssetGenerator.cs`
 - `Assets/Scripts/MiniCore/Editor/HybridCLR/HybridClrBuildValidator.cs`
 - `Assets/Scripts/MiniCore/Editor/HybridCLR/HybridClrYooAssetBuildCommand.cs`
 - `Assets/Scripts/MiniCore/Editor/MiniCore.Editor.asmdef`
@@ -34,6 +38,33 @@
 - `Assets/Scripts/MiniCore/HotUpdate/Client/Pool/GameObjectPoolMgr.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Client/Pool/IPoolObject.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Client/UI/Core/GlobalListenerComponent.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/Component/MiniBomberClientComponents.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/Flow/MiniBomberClientFlowComponent.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/Presentation/MiniBomberBattlePresentationComponent.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/Presenter/MiniBomberWindowPresenters.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/BattleHudWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/CreateRoomPopupView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/LobbyWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/LoginWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/MatchResultWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/MessageToastWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/MiniBomberWindowViewBase.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/NetworkDebugWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/ReconnectOverlayView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/RegisterWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/RoomWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/View/SceneLoadingWindowView.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Common/MiniBomberBattleModel.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Common/MiniBomberConstants.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Entry/MiniBomberClientStartupComponent.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Entry/MiniBomberServerStartupComponent.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Entry/MiniBomberStartupComponentBase.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Server/Account/MiniBomberAccountRepositoryComponent.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Server/Battle/MiniBomberBattleSimulation.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Server/Lobby/MiniBomberServerState.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Server/MiniBomberServerRuntimeComponent.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Entity/DemoMessageReceivedEvent.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Entity/PoolObject/TestBall.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Entry/GameStartup.cs`
@@ -48,6 +79,7 @@
 - `Assets/Scripts/MiniCore/HotUpdate/Service/HotUpdateServiceContracts.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetResourceService.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetResourceServiceInitArgs.cs`
+- `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetSceneService.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/DedicatedClientSmokeTestRunner.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/NetworkBenchmarkLatencyCollector.cs`
 - `Assets/Scripts/MiniCore/HotUpdate/Testing/NetworkBenchmarkRunner.cs`
@@ -113,10 +145,12 @@
 - `Assets/Scripts/MiniCore/Network/Transport/Entity/Udp/UdpServerSession.cs`
 - `Assets/Scripts/MiniCore/Network/Transport/Entity/Udp/UdpServerTransport.cs`
 - `Assets/Scripts/MiniCore/Network/Transport/Entity/Udp/UdpTransport.cs`
+- `Assets/Scripts/MiniCore/Protocol/Generated/Message/MiniBomber.cs`
 - `Assets/Scripts/MiniCore/Protocol/Generated/Message/NetworkDemo.cs`
 - `Assets/Scripts/MiniCore/Protocol/Generated/Registry/OpcodeRegistry.Generated.cs`
 - `Assets/Scripts/MiniCore/Protocol/Generated/Registry/ProtobufMessageRegistry.Generated.cs`
 - `Assets/Scripts/MiniCore/Protocol/Generated/Registry/ProtobufMessageRegistry.cs`
+- `Assets/Scripts/MiniCore/Protocol/Generated/Role/MiniBomber.ProtocolRole.g.cs`
 - `Assets/Scripts/MiniCore/Protocol/Generated/Role/NetworkDemo.ProtocolRole.g.cs`
 - `Assets/Scripts/MiniCore/Protocol/MiniCore.Protocol.asmdef`
 - `Assets/Scripts/MiniCore/Protocol/Model/Message/INetworkMessage.cs`
@@ -160,6 +194,18 @@
 - `Assets/Scripts/MiniCore/Templates/PresenterTemplate.txt`
 - `Assets/Scripts/MiniCore/Templates/ViewTemplate.txt`
 - `Assets/Scripts/MiniCore/Unity/Attribute/UnreadPropertyAttribute.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Configuration/BomberMapDefinition.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Configuration/MiniBomberConfiguration.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Configuration/MiniBomberRuleConfig.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Configuration/MiniBomberRuntimeConfig.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Input/BomberInputComponent.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Scene/BomberBattleSceneBinding.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/View/BomberBombView.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/View/BomberCameraController.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/View/BomberExplosionView.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/View/BomberMapView.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/View/BomberPickupView.cs`
+- `Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/View/BomberPlayerView.cs`
 - `Assets/Scripts/MiniCore/Unity/Driver/UnityGlobalBootstrap.cs`
 - `Assets/Scripts/MiniCore/Unity/Driver/UnityGlobalDriver.cs`
 - `Assets/Scripts/MiniCore/Unity/Extension.cs`
@@ -211,7 +257,9 @@
 - `Assets/Scripts/Project/Bootstrap/UpdateMainWindow.cs`
 
 ## Assets/Tests/Editor
+- `Assets/Tests/Editor/AppServiceProviderConfigurationTests.cs`
 - `Assets/Tests/Editor/ByteBufferPoolTests.cs`
+- `Assets/Tests/Editor/Demos/MiniBomber/MiniBomberBattleSimulationTests.cs`
 - `Assets/Tests/Editor/EventBusTests.cs`
 - `Assets/Tests/Editor/FixedCapacityPacketQueueTests.cs`
 - `Assets/Tests/Editor/GlobalComponentLifecycleTests.cs`
@@ -236,6 +284,7 @@
 
 ## Proto
 - `Proto/.DS_Store`
+- `Proto/Demos/MiniBomber/MiniBomber.proto`
 - `Proto/Manifest/OpcodeManifest.json`
 - `Proto/NetworkDemo.proto`
 - `Proto/Tools/README.md`
@@ -265,6 +314,7 @@
 - `Docs/AI_CONTEXT.md`
 - `Docs/Architecture.md`
 - `Docs/BuildAndHotUpdateWorkflow.md`
+- `Docs/Demos/MiniBomber.md`
 - `Docs/DocumentationConventions.md`
 - `Docs/Eventing.md`
 - `Docs/MTask.md`
@@ -288,6 +338,13 @@
 - `Tools/EventAnalyzer/Tests/AnalyzerFixture.cs`
 
 ## Assets/Settings
+- `Assets/Settings/MiniCore/UI/InputReferences/Cancel.asset`
+- `Assets/Settings/MiniCore/UI/InputReferences/Click.asset`
+- `Assets/Settings/MiniCore/UI/InputReferences/Navigate.asset`
+- `Assets/Settings/MiniCore/UI/InputReferences/Point.asset`
+- `Assets/Settings/MiniCore/UI/InputReferences/Scroll.asset`
+- `Assets/Settings/MiniCore/UI/InputReferences/Submit.asset`
+- `Assets/Settings/MiniCore/UI/MiniCoreUI.inputactions`
 - `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_CameraSpace.preset`
 - `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_Landscape_1920x1080.preset`
 - `Assets/Settings/MiniCore/UI/Presets/CanvasScaler_Portrait_1080x1920.preset`

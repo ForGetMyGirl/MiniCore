@@ -11,12 +11,19 @@ namespace MiniCore.EditorTools
 {
     /// <summary>
     /// MiniCore 项目启动模块的可视化配置窗口。
-    /// 开发者只需勾选标记模块、填写 Args 覆盖值并生成，即可得到稳定的 HotUpdate 启动代码。
+    /// 开发者按服务接口选择唯一 Provider、填写 Args 覆盖值并生成，即可得到稳定的 HotUpdate 启动代码。
     /// </summary>
     public sealed class MiniCoreStartupWindow : EditorWindow
     {
         #region Private 私有成员
 
+        private static readonly Color[] ServiceGroupColors =
+        {
+            new Color(0.82f, 0.91f, 1.00f),
+            new Color(0.86f, 0.96f, 0.86f),
+            new Color(0.96f, 0.91f, 0.80f),
+            new Color(0.93f, 0.86f, 0.98f)
+        }; // 接口分组交替使用的柔和底色。
         private readonly HashSet<string> expandedServices = new HashSet<string>(); // 当前展开参数面板的服务类型名。
         private Vector2 scrollPosition; // 窗口滚动位置。
         private Vector2 catalogScrollPosition; // 项目能力目录滚动位置。
@@ -24,10 +31,6 @@ namespace MiniCore.EditorTools
         private bool showModuleCatalog = true; // 是否展开模块目录。
         private bool showComponentCatalog = true; // 是否展开普通组件目录。
         private MiniCoreStartupSettings settings; // 当前项目启动配置资源。
-
-        #endregion
-
-        #region Private 私有成员
 
         /// <summary>
         /// 打开 MiniCore 项目启动配置窗口。
@@ -56,7 +59,7 @@ namespace MiniCore.EditorTools
             List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules = MiniCoreStartupCodeGenerator.DiscoverAppModules();
             List<Type> components = DiscoverOrdinaryComponents(services, appModules);
             GUILayout.Label("MiniCore 项目启动配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("未启用模块不会自动注册或启动。", MessageType.Info);
+            EditorGUILayout.HelpBox("每个 AppService 接口选择一个 Provider；选择“不启用”时该接口不会注册。普通业务组件继续由 GameStartup 按流程创建。", MessageType.Info);
 
             float catalogWidth = Mathf.Clamp(position.width * 0.30f, 340f, 500f);
             float configurationWidth = Mathf.Max(760f, position.width - catalogWidth - 18f);
@@ -251,46 +254,50 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 按具体 AppService 实现绘制项目统一的启用配置。
+        /// 按 AppService 接口绘制单选 Provider 配置。
         /// </summary>
         /// <param name="services">已发现服务实现。</param>
         private void DrawServices(List<MiniCoreStartupCodeGenerator.AppServiceInfo> services)
         {
             GUILayout.Label("AppService", EditorStyles.boldLabel);
-            foreach (MiniCoreStartupCodeGenerator.AppServiceInfo service in services)
+            List<AppServiceContractGroup> groups = AppServiceProviderConfiguration.BuildGroups(services, settings);
+            for (int groupIndex = 0; groupIndex < groups.Count; groupIndex++)
             {
-                MiniCoreAppServiceSettings serviceSettings = FindServiceSettings(service.Type);
-                if (serviceSettings == null)
-                {
-                    continue;
-                }
-
+                AppServiceContractGroup group = groups[groupIndex];
+                Color previousBackgroundColor = GUI.backgroundColor;
+                GUI.backgroundColor = ServiceGroupColors[groupIndex % ServiceGroupColors.Length];
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Label(service.Attribute.DisplayName, EditorStyles.boldLabel);
-                GUILayout.FlexibleSpace();
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.SelectableLabel(service.Type.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                DrawEnabledToggle(ref serviceSettings.Enabled);
-                EditorGUILayout.LabelField("服务接口", string.Join("、", service.Attribute.ServiceTypes.Select(item => item.Name)), EditorStyles.miniLabel);
-                EditorGUILayout.LabelField("描述", GetCatalogDescription(service.Attribute.Description), EditorStyles.miniLabel);
-                if (service.Attribute.RequiresServices != null && service.Attribute.RequiresServices.Length > 0)
+                GUI.backgroundColor = previousBackgroundColor;
+                EditorGUILayout.LabelField(group.Contract.Name, EditorStyles.boldLabel);
+                EditorGUILayout.SelectableLabel(group.Contract.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                DrawProviderPopup(group, services);
+
+                if (group.HasConflict)
                 {
-                    EditorGUILayout.LabelField("依赖", string.Join("、", service.Attribute.RequiresServices.Select(item => item.Name)), EditorStyles.miniLabel);
+                    EditorGUILayout.HelpBox(
+                        $"当前资产同时启用了 {string.Join("、", group.EnabledProviders.Select(item => item.Type.Name))}。请选择唯一 Provider 后才能生成启动代码。",
+                        MessageType.Error);
                 }
 
-                if (service.ArgsType != null)
+                MiniCoreStartupCodeGenerator.AppServiceInfo selectedProvider = group.SelectedProvider;
+                if (selectedProvider != null)
                 {
-                    bool expanded = expandedServices.Contains(service.Type.AssemblyQualifiedName);
-                    bool nextExpanded = EditorGUILayout.Foldout(expanded, $"启动参数 ({service.ArgsType.Name})", true);
-                    if (nextExpanded)
+                    DrawSelectedProvider(group, selectedProvider, groups);
+                    MiniCoreAppServiceSettings serviceSettings = FindServiceSettings(selectedProvider.Type);
+                    if (selectedProvider.ArgsType != null && serviceSettings != null)
                     {
-                        expandedServices.Add(service.Type.AssemblyQualifiedName);
-                        DrawArguments(service.ArgsType, serviceSettings.Arguments, service.Attribute.DisplayName);
-                    }
-                    else
-                    {
-                        expandedServices.Remove(service.Type.AssemblyQualifiedName);
+                        string expansionKey = group.Contract.AssemblyQualifiedName + "|" + selectedProvider.Type.AssemblyQualifiedName;
+                        bool expanded = expandedServices.Contains(expansionKey);
+                        bool nextExpanded = EditorGUILayout.Foldout(expanded, $"启动参数 ({selectedProvider.ArgsType.Name})", true);
+                        if (nextExpanded)
+                        {
+                            expandedServices.Add(expansionKey);
+                            DrawArguments(selectedProvider.ArgsType, serviceSettings.Arguments, selectedProvider.Attribute.DisplayName);
+                        }
+                        else
+                        {
+                            expandedServices.Remove(expansionKey);
+                        }
                     }
                 }
 
@@ -299,12 +306,90 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 绘制一个项目统一的启用勾选框。
+        /// 绘制接口级 Provider 单选下拉框并应用选择。
         /// </summary>
-        /// <param name="value">对应的启用状态。</param>
-        private static void DrawEnabledToggle(ref bool value)
+        /// <param name="group">当前接口分组。</param>
+        /// <param name="services">全部服务实现。</param>
+        private void DrawProviderPopup(
+            AppServiceContractGroup group,
+            List<MiniCoreStartupCodeGenerator.AppServiceInfo> services)
         {
-            value = EditorGUILayout.ToggleLeft("启用模块", value);
+            int optionOffset = group.HasConflict ? 2 : 1;
+            var options = new GUIContent[group.Providers.Count + optionOffset];
+            int currentIndex = 0;
+            if (group.HasConflict)
+            {
+                options[0] = new GUIContent("配置冲突（请选择）");
+                options[1] = new GUIContent("不启用");
+            }
+            else
+            {
+                options[0] = new GUIContent("不启用");
+            }
+
+            for (int providerIndex = 0; providerIndex < group.Providers.Count; providerIndex++)
+            {
+                MiniCoreStartupCodeGenerator.AppServiceInfo provider = group.Providers[providerIndex];
+                int optionIndex = providerIndex + optionOffset;
+                options[optionIndex] = new GUIContent($"{provider.Attribute.DisplayName} — {provider.Type.Name}");
+                if (!group.HasConflict && group.SelectedProvider?.Type == provider.Type)
+                {
+                    currentIndex = optionIndex;
+                }
+            }
+
+            EditorGUI.BeginChangeCheck();
+            int nextIndex = EditorGUILayout.Popup(new GUIContent("Provider"), currentIndex, options);
+            if (!EditorGUI.EndChangeCheck())
+            {
+                return;
+            }
+
+            if (group.HasConflict && nextIndex == 0)
+            {
+                return;
+            }
+
+            MiniCoreStartupCodeGenerator.AppServiceInfo selectedProvider = nextIndex < optionOffset ? null : group.Providers[nextIndex - optionOffset];
+            AppServiceProviderConfiguration.SelectProvider(settings, services, group.Contract, selectedProvider);
+            EditorUtility.SetDirty(settings);
+        }
+
+        /// <summary>
+        /// 绘制当前接口所选 Provider 的说明、运行目标和依赖诊断。
+        /// </summary>
+        /// <param name="group">当前接口分组。</param>
+        /// <param name="provider">唯一选中的 Provider。</param>
+        /// <param name="groups">全部接口分组。</param>
+        private static void DrawSelectedProvider(
+            AppServiceContractGroup group,
+            MiniCoreStartupCodeGenerator.AppServiceInfo provider,
+            List<AppServiceContractGroup> groups)
+        {
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("当前实现", provider.Attribute.DisplayName, EditorStyles.boldLabel);
+            EditorGUILayout.SelectableLabel(provider.Type.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            EditorGUILayout.LabelField("描述", GetCatalogDescription(provider.Attribute.Description), EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.LabelField("提供接口", string.Join("、", provider.Attribute.ServiceTypes.Select(item => item.Name)), EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("运行目标", provider.Attribute.RunInBatchMode ? "普通客户端 + BatchMode" : "仅普通客户端（BatchMode 跳过）", EditorStyles.miniLabel);
+
+            Type[] dependencies = provider.Attribute.RequiresServices ?? Array.Empty<Type>();
+            if (dependencies.Length > 0)
+            {
+                EditorGUILayout.LabelField("依赖", string.Join("、", dependencies.Select(item => item.Name)), EditorStyles.miniLabel);
+                List<Type> missingDependencies = AppServiceProviderConfiguration.GetMissingDependencies(provider, groups);
+                if (missingDependencies.Count > 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        $"缺少依赖 Provider：{string.Join("、", missingDependencies.Select(item => item.Name))}。请在对应接口分组中手动选择，生成器不会自动启用依赖。",
+                        MessageType.Warning);
+                }
+            }
+
+            if (provider.Attribute.ServiceTypes.Length > 1)
+            {
+                EditorGUILayout.HelpBox($"该 Provider 同时提供多个接口；在“{group.Contract.Name}”分组中的选择会同步到它声明的其他接口。", MessageType.None);
+            }
         }
 
         /// <summary>

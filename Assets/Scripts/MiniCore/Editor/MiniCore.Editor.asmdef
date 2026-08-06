@@ -1,7 +1,7 @@
 {
   "name": "MiniCore.Editor",
   "rootNamespace": "",
-  "references": ["MiniCore.Runtime", "MiniCore.Protocol", "MiniCore.Network", "MiniCore.Unity", "MiniCore.HotUpdate", "HybridCLR.Editor", "YooAsset", "YooAsset.Editor"],
+  "references": ["MiniCore.Runtime", "MiniCore.Protocol", "MiniCore.Network", "MiniCore.Unity", "MiniCore.HotUpdate", "Unity.InputSystem", "HybridCLR.Editor", "YooAsset", "YooAsset.Editor"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

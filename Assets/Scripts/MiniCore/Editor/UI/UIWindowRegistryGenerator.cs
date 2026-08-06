@@ -28,10 +28,39 @@ namespace MiniCore.EditorTools.UI
         #region Public 公共成员
 
         /// <summary>
-        /// 校验全部窗口并覆盖生成路由和直接构造注册表。
+        /// 从菜单手动生成窗口注册表，并在 Console 输出明确的执行结果。
         /// </summary>
         [MenuItem("MiniCore/UI/Generate Window Registry", priority = 2001)]
+        private static void GenerateFromMenu()
+        {
+            try
+            {
+                int windowCount = GenerateInternal(out bool changed);
+                string state = changed ? "已更新生成文件" : "生成文件已是最新";
+                Debug.Log(
+                    $"UI Window Registry 生成成功：共 {windowCount} 个窗口，{state}。\n" +
+                    $"Routes: {UIAuthoringUtility.RoutesPath}\nRegistry: {UIAuthoringUtility.RegistryPath}");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"UI Window Registry 生成失败：{exception.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 校验全部窗口并覆盖生成路由和直接构造注册表。
+        /// </summary>
         public static void Generate()
+        {
+            GenerateInternal(out _);
+        }
+
+        /// <summary>
+        /// 扫描窗口 Prefab，并返回窗口数量与生成文件是否发生变化。
+        /// </summary>
+        /// <param name="changed">是否写入了新的生成内容。</param>
+        /// <returns>成功收集的窗口数量。</returns>
+        private static int GenerateInternal(out bool changed)
         {
             if (!TryCollect(out List<UIWindowGenerationInfo> windows, out string error))
             {
@@ -40,12 +69,14 @@ namespace MiniCore.EditorTools.UI
 
             string routes = BuildRoutes(windows);
             string registry = BuildRegistry(windows);
-            bool changed = UIAuthoringUtility.WriteGeneratedFile(UIAuthoringUtility.RoutesPath, routes);
+            changed = UIAuthoringUtility.WriteGeneratedFile(UIAuthoringUtility.RoutesPath, routes);
             changed |= UIAuthoringUtility.WriteGeneratedFile(UIAuthoringUtility.RegistryPath, registry);
             if (changed)
             {
                 AssetDatabase.Refresh();
             }
+
+            return windows.Count;
         }
 
         /// <summary>
@@ -109,9 +140,15 @@ namespace MiniCore.EditorTools.UI
             HashSet<UIWindowId> ids = new HashSet<UIWindowId>();
             HashSet<string> routes = new HashSet<string>(StringComparer.Ordinal);
             HashSet<string> addresses = new HashSet<string>(StringComparer.Ordinal);
-            string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { UIAuthoringUtility.WindowsRoot });
-            string windowsFullPath = Path.GetFullPath(UIAuthoringUtility.WindowsRoot);
-            if (guids.Length == 0 && Directory.Exists(windowsFullPath) && Directory.GetFiles(windowsFullPath, "*.prefab", SearchOption.AllDirectories).Length > 0)
+            string[] guids = AssetDatabase.FindAssets("t:Prefab", UIAuthoringUtility.WindowSearchRoots);
+            bool hasUndiscoveredPrefabs = false;
+            for (int rootIndex = 0; rootIndex < UIAuthoringUtility.WindowSearchRoots.Length; rootIndex++)
+            {
+                string windowsFullPath = Path.GetFullPath(UIAuthoringUtility.WindowSearchRoots[rootIndex]);
+                hasUndiscoveredPrefabs |= Directory.Exists(windowsFullPath) && Directory.GetFiles(windowsFullPath, "*.prefab", SearchOption.AllDirectories).Length > 0;
+            }
+
+            if (guids.Length == 0 && hasUndiscoveredPrefabs)
             {
                 error = "AssetDatabase 尚未完成 UI Windows 导入，保留现有生成表并等待下一次脚本重载。";
                 return false;
@@ -607,7 +644,7 @@ namespace MiniCore.EditorTools.UI
             for (int i = 0; i < paths.Length; i++)
             {
                 string path = paths[i];
-                bool prefab = path.StartsWith(UIAuthoringUtility.WindowsRoot + "/", StringComparison.Ordinal) && path.EndsWith(".prefab", StringComparison.Ordinal);
+                bool prefab = UIAuthoringUtility.IsWindowPrefabPath(path);
                 bool source = path.StartsWith(HotUpdateUIRoot, StringComparison.Ordinal) && !path.StartsWith(GeneratedRoot, StringComparison.Ordinal) && path.EndsWith(".cs", StringComparison.Ordinal);
                 if (prefab || source)
                 {

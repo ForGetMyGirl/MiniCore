@@ -1,6 +1,6 @@
 # 项目启动与服务配置
 
-MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项目的初始化。资源、通用资产和 UI 已完成 AppService 化；旧场景绑定和旧 UI API 不保留兼容包装。UI 的窗口开发规则见 [UI 框架](UIFramework.md)。
+MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项目的初始化。资源、通用资产和 UI 已完成 AppService 化；旧场景绑定和旧 UI API 不保留兼容包装。UI 的窗口开发规则见 [UI 框架](UIFramework.md)，完整的客户端/Dedicated Server 分流示例见 [MiniBomber 全链路 Demo](Demos/MiniBomber.md)。
 
 ## 项目启动流程
 
@@ -9,6 +9,8 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 3. `MiniCoreStartup.StartAsync()` 为每个已启用的 AppService 接口选择一个 Provider，使用 `Global.RegisterAppService` 注册，并按依赖顺序启动。
 4. 仅实现 `IAsyncAppService` 的服务会在注册后调用并等待 `InitializeAsync()`；生成入口统一返回 `MTask`，不会生成无效的接口判断。
 5. 服务启动完成后，调用项目唯一的 `GameStartup.StartAsync()`。
+
+Bootstrap 加载 HotUpdate DLL 后直接调用这条启动链；登录、大厅或服务端的首个场景与流程都应由 `GameStartup` 决定，不在 Bootstrap 中预先加载业务场景。
 
 ## MTask 生命周期与退出
 
@@ -22,10 +24,11 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
 
 打开 Unity 菜单 `MiniCore > 项目启动配置`：
 
-1. 在左侧 **AppService** 区勾选“启用模块”需要启动的服务；未勾选的服务不会自动注册或启动。同一接口只能勾选一个实现。新发现服务默认关闭。普通 `AComponent` 不再作为左侧启动项配置。
-2. 展开服务的“启动参数”区域，可覆盖非敏感 Args 的代码默认值；未勾选覆盖时采用 Args 类中的默认值。
-3. 右侧“项目能力目录”只读列出已发现的 Service、AppModule 和已标注具体职责的普通 AComponent，可折叠，用于查找项目当前可调用能力，不会改变启动配置。左侧会显示服务完整命名空间、接口、依赖、描述与可编辑 Args；右侧按类别显示用途、接口和完整类型名。
-4. `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 和传统 `MiniCoreStartupModuleAttribute` 都支持命名参数 `Description`。未填写描述时目录会明确显示“未填写用途说明”。普通组件只有显式添加 `ComponentCatalogAttribute` 才会显示，避免把框架内部实现误当作可调用功能：
+1. 左侧 **AppService** 按服务接口分组，每个颜色块代表一个 `IAppService` 接口。使用 `Provider` 下拉框选择唯一实现，或选择“不启用”；新发现的接口默认不启用。普通 `AComponent` 不作为左侧启动项配置。
+2. 每个接口块显示所选 Provider 的具体类型、职责、全部接口、依赖和 BatchMode 行为。多接口 Provider 在任一相关接口中选择后会整体同步；关闭其中任一接口也会关闭该 Provider。编辑器不会自动选择依赖，缺失依赖会显示黄色提示。
+3. 展开所选实现的“启动参数”区域，可覆盖非敏感 Args 的代码默认值；未勾选覆盖时采用 Args 类中的默认值。Args 仍按具体实现分别保存，切换 Provider 不会删除另一实现已经填写的参数。
+4. 右侧“项目能力目录”只读列出已发现的 Service、AppModule 和已标注具体职责的普通 AComponent，可折叠，用于查找项目当前可调用能力，不会改变启动配置。左侧会显示服务完整命名空间、接口、依赖、描述与可编辑 Args；右侧按类别显示用途、接口和完整类型名。
+5. `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 和传统 `MiniCoreStartupModuleAttribute` 都支持命名参数 `Description`。未填写描述时目录会明确显示“未填写用途说明”。普通组件只有显式添加 `ComponentCatalogAttribute` 才会显示，避免把框架内部实现误当作可调用功能：
 
    ```csharp
    [ComponentCatalog("全局监听组件", Description = "集中注册指定节点及其子节点下的 IListener，并批量启动或停止全局监听。")]
@@ -35,15 +38,17 @@ MiniCore 通过“AppService 启动配置 + `GameStartup`”完成 HotUpdate 项
    ```
 
    服务和 AppModule 同样使用命名参数：`[AppService("网络", typeof(INetworkService), Description = "管理多会话网络通信。")]`、`[AppModule(typeof(IExampleModule), Description = "提供示例业务能力。")]`。
-5. 点击“保存启动参数并生成代码”。控制台会指出冲突的接口、缺失依赖或无效 Args；生成后应等待 Unity 编译完成再运行。
+6. 点击“保存启动参数并生成代码”。历史资产若同时启用了同一接口的多个实现，接口块会显示红色冲突；生成器仍会最终拦截冲突、缺失依赖、依赖循环和无效 Args。生成后应等待 Unity 编译完成再运行。
 
-服务 Provider 与其 Args 覆盖值保存于 `Assets/Settings/MiniCoreStartupSettings.asset`，启动代码生成到 `Assets/Scripts/MiniCore/HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`。生成器会校验 AppService 接口、Provider、依赖和循环；不会因为目标是 Dedicated Server 而强制禁止 Unity 资源或 Canvas 服务。
+服务 Provider 与其 Args 覆盖值保存于 `Assets/Settings/MiniCoreStartupSettings.asset`，启动代码生成到 `Assets/Scripts/MiniCore/HotUpdate/Generated/Startup/MiniCoreStartup.Generated.cs`。生成器会校验 AppService 接口、Provider、依赖和循环；服务默认在普通客户端与 BatchMode 中使用相同装配规则。
 
-默认配置应只启用项目实际需要的服务。客户端与 Dedicated Server 共用同一份已启用服务清单；两者的业务行为由各自的打包目标和 `GameStartup` 决定。
+依赖图形设备或交互界面的服务可以在 `[AppService]` 上设置 `RunInBatchMode = false`。生成器会在 BatchMode 中跳过该服务的注册与异步初始化；例如 UIService 因此不会在 Dedicated Server 创建 Canvas 或 EventSystem。是否跳过必须由服务自身显式声明，生成器不会根据服务名称或资源类型猜测。
 
-## 未启用模块的行为
+默认配置应只启用项目实际需要的服务。客户端与 Dedicated Server 共用同一份已启用服务清单；`RunInBatchMode` 负责服务装配差异，`GameStartup` 负责账号、场景、战斗等业务流程差异。
 
-“启用模块”只控制 AppService 的自动注册和启动，不会裁剪代码、程序集或资源；它们仍会保留在项目和最终包体中。
+## 未启用服务的行为
+
+Provider 选择只控制 AppService 的自动注册和启动，不会裁剪代码、程序集或资源；未选择的实现仍会保留在项目和最终包体中。
 
 通过 `Global.GetService<T>` 获取未启用服务会抛出“未注册应用服务接口”异常。服务本身是可选能力时，应改用 `Global.TryGetService<T>` 并根据返回值决定是否使用：
 
@@ -81,7 +86,7 @@ Global.ReleaseAll(this);
 
 ## 内置服务速查
 
-右侧目录的服务说明来自 `[AppService(..., Description = "...")]`。当前内置 Provider 如下；是否启用由统一的“启用”勾选决定。
+右侧目录的服务说明来自 `[AppService(..., Description = "...")]`。当前内置 Provider 如下；是否启用由对应接口分组中的 Provider 下拉框决定。
 
 | 显示名 | 接口 | 用途 |
 | --- | --- | --- |
@@ -122,6 +127,12 @@ LoginResponse response = await http.SendJsonAsync<LoginRequest, LoginResponse>(
 
 环境、区服或登录后下发的地址应由调用业务或项目自己的运行时 Endpoint Provider 管理，不能写入通用 HTTP 服务的启动参数。
 
+## Protobuf 网络与业务 JSON 共存
+
+网络消息默认继续使用 `ProtobufSerializer`，`INetworkService.SetSerializer` 和现有网络测试接口保持不变。这个选择只约束网络消息的编码方式，不会把整个项目锁定为只能使用 Protobuf，也不需要在项目启动配置中增加系统级“JSON/PB Provider”。
+
+任何引用 `MiniCore.Serialization` 的业务程序集都可以在普通数据、调试工具或非网络持久化场景中直接创建 `NewtonsoftJsonSerializer` 进行 JSON 序列化和反序列化。配置服务同时提供 `LoadJsonAsync` 与 `LoadProtobufAsync`，HTTP 服务也同时提供 `SendJsonAsync` 与 `SendProtobufAsync`；这些调用可以和 PB 网络会话同时存在，彼此不覆盖。
+
 ## 加密存档
 
 `EncryptedSaveService` 只依赖 `IStoragePathService`。它通过启动参数 `EncryptionKey` 接收开发者手动填写的稳定口令：服务先以 SHA-256 得到 32 字节主密钥，再以 HMAC-SHA256 按逻辑槽位派生工作密钥，最后使用 AES-CBC 加密并以 HMAC-SHA256 校验完整性。存档文件位于本地存储根目录的 `Saves` 子目录。
@@ -139,7 +150,9 @@ LoginResponse response = await http.SendJsonAsync<LoginRequest, LoginResponse>(
 
 ## 编写项目启动逻辑
 
-在 [GameStartup.cs](../Assets/Scripts/MiniCore/HotUpdate/Entry/GameStartup.cs) 的 `StartAsync()` 中编写项目的首个业务动作，例如进入登录界面、加载存档或启动服务端监听：
+在 [GameStartup.cs](../Assets/Scripts/MiniCore/HotUpdate/Entry/GameStartup.cs) 的 `StartAsync()` 中选择项目运行形态和首个业务流程。它在项目启动配置中的服务、模块和参数全部装配完成后调用，是游戏开发者的唯一自定义入口。
+
+当某个玩法需要加载多份配置、创建多个组件并维护自己的退出资源时，建议让 `GameStartup` 只创建一个普通 Startup Component，再由该组件完成玩法装配。MiniBomber 示例将实现放在 `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Entry`，避免把 Demo 细节堆积在项目级入口：
 
 ```csharp
 public sealed class GameStartup : AGameStartup
@@ -148,15 +161,18 @@ public sealed class GameStartup : AGameStartup
     {
         if (Application.isBatchMode)
         {
-            INetworkService network = Global.GetService<INetworkService>(this);
-            await network.StartKcpServerAsync("0.0.0.0", 20000);
+            MiniBomberServerStartupComponent server = Global.GetOrAdd<MiniBomberServerStartupComponent>(this);
+            await server.InitializeAsync();
             return;
         }
 
-        // 客户端首个业务动作。
+        MiniBomberClientStartupComponent client = Global.GetOrAdd<MiniBomberClientStartupComponent>(this);
+        await client.InitializeAsync();
     }
 }
 ```
+
+Startup Component 是普通 `AComponent`，不是新的系统服务，也不添加 `[ComponentCatalog]`。它只把某个玩法的启动编排和生命周期从 `GameStartup` 中拆开；具体服务实现仍必须在调用 `GameStartup` 之前由 `MiniCoreStartupSettings` 生成并初始化，不能在这里临时替换 Provider。
 
 ## 传统启动模块
 

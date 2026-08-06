@@ -1,0 +1,418 @@
+syntax = "proto3";
+
+package minicore.demo.minibomber;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+// 公共枚举
+
+enum MiniBomberClientDestination {
+  MINI_BOMBER_DESTINATION_LOGIN = 0;
+  MINI_BOMBER_DESTINATION_LOBBY = 1;
+  MINI_BOMBER_DESTINATION_ROOM = 2;
+  MINI_BOMBER_DESTINATION_BATTLE = 3;
+  MINI_BOMBER_DESTINATION_RESULT = 4;
+}
+
+enum MiniBomberRoomState {
+  MINI_BOMBER_ROOM_WAITING = 0;
+  MINI_BOMBER_ROOM_LOADING = 1;
+  MINI_BOMBER_ROOM_BATTLE = 2;
+  MINI_BOMBER_ROOM_RESULT = 3;
+}
+
+enum MiniBomberBattleEventType {
+  MINI_BOMBER_EVENT_NONE = 0;
+  MINI_BOMBER_EVENT_BOMB_PLACED = 1;
+  MINI_BOMBER_EVENT_EXPLOSION_STARTED = 2;
+  MINI_BOMBER_EVENT_BLOCK_DESTROYED = 3;
+  MINI_BOMBER_EVENT_PICKUP_SPAWNED = 4;
+  MINI_BOMBER_EVENT_PICKUP_COLLECTED = 5;
+  MINI_BOMBER_EVENT_PLAYER_KILLED = 6;
+  MINI_BOMBER_EVENT_PLAYER_RESPAWNED = 7;
+  MINI_BOMBER_EVENT_SCORE_CHANGED = 8;
+}
+
+enum MiniBomberPickupType {
+  MINI_BOMBER_PICKUP_NONE = 0;
+  MINI_BOMBER_PICKUP_BOMB_COUNT = 1;
+  MINI_BOMBER_PICKUP_BOMB_RANGE = 2;
+}
+
+// 公共 DTO
+
+message MiniBomberVersionInfo {
+  string build_version = 1;
+  int32 protocol_version = 2;
+  int32 rule_version = 3;
+  string content_version = 4;
+}
+
+message MiniBomberPlayerProfileDto {
+  int64 player_id = 1;
+  string player_name = 2;
+}
+
+message MiniBomberRoomSummaryDto {
+  int64 room_id = 1;
+  string room_name = 2;
+  string owner_name = 3;
+  int32 player_count = 4;
+  int32 max_player_count = 5;
+  int32 duration_seconds = 6;
+  MiniBomberRoomState state = 7;
+  int64 revision = 8;
+}
+
+message MiniBomberRoomMemberDto {
+  int64 player_id = 1;
+  string player_name = 2;
+  bool is_owner = 3;
+  bool is_ready = 4;
+  bool is_online = 5;
+  int32 score = 6;
+}
+
+message MiniBomberRoomSnapshotDto {
+  int64 room_id = 1;
+  string room_name = 2;
+  int64 owner_player_id = 3;
+  int32 duration_seconds = 4;
+  MiniBomberRoomState state = 5;
+  int64 revision = 6;
+  repeated MiniBomberRoomMemberDto members = 7;
+  int64 match_id = 8;
+}
+
+// 账号消息
+
+//[IRpcRequest]
+message MiniBomberRegisterRequest {
+  string account = 1;
+  string password = 2;
+  string player_name = 3;
+  MiniBomberVersionInfo version = 4;
+}
+
+//[IRpcResponse]
+message MiniBomberRegisterResponse {
+  int32 code = 1;
+  string msg = 2;
+}
+
+//[IRpcRequest]
+message MiniBomberLoginRequest {
+  string account = 1;
+  string password = 2;
+  MiniBomberVersionInfo version = 3;
+}
+
+//[IRpcResponse]
+message MiniBomberLoginResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberPlayerProfileDto player = 3;
+  string session_token = 4;
+  MiniBomberClientDestination destination = 5;
+  int64 room_id = 6;
+  int64 match_id = 7;
+}
+
+//[IRpcRequest]
+message MiniBomberResumeSessionRequest {
+  int64 player_id = 1;
+  string session_token = 2;
+  MiniBomberVersionInfo version = 3;
+}
+
+//[IRpcResponse]
+message MiniBomberResumeSessionResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberPlayerProfileDto player = 3;
+  MiniBomberClientDestination destination = 4;
+  MiniBomberRoomSnapshotDto room = 5;
+  int64 match_id = 6;
+}
+
+// 大厅和房间消息
+
+//[IRpcRequest]
+message MiniBomberLobbySnapshotRequest {
+  int64 player_id = 1;
+}
+
+//[IRpcResponse]
+message MiniBomberLobbySnapshotResponse {
+  int32 code = 1;
+  string msg = 2;
+  int64 revision = 3;
+  repeated MiniBomberRoomSummaryDto rooms = 4;
+  int32 online_player_count = 5;
+}
+
+//[IRpcRequest]
+message MiniBomberCreateRoomRequest {
+  int64 player_id = 1;
+  string room_name = 2;
+  int32 duration_seconds = 3;
+}
+
+//[IRpcResponse]
+message MiniBomberCreateRoomResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberRoomSnapshotDto room = 3;
+}
+
+//[IRpcRequest]
+message MiniBomberJoinRoomRequest {
+  int64 player_id = 1;
+  int64 room_id = 2;
+}
+
+//[IRpcResponse]
+message MiniBomberJoinRoomResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberRoomSnapshotDto room = 3;
+}
+
+//[IRpcRequest]
+message MiniBomberLeaveRoomRequest {
+  int64 player_id = 1;
+  int64 room_id = 2;
+}
+
+//[IRpcResponse]
+message MiniBomberLeaveRoomResponse {
+  int32 code = 1;
+  string msg = 2;
+}
+
+//[IRpcRequest]
+message MiniBomberUpdateRoomRequest {
+  int64 player_id = 1;
+  int64 room_id = 2;
+  string room_name = 3;
+  int32 duration_seconds = 4;
+  int64 expected_revision = 5;
+}
+
+//[IRpcResponse]
+message MiniBomberUpdateRoomResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberRoomSnapshotDto room = 3;
+}
+
+//[IRpcRequest]
+message MiniBomberSetReadyRequest {
+  int64 player_id = 1;
+  int64 room_id = 2;
+  bool is_ready = 3;
+}
+
+//[IRpcResponse]
+message MiniBomberSetReadyResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberRoomSnapshotDto room = 3;
+}
+
+//[IRpcRequest]
+message MiniBomberStartMatchRequest {
+  int64 player_id = 1;
+  int64 room_id = 2;
+}
+
+//[IRpcResponse]
+message MiniBomberStartMatchResponse {
+  int32 code = 1;
+  string msg = 2;
+  int64 match_id = 3;
+}
+
+//[IRpcRequest]
+message MiniBomberSceneReadyRequest {
+  int64 player_id = 1;
+  int64 room_id = 2;
+  int64 match_id = 3;
+}
+
+//[IRpcResponse]
+message MiniBomberSceneReadyResponse {
+  int32 code = 1;
+  string msg = 2;
+}
+
+//[INormalMessage]
+message MiniBomberLobbyChangedNotice {
+  int64 revision = 1;
+}
+
+//[INormalMessage]
+message MiniBomberRoomSnapshotNotice {
+  MiniBomberRoomSnapshotDto room = 1;
+}
+
+//[INormalMessage]
+message MiniBomberMatchPrepareNotice {
+  int64 room_id = 1;
+  int64 match_id = 2;
+  string battle_scene_address = 3;
+  string map_address = 4;
+  int32 duration_seconds = 5;
+  int32 random_seed = 6;
+  int32 loading_timeout_milliseconds = 7;
+}
+
+//[INormalMessage]
+message MiniBomberMatchCountdownNotice {
+  int64 match_id = 1;
+  int64 server_start_timestamp_milliseconds = 2;
+  int32 countdown_milliseconds = 3;
+}
+
+// 战斗输入和状态
+
+message MiniBomberInputFrameDto {
+  int64 sequence = 1;
+  int64 client_tick = 2;
+  int32 move_x = 3;
+  int32 move_z = 4;
+  bool place_bomb = 5;
+}
+
+//[INormalMessage]
+message MiniBomberBattleInputBatch {
+  int64 player_id = 1;
+  int64 match_id = 2;
+  repeated MiniBomberInputFrameDto frames = 3;
+}
+
+message MiniBomberBattlePlayerDto {
+  int64 player_id = 1;
+  string player_name = 2;
+  int32 position_x_millimeters = 3;
+  int32 position_z_millimeters = 4;
+  int32 facing_x = 5;
+  int32 facing_z = 6;
+  bool is_alive = 7;
+  int64 respawn_tick = 8;
+  int64 invulnerable_until_tick = 9;
+  int32 score = 10;
+  int32 kills = 11;
+  int32 deaths = 12;
+  int32 bomb_capacity = 13;
+  int32 bomb_range = 14;
+  int64 acknowledged_input_sequence = 15;
+  bool is_online = 16;
+}
+
+message MiniBomberBattleBombDto {
+  int64 bomb_id = 1;
+  int64 owner_player_id = 2;
+  int32 cell_x = 3;
+  int32 cell_z = 4;
+  int32 range = 5;
+  int64 explode_tick = 6;
+  bool owner_can_pass = 7;
+}
+
+message MiniBomberBattlePickupDto {
+  int64 pickup_id = 1;
+  MiniBomberPickupType type = 2;
+  int32 cell_x = 3;
+  int32 cell_z = 4;
+}
+
+//[INormalMessage]
+message MiniBomberBattleSnapshot {
+  int64 match_id = 1;
+  int64 server_tick = 2;
+  int32 remaining_milliseconds = 3;
+  repeated MiniBomberBattlePlayerDto players = 4;
+  repeated MiniBomberBattleBombDto bombs = 5;
+  repeated MiniBomberBattlePickupDto pickups = 6;
+  bytes destroyed_breakable_cells = 7;
+  int64 revision = 8;
+  int64 last_event_id = 9;
+}
+
+// 房间级玩家动态增量；接收方只有在 base_tick 等于当前基线时才能应用。
+//[INormalMessage]
+message MiniBomberBattleDelta {
+  int64 match_id = 1;
+  int64 server_tick = 2;
+  int64 base_tick = 3;
+  int64 revision = 4;
+  int32 remaining_milliseconds = 5;
+  repeated MiniBomberBattlePlayerDto players = 6;
+}
+
+message MiniBomberBattleEventDto {
+  int64 event_id = 1;
+  MiniBomberBattleEventType type = 2;
+  int64 server_tick = 3;
+  int64 actor_player_id = 4;
+  int64 target_player_id = 5;
+  int64 entity_id = 6;
+  int32 cell_x = 7;
+  int32 cell_z = 8;
+  MiniBomberPickupType pickup_type = 9;
+  string actor_name = 10;
+  string target_name = 11;
+  int32 score = 12;
+  int32 kills = 13;
+  int32 deaths = 14;
+}
+
+//[INormalMessage]
+message MiniBomberBattleEventBatch {
+  int64 match_id = 1;
+  repeated MiniBomberBattleEventDto events = 2;
+  int64 server_tick = 3;
+  int64 previous_event_id = 4;
+  int64 revision = 5;
+}
+
+//[IRpcRequest]
+message MiniBomberBattleResyncRequest {
+  int64 player_id = 1;
+  int64 match_id = 2;
+  int64 known_server_tick = 3;
+  int64 known_revision = 4;
+  int64 known_event_id = 5;
+}
+
+//[IRpcResponse]
+message MiniBomberBattleResyncResponse {
+  int32 code = 1;
+  string msg = 2;
+  MiniBomberBattleSnapshot snapshot = 3;
+}
+
+message MiniBomberMatchResultEntryDto {
+  int32 rank = 1;
+  int64 player_id = 2;
+  string player_name = 3;
+  int32 score = 4;
+  int32 kills = 5;
+  int32 deaths = 6;
+  bool is_online = 7;
+}
+
+//[INormalMessage]
+message MiniBomberMatchResultNotice {
+  int64 room_id = 1;
+  int64 match_id = 2;
+  repeated MiniBomberMatchResultEntryDto results = 3;
+  int32 return_to_room_milliseconds = 4;
+}
+
+//[INormalMessage]
+message MiniBomberDisconnectNotice {
+  int32 code = 1;
+  string reason = 2;
+  bool may_resume = 3;
+}

@@ -117,6 +117,8 @@ ScreenWindowView                  AUIWindowView + CanvasGroup
     └── 其他业务控件
 ```
 
+`AUIWindowView.PrepareForOpen` 会在每次打开或从缓存恢复时，将窗口根 RectTransform 统一恢复为目标 Layer 的全拉伸子节点（Anchors 0～1、Offsets 0、Scale 1）。因此窗口根不应保存 1920×1080 等固定尺寸；需要固定宽高的弹窗面板应放在 `ContentRoot/PanelRoot`，之后再由安全区策略修改窗口根或 ContentRoot。
+
 不是把控件从窗口“移动到 Root 的 SafeArea 节点”，而是由 `AUIWindowView.SafeAreaTarget` 引用窗口自己的 `ContentRoot`。设备安全区变化时，View 只修改这个目标的锚点。
 
 创建向导的模板结构为：
@@ -158,6 +160,8 @@ public sealed class InventoryWindowView : AUIWindowView
 - 可选 Transition Driver
 - Safe Area 策略与目标
 - Navigation Group 和缓存数量
+
+同一个 Inspector 会在 `View Bindings` 区自动绘制派生 View 自己声明的 `Button`、`TMP_Text`、`GameObject` 等序列化字段。控件引用仍绑定在窗口自己的 View 上，不需要另挂 Authoring 组件。
 
 注册表生成器直接读取 Prefab 根节点的 `AUIWindowView`。窗口只允许一个 View 定义源，不扫描或依赖旧 Authoring 组件。`Transition Driver = null` 表示无动画，不需要空 Driver 占位。
 
@@ -222,7 +226,9 @@ Loading → Staging → Opening → Active → Closing → Cached / Destroyed
 
 缓存 View 第一次实例化时就以最终 Layer 为父节点。关闭时原地禁用并进入缓存栈，不移动到隐藏 Pool；复用时重新激活并放到正确的同层顺序。Prefetch 也直接创建在最终 Layer 下。
 
-Modal 遮罩由 Session 在窗口同一 Layer 中动态创建，拉伸铺满 Layer，Sibling 顺序始终位于窗口正下方。遮罩和窗口一起关闭；是否允许点击遮罩关闭由 View 配置决定。
+`NavigateAsync` 负责同一 Navigation Group 内 Screen 到 Screen 的替换；当业务进入战斗等“不需要 Screen、只显示 Hud”的状态时，调用 `CloseNavigationAsync(group)` 明确关闭该组当前 Screen。Hud、Popup、System 等其他 Layer 不属于 Screen 导航组，必须由打开方保存 `UIWindowHandle` 并在业务状态退出时精确关闭。
+
+Modal 遮罩由 Session 在窗口同一 Layer 中动态创建，拉伸铺满 Layer，Sibling 顺序始终位于窗口正下方。默认使用黑色 `Alpha 0.8`，确保弹窗和背景有明确层次；遮罩和窗口一起关闭，是否允许点击遮罩关闭由 View 配置决定。
 
 Presenter/ViewModel 使用 Session 任务域；View 每次激活创建独立任务域。关闭、加载失败、动画异常和服务退出进入同一清理路径，绑定、安全区订阅、逻辑、遮罩和资源租约都会释放。
 
@@ -245,7 +251,7 @@ await ui.CloseAsync(detail);
 
 调用方不传 Prefab 地址、View/Presenter 类型、Canvas Layer、动画或缓存参数；这些值全部来自生成注册表。
 
-`WindowId` 是 View 中序列化的稳定 128 位身份。`RouteName` 是开发者可读的公共类型名，普通 Prefab 重命名不会自动改变 Route。`UIWindowHandle` 包含 WindowId、实例键和代次，旧代句柄不能误操作缓存复用后的窗口。
+`WindowId` 是 View 中序列化的稳定 128 位身份。`RouteName` 是开发者可读的公共类型名，普通 Prefab 重命名不会自动改变 Route。`UIWindowHandle` 是不可变引用句柄，包含 WindowId、实例键和代次；两个句柄按实例身份比较，旧代句柄不能误操作缓存复用后的窗口，`null` 表示没有有效窗口。使用引用句柄还能避免复杂值类型跨 HotUpdate `MTask<T>` 与 AOT 泛型边界时依赖额外的 HybridCLR adjustor thunk。
 
 ## 11. KCP 可运行示例
 
@@ -258,7 +264,7 @@ await ui.CloseAsync(detail);
 | Prefab | `Assets/AssetRes/UI/Windows/KcpTestWindow.prefab` |
 | 生成路由 | `Assets/Scripts/MiniCore/HotUpdate/UI/Generated/UIWindowRoutes.Generated.cs` |
 
-`GameStartup` 使用 `await ui.OpenAsync<KcpTestWindow>()` 打开示例。运行 `HotUpdateScene` 后，可在窗口中启动 KCP Server、连接 Client、发送 Normal/RPC 消息。它同时演示：
+KCP 示例入口和强类型路由仍保留，但 `GameStartup` 已改为启动 [MiniBomber 全链路 Demo](Demos/MiniBomber.md)，不再默认打开 `KcpTestWindow`。需要单独验证时，在自定义启动或测试入口调用 `await ui.OpenAsync<KcpTestWindow>()`。该窗口可启动 KCP Server、连接 Client、发送 Normal/RPC 消息，并演示：
 
 - View 基类内置 Authoring 配置；
 - `ContentRoot` 作为 SafeAreaTarget；
@@ -288,3 +294,18 @@ await ui.CloseAsync(detail);
 - Transition Driver 为空或确实实现 `IUITransitionDriver`。
 
 Preset 不进入 YooAsset，也不参与运行时加载。
+
+## 14. 验证记录
+
+### 2026-08-05（Modal 遮罩可见性）
+
+- 症状：Popup 自动创建的黑色 ModalMask 使用 `Alpha 0.55`，在较暗或复杂背景中层次不明显。
+- 修复：Session 的唯一运行时遮罩默认值改为 `Alpha 0.8`；不修改 `SceneLoadingWindow` 等实际业务 UI 的背景透明度，也不增加 Prefab 配置项。
+- 回归：增加默认值 Editor 测试，并要求在 MiniBomber 的 Register、CreateRoom 和 MatchResult 三个 Modal Popup 上进行运行态目视检查。
+
+### 2026-08-05（派生 View 控件字段恢复显示）
+
+- 症状：所有 `AUIWindowView` 派生组件的 Inspector 只显示 WindowId、Route、Logic、安全区等框架字段，看不到派生类声明的按钮、文本和平台操作根节点。
+- 根因：`UIWindowViewEditor` 完全接管 Inspector 后只手工绘制了基类 Authoring 字段，没有继续绘制其余序列化属性；字段仍在 Prefab 数据和脚本中，不是 Unity 序列化失败。
+- 修复：增加独立 `View Bindings` 区，统一绘制所有非框架字段，同时排除已经显示过的基类属性，适用于全部窗口派生类。
+- 回归：新增 Inspector 字段分类测试，并运行 UI Framework Editor 定向测试与隔离 Unity 编译；没有改变窗口序列化格式、Prefab GUID 或生成注册表。

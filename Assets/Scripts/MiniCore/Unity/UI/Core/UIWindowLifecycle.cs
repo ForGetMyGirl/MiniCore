@@ -191,7 +191,7 @@ namespace MiniCore.UI
         /// <param name="resultWriter">可选的窗口结果提交入口。</param>
         public UIWindowContext(UIWindowHandle handle, object arguments, UIBindingSet bindings, MTaskDomain domain, IUIService service, Action<object> resultWriter = null)
         {
-            Handle = handle;
+            Handle = handle ?? throw new ArgumentNullException(nameof(handle));
             Arguments = arguments;
             Bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
             Domain = domain ?? throw new ArgumentNullException(nameof(domain));
@@ -396,7 +396,6 @@ namespace MiniCore.UI
     /// 拥有独立激活任务域并可安全进入缓存池的窗口 View 基类。
     /// </summary>
     [RequireComponent(typeof(RectTransform), typeof(CanvasGroup))]
-    [RequireComponent(typeof(RectTransform), typeof(CanvasGroup))]
     public abstract class AUIWindowView : AMTaskBehaviour
     {
         #region UnityProperty Unity 引用属性
@@ -588,12 +587,18 @@ namespace MiniCore.UI
         public override MTaskDomain GetMTaskDomain() => activationDomain ?? base.GetMTaskDomain();
 
         /// <summary>
-        /// 为新的打开周期创建任务域并恢复基本交互状态。
+        /// 为新的打开周期创建任务域，将窗口根恢复为全 Layer 拉伸并恢复基本交互状态。
         /// </summary>
         public void PrepareForOpen()
         {
             activationDomain?.Dispose();
             activationDomain = new MTaskDomain($"{GetType().FullName}.Activation", MTaskExecutors.Unity);
+            RectTransform rectTransform = (RectTransform)transform;
+            rectTransform.anchorMin = Vector2.zero;
+            rectTransform.anchorMax = Vector2.one;
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
+            rectTransform.localScale = Vector3.one;
             CanvasGroup.alpha = 1f;
             CanvasGroup.interactable = false;
             CanvasGroup.blocksRaycasts = false;

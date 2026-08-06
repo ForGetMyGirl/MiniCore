@@ -376,7 +376,17 @@ namespace MiniCore.Threading
             while (Volatile.Read(ref disposed) == 0)
             {
                 DrainContinuations();
+                if (Volatile.Read(ref disposed) != 0)
+                {
+                    break;
+                }
+
                 int waitMilliseconds = CollectDueTimers();
+                if (waitMilliseconds == 0)
+                {
+                    continue;
+                }
+
                 signal.WaitOne(waitMilliseconds);
             }
 
@@ -417,11 +427,12 @@ namespace MiniCore.Threading
         /// <summary>
         /// 派发到期计时器并计算下次唤醒间隔。
         /// </summary>
-        /// <returns>下次等待的毫秒数。</returns>
+        /// <returns>零表示已有就绪续体，正数表示等待下一枚计时器，<see cref="Timeout.Infinite"/> 表示等待外部信号。</returns>
         private int CollectDueTimers()
         {
             long now = MTaskClock.Timestamp;
             long nearest = long.MaxValue;
+            bool hasReadyContinuation = false;
             lock (timerGate)
             {
                 for (int i = timers.Count - 1; i >= 0; i--)
@@ -433,6 +444,7 @@ namespace MiniCore.Threading
                         if (scheduled.TryTake(out Action continuation))
                         {
                             continuations.Enqueue(continuation);
+                            hasReadyContinuation = true;
                         }
 
                         scheduled.Return();
@@ -446,9 +458,14 @@ namespace MiniCore.Threading
                 }
             }
 
+            if (hasReadyContinuation)
+            {
+                return 0;
+            }
+
             if (nearest == long.MaxValue)
             {
-                return 1000;
+                return Timeout.Infinite;
             }
 
             return Math.Max(1, MTaskClock.ToMilliseconds(nearest - now));

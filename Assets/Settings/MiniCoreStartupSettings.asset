@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77d87d94177a34e98b862345b0cc4dca, type: 3}
   m_Name: MiniCoreStartupSettings
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   Modules: []
   Services:
   - AssemblyQualifiedTypeName: MiniCore.Service.UnityWebRequestHttpService, MiniCore.Unity,
@@ -20,13 +20,13 @@ MonoBehaviour:
     Arguments:
     - MemberName: DefaultTimeoutSeconds
       UseCodeDefault: 1
-      Value: 
+      Value:
     - MemberName: MaxRetryCount
       UseCodeDefault: 1
-      Value: 
+      Value:
     - MemberName: RetryBackoffMilliseconds
       UseCodeDefault: 1
-      Value: 
+      Value:
   - AssemblyQualifiedTypeName: MiniCore.Service.UIService, MiniCore.HotUpdate, Version=0.0.0.0,
       Culture=neutral, PublicKeyToken=null
     Enabled: 1
@@ -40,7 +40,14 @@ MonoBehaviour:
     Arguments:
     - MemberName: PackageName
       UseCodeDefault: 1
-      Value: 
+      Value:
+  - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetSceneService, MiniCore.HotUpdate,
+      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    Enabled: 1
+    Arguments:
+    - MemberName: PackageName
+      UseCodeDefault: 1
+      Value:
   - AssemblyQualifiedTypeName: MiniCore.Service.EncryptedSaveService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1
@@ -89,4 +96,4 @@ MonoBehaviour:
     Arguments:
     - MemberName: PoolSize
       UseCodeDefault: 1
-      Value: 
+      Value:

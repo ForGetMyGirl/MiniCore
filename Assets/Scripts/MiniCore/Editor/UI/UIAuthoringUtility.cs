@@ -20,6 +20,39 @@ namespace MiniCore.EditorTools.UI
         public const string WindowsRoot = "Assets/AssetRes/UI/Windows";
 
         /// <summary>
+        /// Demo 自包含窗口 Prefab 的收集根目录。
+        /// </summary>
+        public const string DemoWindowsRoot = "Assets/AssetRes/Demos/MiniBomber/UI";
+
+        /// <summary>
+        /// 注册表生成器扫描的正式窗口和 Demo 窗口根目录。
+        /// </summary>
+        public static readonly string[] WindowSearchRoots = { WindowsRoot, DemoWindowsRoot };
+
+        /// <summary>
+        /// 判断资产路径是否位于正式或 Demo 窗口收集根目录。
+        /// </summary>
+        /// <param name="path">Unity 资产路径。</param>
+        /// <returns>属于可生成窗口 Prefab 时返回 true。</returns>
+        public static bool IsWindowPrefabPath(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !path.EndsWith(".prefab", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            for (int index = 0; index < WindowSearchRoots.Length; index++)
+            {
+                if (path.StartsWith(WindowSearchRoots[index] + "/", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// 自动生成注册表文件路径。
         /// </summary>
         public const string RegistryPath = "Assets/Scripts/MiniCore/HotUpdate/UI/Generated/UIWindowRegistry.Generated.cs";

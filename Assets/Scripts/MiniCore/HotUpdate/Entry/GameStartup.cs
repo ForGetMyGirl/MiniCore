@@ -1,33 +1,29 @@
-using System;
-using MiniCore.Threading;
 using MiniCore.Core;
-using MiniCore.Eventing;
+using MiniCore.Demo.MiniBomber;
 using MiniCore.Model;
-using MiniCore.Service;
-using MiniCore.UI;
+using MiniCore.Threading;
 using UnityEngine;
 
 namespace MiniCore.HotUpdate
 {
     /// <summary>
-    /// 当前项目唯一的自定义启动入口。
-    /// 框架会先装配编辑器配置的模块，再调用此类的 StartAsync；业务只需在这里编写额外启动行为。
+    /// 当前项目唯一的开发者自定义启动入口。
+    /// 框架先装配项目启动配置中的服务与模块，再由此处选择运行形态和首个业务流程。
     /// </summary>
     public sealed class GameStartup : AGameStartup
     {
         #region Public 公共成员
 
         /// <summary>
-        /// 根据当前 Player 模式启动示例业务。
-        /// 客户端创建测试面板；Dedicated Server 启动 KCP 监听。新项目可直接替换为自己的业务逻辑。
+        /// 根据当前运行形态进入网络测试、MiniBomber 客户端或 Dedicated Server 流程。
         /// </summary>
-        /// <returns>项目启动完成任务。</returns>
+        /// <returns>选定业务入口初始化完成任务。</returns>
         public override async MTask StartAsync()
         {
             if (Application.isBatchMode)
             {
-                await StartDedicatedServerAsync();
-                ConfigureDedicatedServerSmokeTestIfRequested();
+                serverStartup = Global.GetOrAdd<MiniBomberServerStartupComponent>(this);
+                await serverStartup.InitializeAsync();
                 return;
             }
 
@@ -37,41 +33,36 @@ namespace MiniCore.HotUpdate
                 return;
             }
 
-            MiniCore.UI.IUIService ui = Global.GetService<MiniCore.UI.IUIService>(this);
-            await ui.OpenAsync<KcpTestWindow>();
-            // CreateScenePanel();
-            // CreateNetworkSmokeTestRunnerIfRequested();
-            // CreateDedicatedClientSmokeTestRunnerIfRequested();
+            if (NetworkSmokeTestRunner.HasCommandLineArgument(NetworkSmokeTestRunner.RunArgument))
+            {
+                CreateNetworkSmokeTestRunnerIfRequested();
+                return;
+            }
+
+            if (DedicatedClientSmokeTestRunner.HasCommandLineArgument(DedicatedClientSmokeTestRunner.RunArgument))
+            {
+                CreateDedicatedClientSmokeTestRunnerIfRequested();
+                return;
+            }
+
+            clientStartup = Global.GetOrAdd<MiniBomberClientStartupComponent>(this);
+            await clientStartup.InitializeAsync();
         }
 
         #endregion
 
         #region Private 私有成员
 
-        private const string DedicatedServerSmokeTestArgument = "-dedicatedServerSmokeTest"; // Dedicated Server 冒烟模式的命令行参数。
-        private EventSubscription dedicatedServerSmokeSubscription; // Dedicated Server 冒烟日志监听的订阅 token。
-
-        /// <summary>
-        /// 创建当前示例场景使用的多协议测试面板。
-        /// </summary>
-        private static void CreateScenePanel()
-        {
-            if (UnityEngine.Object.FindObjectOfType<MultiProtocolTestPanel>() != null)
-            {
-                return;
-            }
-
-            GameObject panelObject = new GameObject("MultiProtocolTestPanel");
-            UnityEngine.Object.DontDestroyOnLoad(panelObject);
-            panelObject.AddComponent<MultiProtocolTestPanel>();
-        }
+        private MiniBomberClientStartupComponent clientStartup; // 普通客户端 Demo 启动组件。
+        private MiniBomberServerStartupComponent serverStartup; // Dedicated Server Demo 启动组件。
 
         /// <summary>
         /// 当客户端以网络冒烟参数启动时创建自动化验证组件。
         /// </summary>
         private static void CreateNetworkSmokeTestRunnerIfRequested()
         {
-            if (!NetworkSmokeTestRunner.HasCommandLineArgument(NetworkSmokeTestRunner.RunArgument) || UnityEngine.Object.FindObjectOfType<NetworkSmokeTestRunner>() != null)
+            if (!NetworkSmokeTestRunner.HasCommandLineArgument(NetworkSmokeTestRunner.RunArgument) ||
+                UnityEngine.Object.FindObjectOfType<NetworkSmokeTestRunner>() != null)
             {
                 return;
             }
@@ -86,7 +77,8 @@ namespace MiniCore.HotUpdate
         /// </summary>
         private static void CreateNetworkBenchmarkRunnerIfRequested()
         {
-            if (!NetworkBenchmarkRunner.HasCommandLineArgument(NetworkBenchmarkRunner.RunArgument) || UnityEngine.Object.FindObjectOfType<NetworkBenchmarkRunner>() != null)
+            if (!NetworkBenchmarkRunner.HasCommandLineArgument(NetworkBenchmarkRunner.RunArgument) ||
+                UnityEngine.Object.FindObjectOfType<NetworkBenchmarkRunner>() != null)
             {
                 return;
             }
@@ -101,7 +93,8 @@ namespace MiniCore.HotUpdate
         /// </summary>
         private static void CreateDedicatedClientSmokeTestRunnerIfRequested()
         {
-            if (!DedicatedClientSmokeTestRunner.HasCommandLineArgument(DedicatedClientSmokeTestRunner.RunArgument) || UnityEngine.Object.FindObjectOfType<DedicatedClientSmokeTestRunner>() != null)
+            if (!DedicatedClientSmokeTestRunner.HasCommandLineArgument(DedicatedClientSmokeTestRunner.RunArgument) ||
+                UnityEngine.Object.FindObjectOfType<DedicatedClientSmokeTestRunner>() != null)
             {
                 return;
             }
@@ -111,68 +104,18 @@ namespace MiniCore.HotUpdate
             testObject.AddComponent<DedicatedClientSmokeTestRunner>();
         }
 
-        /// <summary>
-        /// 为 Dedicated Server 启动命令行指定端口上的 KCP 监听。
-        /// </summary>
-        /// <returns>KCP 监听完成启动的任务。</returns>
-        private async MTask StartDedicatedServerAsync()
-        {
-            INetworkService network = Global.GetService<INetworkService>(this);
-            await network.StartKcpServerAsync("0.0.0.0", ReadServerPort());
-        }
-
-        /// <summary>
-        /// 在 Dedicated Server 冒烟模式下订阅业务事件并输出服务端就绪日志。
-        /// </summary>
-        private void ConfigureDedicatedServerSmokeTestIfRequested()
-        {
-            if (!NetworkSmokeTestRunner.HasCommandLineArgument(DedicatedServerSmokeTestArgument))
-            {
-                return;
-            }
-
-            IApplicationEventBus eventBus = Global.GetOrAddModule<IApplicationEventBus>(this);
-            dedicatedServerSmokeSubscription = eventBus.Subscribe<DemoMessageReceivedEvent>(LogDedicatedServerSmokeEvent);
-            Debug.Log($"DEDICATED_SERVER_SMOKE: READY entry:{nameof(MiniCoreStartup)} port:{ReadServerPort()}");
-        }
-
-        /// <summary>
-        /// 将业务 Handler 广播的消息镜像为 Dedicated Server 冒烟日志。
-        /// </summary>
-        /// <param name="@event">Handler 广播的强类型业务事件。</param>
-        private static void LogDedicatedServerSmokeEvent(DemoMessageReceivedEvent @event)
-        {
-            Debug.Log($"DEDICATED_SERVER_SMOKE: event:{@event.Message}");
-        }
-
-        /// <summary>
-        /// 从命令行读取服务端监听端口。
-        /// </summary>
-        /// <returns>合法端口；未指定或无效时返回 20000。</returns>
-        private static int ReadServerPort()
-        {
-            string[] arguments = Environment.GetCommandLineArgs();
-            for (int i = 0; i < arguments.Length - 1; i++)
-            {
-                if (string.Equals(arguments[i], "-serverPort", StringComparison.OrdinalIgnoreCase) && int.TryParse(arguments[i + 1], out int port) && port > 0 && port <= 65535)
-                {
-                    return port;
-                }
-            }
-
-            return 20000;
-        }
-
         #endregion
 
         #region Override 重写实现
 
         /// <summary>
-        /// 解除 Dedicated Server 冒烟事件订阅。
+        /// 释放当前 GameStartup 持有的具体业务启动组件。
         /// </summary>
         protected override void OnDispose()
         {
-            dedicatedServerSmokeSubscription.Dispose();
+            clientStartup = null;
+            serverStartup = null;
+            Global.ReleaseAll(this);
             base.OnDispose();
         }
 

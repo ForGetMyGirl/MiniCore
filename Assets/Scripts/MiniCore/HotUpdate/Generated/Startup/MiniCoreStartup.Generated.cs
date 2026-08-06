@@ -47,8 +47,12 @@ namespace MiniCore.HotUpdate
             global::MiniCore.Service.SettingsService service9 = Global.RegisterAppService<global::MiniCore.Service.ISettingsService, global::MiniCore.Service.SettingsService>(null);
             await ((global::MiniCore.Service.IAsyncAppService)service9).InitializeAsync();
             global::MiniCore.Service.TimerService service10 = Global.RegisterAppService<global::MiniCore.Service.ITimerService, global::MiniCore.Service.TimerService>(null);
-            global::MiniCore.Service.UIService service11 = Global.RegisterAppService<global::MiniCore.UI.IUIService, global::MiniCore.Service.UIService>(new global::MiniCore.Service.UIServiceInitArgs { ProfileAddress = "UIProjectProfile" });
-            await ((global::MiniCore.Service.IAsyncAppService)service11).InitializeAsync();
+            if (!UnityEngine.Application.isBatchMode)
+            {
+                global::MiniCore.Service.UIService service11 = Global.RegisterAppService<global::MiniCore.UI.IUIService, global::MiniCore.Service.UIService>(new global::MiniCore.Service.UIServiceInitArgs { ProfileAddress = "UIProjectProfile" });
+                await ((global::MiniCore.Service.IAsyncAppService)service11).InitializeAsync();
+            }
+            global::MiniCore.Service.YooAssetSceneService service12 = Global.RegisterAppService<global::MiniCore.Service.ISceneService, global::MiniCore.Service.YooAssetSceneService>(new global::MiniCore.Service.YooAssetSceneServiceInitArgs());
         }
 
         #endregion

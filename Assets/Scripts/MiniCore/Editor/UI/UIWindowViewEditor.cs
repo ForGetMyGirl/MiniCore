@@ -13,6 +13,27 @@ namespace MiniCore.EditorTools.UI
     {
         #region Private 私有成员
 
+        private static readonly string[] FrameworkPropertyNames =
+        {
+            "m_Script",
+            "transitionDriver",
+            "safeAreaTarget",
+            "windowId",
+            "routeName",
+            "logicTypeName",
+            "assetAddress",
+            "template",
+            "renderSpace",
+            "layer",
+            "instancePolicy",
+            "duplicateOpenPolicy",
+            "cachePolicy",
+            "safeAreaPolicy",
+            "modal",
+            "closeOnMaskClick",
+            "maxCacheCount",
+            "navigationGroup"
+        }; // 已由框架 Authoring 区单独绘制的序列化字段。
         private bool showAdvanced; // 是否展开高级覆盖项。
 
         #endregion
@@ -40,6 +61,7 @@ namespace MiniCore.EditorTools.UI
             DrawLogicPopup();
             EditorGUILayout.PropertyField(serializedObject.FindProperty("transitionDriver"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("safeAreaTarget"));
+            DrawViewBindings();
 
             showAdvanced = EditorGUILayout.Foldout(showAdvanced, "Advanced", true);
             if (showAdvanced)
@@ -68,7 +90,75 @@ namespace MiniCore.EditorTools.UI
 
         #endregion
 
+        #region Internal 内部成员
+
+        /// <summary>
+        /// 判断序列化字段是否属于派生 View 自己声明的控件绑定。
+        /// </summary>
+        /// <param name="propertyName">序列化字段名称。</param>
+        /// <returns>字段不属于框架 Authoring 配置时返回 true。</returns>
+        internal static bool IsViewBindingProperty(string propertyName)
+        {
+            if (string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            for (int index = 0; index < FrameworkPropertyNames.Length; index++)
+            {
+                if (string.Equals(FrameworkPropertyNames[index], propertyName, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 检查当前窗口是否含有需要在 Inspector 显示的派生 View 字段。
+        /// </summary>
+        /// <param name="viewObject">目标窗口序列化对象。</param>
+        /// <returns>至少存在一个派生 View 字段时返回 true。</returns>
+        internal static bool HasViewBindingProperties(SerializedObject viewObject)
+        {
+            if (viewObject == null)
+            {
+                throw new ArgumentNullException(nameof(viewObject));
+            }
+
+            SerializedProperty iterator = viewObject.GetIterator();
+            bool enterChildren = true;
+            while (iterator.NextVisible(enterChildren))
+            {
+                enterChildren = false;
+                if (IsViewBindingProperty(iterator.name))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+
         #region Private 私有成员
+
+        /// <summary>
+        /// 绘制派生 View 声明的按钮、文本和业务对象引用。
+        /// </summary>
+        private void DrawViewBindings()
+        {
+            if (!HasViewBindingProperties(serializedObject))
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("View Bindings", EditorStyles.boldLabel);
+            DrawPropertiesExcluding(serializedObject, FrameworkPropertyNames);
+        }
 
         /// <summary>
         /// 绘制可直接构造逻辑类型下拉并保存程序集限定名。

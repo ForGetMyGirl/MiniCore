@@ -71,7 +71,8 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 - `UpdateMainWindow` 负责 YooAsset 初始化、版本/清单/下载、AOT 元数据加载、`MiniCore.HotUpdate.dll` 加载，并在最后调用 Entry。
 - AOT 元数据先于 HotUpdate DLL 加载。不要把所有剥离 DLL 盲目打入包；以生成的 HybridCLR AOT 地址表为准。
 - `MiniCore.HotUpdate.dll` 必须在 YooAsset 包中，地址为 Bootstrap 配置使用的 `HotUpdate`。
-- `MiniCoreStartup` 在所有运行形态使用同一份已启用模块和 AppService 清单；`GameStartup` 根据打包目标负责项目业务启动，服务端端口参数为 `-serverPort`，默认 `20000`。
+- `MiniCoreStartup` 在所有运行形态使用同一份已启用模块和 AppService 清单；启动编辑器按 `IAppService` 接口分组单选 Provider，具体实现的 Args 独立保留。`GameStartup` 根据打包目标负责项目业务启动，复杂玩法应委托给玩法目录下的普通 Startup Component；服务端端口参数为 `-serverPort`，默认 `20000`。
+- 网络默认 Protobuf 只约束网络消息编码；业务可以同时直接使用 `NewtonsoftJsonSerializer`，配置和 HTTP 也可分别调用 JSON/PB API，不设置系统级序列化 Provider。
 - 启动配置只选择 AppService Provider 并覆盖非敏感 Args。每个接口只能启用一个 Provider；`RequiresServices` 必须在项目启动配置中可用。
 - 只有实现 `MiniCore.Service.IAsyncAppService` 的 Provider 才会在生成代码中调用 `InitializeAsync()`；不要对所有具体服务生成接口模式匹配。
 - `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 都可填写 `Description`，供启动配置窗口的只读目录展示。
@@ -100,6 +101,7 @@ Unity  <- Project.Bootstrap               -动态加载-> HotUpdate
 | 新协议与 Proto | `Proto/`、`Editor/Protocol/ProtoCodeGenerator.cs`、[网络与协议](NetworkLayerAnalysis.md#2-proto-与生成流程) |
 | Opcode/Handler 生成 | `Editor/Opcode*.cs`、`Protocol/Generated/Registry`、`HotUpdate/Generated/Network` |
 | UI 窗口、Root、分辨率、安全区域和动画 | `Unity/UI`、`HotUpdate/UI`、`Editor/UI`、[UI 框架](UIFramework.md) |
+| MiniBomber 账号、大厅、房间、战斗、三端和热更新联调 | `Demos/MiniBomber`、`Proto/Demos/MiniBomber`、[MiniBomber 全链路 Demo](Demos/MiniBomber.md) |
 | 热更启动/打包 | `Project/Bootstrap/UpdateMainWindow.cs`、`HotUpdate/Entry`、`Editor/HybridCLR` |
 | 性能测试 | `Assets/Tests/Editor`、[性能测试指南](PerformanceTestingGuide.md) |
 | 文档维护 | [文档维护约定](DocumentationConventions.md) |

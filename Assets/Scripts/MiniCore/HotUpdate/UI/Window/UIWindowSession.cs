@@ -125,6 +125,7 @@ namespace MiniCore.UI
     {
         #region Private 私有成员
 
+        private const float DefaultModalMaskAlpha = 0.8f; // 自动 Modal 遮罩的默认不透明度。
         private readonly IUIWindowSessionHost host; // 窗口运行时宿主。
         private readonly MTaskDomain domain; // Presenter/ViewModel 共用的会话任务域。
         private readonly UIBindingSet bindings = new UIBindingSet(); // 本次会话的统一解绑集合。
@@ -177,10 +178,10 @@ namespace MiniCore.UI
         {
             host = sessionHost ?? throw new ArgumentNullException(nameof(sessionHost));
             Definition = definition ?? throw new ArgumentNullException(nameof(definition));
-            Handle = handle;
+            Handle = handle ?? throw new ArgumentNullException(nameof(handle));
             arguments = openArguments;
             resultChannel = channel;
-            domain = new MTaskDomain($"UIWindow:{definition.RouteName}:{handle.InstanceId.Generation}", MTaskExecutors.Unity);
+            domain = new MTaskDomain($"UIWindow:{definition.RouteName}:{Handle.InstanceId.Generation}", MTaskExecutors.Unity);
             activeTask = activeCompletion.Task.Share();
             closedTask = closedCompletion.Task.Share();
             State = UIWindowState.None;
@@ -374,7 +375,7 @@ namespace MiniCore.UI
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             Image image = modalMask.GetComponent<Image>();
-            image.color = new Color(0f, 0f, 0f, 0.55f);
+            image.color = new Color(0f, 0f, 0f, DefaultModalMaskAlpha);
             Button button = modalMask.GetComponent<Button>();
             button.interactable = Definition.CloseOnMaskClick;
             if (Definition.CloseOnMaskClick)

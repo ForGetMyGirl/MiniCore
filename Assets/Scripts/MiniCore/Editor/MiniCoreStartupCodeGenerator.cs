@@ -134,6 +134,20 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
+        /// 从命令行加载项目启动配置并生成装配代码，供持续集成和隔离编译验证使用。
+        /// </summary>
+        public static void GenerateFromCommandLine()
+        {
+            MiniCoreStartupSettings settings = GetOrCreateSettings();
+            if (!Generate(settings, out string error))
+            {
+                throw new InvalidOperationException($"MiniCore 启动代码生成失败：{error}");
+            }
+
+            UnityEngine.Debug.Log("MiniCore 启动代码生成完成。");
+        }
+
+        /// <summary>
         /// 发现所有显式标记为启动模块的 AComponent 类型。
         /// </summary>
         /// <returns>按显示名称和完整类型名稳定排序的模块信息。</returns>
@@ -630,7 +644,7 @@ namespace MiniCore.EditorTools
                 {
                     if (selectedByContract.TryGetValue(contract, out AppServiceInfo duplicate))
                     {
-                        throw new InvalidOperationException($"服务接口 {contract.FullName} 同时启用了 {duplicate.Type.FullName} 与 {provider.Type.FullName}。同一接口只能勾选一个实现。");
+                        throw new InvalidOperationException($"服务接口 {contract.FullName} 同时启用了 {duplicate.Type.FullName} 与 {provider.Type.FullName}。请在该接口分组中选择唯一 Provider。");
                     }
 
                     selectedByContract.Add(contract, provider);
@@ -643,29 +657,42 @@ namespace MiniCore.EditorTools
             {
                 AppServiceInfo provider = ordered[index];
                 Type[] contracts = selectedByContract.Where(pair => pair.Value.Type == provider.Type).Select(pair => pair.Key).OrderBy(type => type.FullName, StringComparer.Ordinal).ToArray();
+                bool skipInBatchMode = !provider.Attribute.RunInBatchMode;
+                string indent = skipInBatchMode ? "                " : "            ";
+                if (skipInBatchMode)
+                {
+                    builder.AppendLine("            if (!UnityEngine.Application.isBatchMode)");
+                    builder.AppendLine("            {");
+                }
+
                 for (int contractIndex = 0; contractIndex < contracts.Length; contractIndex++)
                 {
                     Type contract = contracts[contractIndex];
                     if (started.Contains(provider.Type))
                     {
-                        builder.AppendLine($"            Global.BindAppService<{GetTypeCodeName(contract)}, {GetTypeCodeName(provider.Type)}>();");
+                        builder.AppendLine($"{indent}Global.BindAppService<{GetTypeCodeName(contract)}, {GetTypeCodeName(provider.Type)}>();");
                         continue;
                     }
 
                     MiniCoreAppServiceSettings serviceSettings = settings.Services.First(item => item.AssemblyQualifiedTypeName == provider.Type.AssemblyQualifiedName);
                     string args = BuildServiceArgumentExpression(provider, serviceSettings);
                     string variableName = "service" + index.ToString(CultureInfo.InvariantCulture);
-                    builder.AppendLine($"            {GetTypeCodeName(provider.Type)} {variableName} = Global.RegisterAppService<{GetTypeCodeName(contract)}, {GetTypeCodeName(provider.Type)}>({args});");
+                    builder.AppendLine($"{indent}{GetTypeCodeName(provider.Type)} {variableName} = Global.RegisterAppService<{GetTypeCodeName(contract)}, {GetTypeCodeName(provider.Type)}>({args});");
                     if (typeof(IAsyncAppService).IsAssignableFrom(provider.Type))
                     {
-                        builder.AppendLine($"            await ((global::MiniCore.Service.IAsyncAppService){variableName}).InitializeAsync();");
+                        builder.AppendLine($"{indent}await ((global::MiniCore.Service.IAsyncAppService){variableName}).InitializeAsync();");
                     }
 
                     if (provider.Type == typeof(NetworkService))
                     {
-                        builder.AppendLine($"            HotUpdateHandlerRegistry.Register({variableName});");
+                        builder.AppendLine($"{indent}HotUpdateHandlerRegistry.Register({variableName});");
                     }
                     started.Add(provider.Type);
+                }
+
+                if (skipInBatchMode)
+                {
+                    builder.AppendLine("            }");
                 }
             }
         }

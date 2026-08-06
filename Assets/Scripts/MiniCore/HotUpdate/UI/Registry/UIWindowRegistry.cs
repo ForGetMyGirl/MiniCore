@@ -158,6 +158,7 @@ namespace MiniCore.UI
 
         private static readonly Dictionary<Type, UIWindowDefinition> ByRoute = new Dictionary<Type, UIWindowDefinition>(); // 路由类型映射。
         private static readonly Dictionary<UIWindowId, UIWindowDefinition> ById = new Dictionary<UIWindowId, UIWindowDefinition>(); // 稳定身份映射。
+        private static readonly Dictionary<string, UIWindowDefinition> ByName = new Dictionary<string, UIWindowDefinition>(StringComparer.Ordinal); // 稳定路由名称映射。
         private static bool initialized; // 生成注册表是否已经装载。
 
         #endregion
@@ -176,6 +177,7 @@ namespace MiniCore.UI
 
             ByRoute.Clear();
             ById.Clear();
+            ByName.Clear();
             RegisterGenerated();
             initialized = true;
         }
@@ -209,12 +211,29 @@ namespace MiniCore.UI
         }
 
         /// <summary>
+        /// 按稳定路由名称获取窗口定义。
+        /// </summary>
+        /// <param name="routeName">窗口 Authoring 中的 RouteName。</param>
+        /// <returns>已生成窗口定义。</returns>
+        public static UIWindowDefinition Get(string routeName)
+        {
+            Initialize();
+            if (string.IsNullOrWhiteSpace(routeName) || !ByName.TryGetValue(routeName, out UIWindowDefinition definition))
+            {
+                throw new InvalidOperationException($"窗口路由名称未生成或已过期：{routeName ?? "<null>"}。");
+            }
+
+            return definition;
+        }
+
+        /// <summary>
         /// 清空当前注册表，供编辑器测试和 Domain Reload 使用。
         /// </summary>
         public static void Reset()
         {
             ByRoute.Clear();
             ById.Clear();
+            ByName.Clear();
             initialized = false;
         }
 
@@ -238,13 +257,14 @@ namespace MiniCore.UI
                 throw new InvalidOperationException($"窗口 {definition.RouteName} 的 WindowId 为空。");
             }
 
-            if (ByRoute.ContainsKey(definition.RouteType) || ById.ContainsKey(definition.Id))
+            if (ByRoute.ContainsKey(definition.RouteType) || ById.ContainsKey(definition.Id) || ByName.ContainsKey(definition.RouteName))
             {
                 throw new InvalidOperationException($"窗口路由或 WindowId 重复：{definition.RouteName}。");
             }
 
             ByRoute.Add(definition.RouteType, definition);
             ById.Add(definition.Id, definition);
+            ByName.Add(definition.RouteName, definition);
         }
 
         #endregion

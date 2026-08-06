@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using HybridCLR.Editor;
+using HybridCLR.Editor.Commands;
 using HybridCLR.Editor.Settings;
 using UnityEditor;
 using UnityEditor.Build;
@@ -36,26 +37,25 @@ namespace MiniCore.EditorTools
         #region Public 公共成员
 
         /// <summary>
-        /// 在 Unity 菜单中同步 HybridCLR 产物并重建 DefaultPackage。
+        /// 执行 HybridCLR 完整生成流程，并用最新产物构建 DefaultPackage。
         /// </summary>
-        [MenuItem("MiniCore/Build/Prepare DefaultPackage", priority = 2200)]
-        public static void PrepareDefaultPackage()
+        [MenuItem("MiniCore/Build/DefaultPackage/完整生成 (Generate All + Build)", priority = 2200)]
+        public static void GenerateAllAndBuildDefaultPackage()
         {
-            BuildDefaultPackageForActiveTarget();
-            Debug.Log("MiniCore DefaultPackage 已同步 HybridCLR DLL 并构建完成。");
+            PrebuildCommand.GenerateAll();
+            BuildDefaultPackageFromGeneratedArtifacts();
+            Debug.Log("MiniCore DefaultPackage 完整构建完成：已执行 HybridCLR Generate All 并打包。");
         }
 
         /// <summary>
-        /// 为当前 Unity 构建目标同步 DLL、生成 AOT 地址表并构建 DefaultPackage。
+        /// 仅编译当前平台热更新 DLL，并用现有 AOT 产物构建 DefaultPackage。
         /// </summary>
-        public static void BuildDefaultPackageForActiveTarget()
+        [MenuItem("MiniCore/Build/DefaultPackage/热更编译 (Compile Active Target + Build)", priority = 2201)]
+        public static void CompileActiveTargetAndBuildDefaultPackage()
         {
-            string[] aotAssemblyPaths = SynchronizeHybridClrArtifacts();
-            BuildDefaultPackage();
-            if (!ValidateRuntimeArtifacts(aotAssemblyPaths, out string error))
-            {
-                throw new BuildFailedException(error);
-            }
+            CompileDllCommand.CompileDllActiveBuildTarget();
+            BuildDefaultPackageFromGeneratedArtifacts();
+            Debug.Log("MiniCore DefaultPackage 热更构建完成：已编译当前平台 HotUpdate DLL 并打包。");
         }
 
         /// <summary>
@@ -82,6 +82,19 @@ namespace MiniCore.EditorTools
         #endregion
 
         #region Private 私有成员
+
+        /// <summary>
+        /// 同步当前 HybridCLR 产物、生成 AOT 地址表、构建并校验 DefaultPackage。
+        /// </summary>
+        private static void BuildDefaultPackageFromGeneratedArtifacts()
+        {
+            string[] aotAssemblyPaths = SynchronizeHybridClrArtifacts();
+            BuildDefaultPackage();
+            if (!ValidateRuntimeArtifacts(aotAssemblyPaths, out string error))
+            {
+                throw new BuildFailedException(error);
+            }
+        }
 
         /// <summary>
         /// 同步当前目标平台的热更新 DLL 和 AOT 元数据，并写出运行时地址表。
@@ -331,7 +344,7 @@ namespace MiniCore.EditorTools
             string[] assetPaths = Directory.GetFiles(AotMetadataAssetDirectory, "*.dll.bytes", SearchOption.TopDirectoryOnly);
             if (assetPaths.Length != expectedNames.Count)
             {
-                error = $"YooAsset AOT 元数据数量错误：期望 {expectedNames.Count}，实际 {assetPaths.Length}。请执行 MiniCore/Build/Prepare DefaultPackage。";
+                error = $"YooAsset AOT 元数据数量错误：期望 {expectedNames.Count}，实际 {assetPaths.Length}。请执行 MiniCore/Build/DefaultPackage/完整生成 (Generate All + Build)。";
                 return false;
             }
 

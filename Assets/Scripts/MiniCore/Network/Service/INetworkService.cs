@@ -64,6 +64,27 @@ namespace MiniCore.Service
         /// 重置收包队列的峰值与累计诊断统计。
         /// </summary>
         void ResetIncomingQueueMetrics();
+        /// <summary>
+        /// 获取最近一次心跳往返耗时。
+        /// </summary>
+        /// <param name="sessionId">目标会话标识。</param>
+        /// <param name="pingMs">往返毫秒数。</param>
+        /// <returns>存在有效心跳数据时返回 true。</returns>
+        bool TryGetLastPingMs(string sessionId, out int pingMs);
+        /// <summary>
+        /// 获取当前统计窗口的最小心跳往返耗时。
+        /// </summary>
+        /// <param name="sessionId">目标会话标识。</param>
+        /// <param name="pingMs">往返毫秒数。</param>
+        /// <returns>存在有效心跳数据时返回 true。</returns>
+        bool TryGetMinPingMs(string sessionId, out int pingMs);
+        /// <summary>
+        /// 获取底层 KCP 传输的平滑往返耗时。
+        /// </summary>
+        /// <param name="sessionId">目标会话标识。</param>
+        /// <param name="rttMs">KCP 平滑往返毫秒数。</param>
+        /// <returns>当前会话为 KCP 且存在数据时返回 true。</returns>
+        bool TryGetTransportRttMs(string sessionId, out int rttMs);
         /// <summary>探测会话可用性。</summary>
         MTask<bool> ProbeSessionAsync(string sessionId, TimeSpan timeout);
         /// <summary>发送普通消息。</summary>

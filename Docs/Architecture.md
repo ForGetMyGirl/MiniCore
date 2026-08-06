@@ -162,7 +162,7 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 
 ### AppService、GameStartup 与生成代码
 
-通过 `MiniCore > 项目启动配置` 的“启用”勾选选择 AppService Provider，并填写非敏感 Args 参数。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
+通过 `MiniCore > 项目启动配置` 按 AppService 接口分组单选 Provider，并填写非敏感 Args 参数。多接口实现会整体同步选择，具体实现的 Args 在切换后仍独立保留。生成器为每个服务接口生成 `Global.RegisterAppService<TInterface, TImplementation>`，先完成 `RequiresServices` 依赖排序；仅 Provider 实现 `MiniCore.Service.IAsyncAppService` 时才生成并等待 `InitializeAsync()`。生成入口统一返回 `MTask`，避免 System Task 进入业务公开 API。
 
 右侧只读能力目录按 Service、AppModule 和带 `ComponentCatalogAttribute` 的普通 `AComponent` 分组，可折叠显示描述、接口和完整命名空间。`Description` 是 `AppServiceAttribute`、`AppModuleAttribute`、`ComponentCatalogAttribute` 与 `MiniCoreStartupModuleAttribute` 的统一元数据；它不参与启动逻辑。
 

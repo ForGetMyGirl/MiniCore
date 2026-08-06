@@ -2,9 +2,86 @@
 namespace MiniCore.HotUpdate
 {
     /// <summary>
+    /// BattleHudWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct BattleHudWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// CreateRoomPopup 的强类型窗口路由。
+    /// </summary>
+    public readonly struct CreateRoomPopup : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
     /// KcpTestWindow 的强类型窗口路由。
     /// </summary>
     public readonly struct KcpTestWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// LobbyWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct LobbyWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// LoginWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct LoginWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// MatchResultWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct MatchResultWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// MessageToastWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct MessageToastWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// NetworkDebugWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct NetworkDebugWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// ReconnectOverlay 的强类型窗口路由。
+    /// </summary>
+    public readonly struct ReconnectOverlay : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// RegisterWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct RegisterWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// RoomWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct RoomWindow : global::MiniCore.UI.IUIWindowRoute
+    {
+    }
+
+    /// <summary>
+    /// SceneLoadingWindow 的强类型窗口路由。
+    /// </summary>
+    public readonly struct SceneLoadingWindow : global::MiniCore.UI.IUIWindowRoute
     {
     }
 

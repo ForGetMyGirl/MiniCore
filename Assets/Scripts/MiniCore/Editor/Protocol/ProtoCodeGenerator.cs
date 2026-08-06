@@ -52,6 +52,19 @@ namespace MiniCore.EditorTools
             }
         }
 
+        /// <summary>
+        /// 从已编译的 HotUpdate Handler 同步稳定 Opcode 和直接注册表，供持续集成验证使用。
+        /// </summary>
+        public static void SynchronizeOpcodeAndHandlersFromCommandLine()
+        {
+            if (!OpcodeRegistryGenerator.Synchronize(true, out string log))
+            {
+                throw new InvalidOperationException(log);
+            }
+
+            UnityEngine.Debug.Log(log);
+        }
+
         #endregion
 
         #region Internal 内部成员

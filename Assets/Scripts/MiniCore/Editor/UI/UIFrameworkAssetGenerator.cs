@@ -10,6 +10,8 @@ using UnityEditor.Presets;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -31,6 +33,8 @@ namespace MiniCore.EditorTools.UI
         private const string KcpPath = "Assets/AssetRes/UI/Windows/KcpTestWindow.prefab";
         private const string KcpWindowId = "de825d1d848b45f193a2fbb15432c4e9";
         private const string MainScenePath = "Assets/Scenes/HotScene/MainScene.unity";
+        private const string UIActionsPath = "Assets/Settings/MiniCore/UI/MiniCoreUI.inputactions";
+        private const string UIActionReferencesRoot = "Assets/Settings/MiniCore/UI/InputReferences";
         private static readonly LayerDefinition[] LayerDefinitions =
         {
             new LayerDefinition(UILayer.Background, 0),
@@ -59,6 +63,7 @@ namespace MiniCore.EditorTools.UI
         {
             EnsureProjectAssetFolders();
             CreateNativePresets();
+            CreateInputActionReferences();
             CreateApplicationRootPrefab(true);
             CreateProjectProfile();
             MigrateKcpWindow();
@@ -99,6 +104,7 @@ namespace MiniCore.EditorTools.UI
         {
             EnsureProjectAssetFolders();
             CreateNativePresets();
+            CreateInputActionReferences();
             CreateApplicationRootPrefab(true);
             CreateProjectProfile();
             AssetDatabase.SaveAssets();
@@ -117,6 +123,7 @@ namespace MiniCore.EditorTools.UI
             UIAuthoringUtility.EnsureAssetFolder(FrameworkRoot);
             UIAuthoringUtility.EnsureAssetFolder(ProfilesRoot);
             UIAuthoringUtility.EnsureAssetFolder(PresetsRoot);
+            UIAuthoringUtility.EnsureAssetFolder(UIActionReferencesRoot);
             UIAuthoringUtility.EnsureAssetFolder(UIAuthoringUtility.WindowsRoot);
         }
 
@@ -141,9 +148,10 @@ namespace MiniCore.EditorTools.UI
                 Stretch((RectTransform)rootObject.transform);
                 UIResolutionService resolution = rootObject.GetComponent<UIResolutionService>();
                 UISafeAreaService safeArea = rootObject.GetComponent<UISafeAreaService>();
-                GameObject eventObject = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+                GameObject eventObject = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
                 eventObject.transform.SetParent(rootObject.transform, false);
                 EventSystem eventSystem = eventObject.GetComponent<EventSystem>();
+                ConfigureInputSystemUI(eventObject.GetComponent<InputSystemUIInputModule>());
 
                 List<UILayerHost> hosts = new List<UILayerHost>(LayerDefinitions.Length * 2);
                 Canvas overlayCanvas = CreateRenderRoot(rootObject.transform, "OverlayRootCanvas", UIRenderSpace.ScreenSpaceOverlay, null, overlaySettings, hosts, out UILayerHost overlayTransitionHost);
@@ -261,6 +269,93 @@ namespace MiniCore.EditorTools.UI
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
             scaler.referencePixelsPerUnit = 100f;
+        }
+
+        /// <summary>
+        /// 将项目级 Input Action Asset 的持久子资源绑定到唯一 UI 输入模块。
+        /// </summary>
+        /// <param name="module">目标 Input System UI 模块。</param>
+        private static void ConfigureInputSystemUI(InputSystemUIInputModule module)
+        {
+            InputActionAsset asset = AssetDatabase.LoadAssetAtPath<InputActionAsset>(UIActionsPath);
+            if (asset == null)
+            {
+                throw new InvalidOperationException($"缺少 UI Input Action Asset：{UIActionsPath}。");
+            }
+
+            SerializedObject serializedModule = new SerializedObject(module);
+            SetInputActionProperty(serializedModule, "m_ActionsAsset", asset);
+            SetInputActionProperty(serializedModule, "m_PointAction", FindActionReference("Point"));
+            SetInputActionProperty(serializedModule, "m_LeftClickAction", FindActionReference("Click"));
+            SetInputActionProperty(serializedModule, "m_ScrollWheelAction", FindActionReference("Scroll"));
+            SetInputActionProperty(serializedModule, "m_MoveAction", FindActionReference("Navigate"));
+            SetInputActionProperty(serializedModule, "m_SubmitAction", FindActionReference("Submit"));
+            SetInputActionProperty(serializedModule, "m_CancelAction", FindActionReference("Cancel"));
+            SetInputActionProperty(serializedModule, "m_MiddleClickAction", null);
+            SetInputActionProperty(serializedModule, "m_RightClickAction", null);
+            SetInputActionProperty(serializedModule, "m_TrackedDevicePositionAction", null);
+            SetInputActionProperty(serializedModule, "m_TrackedDeviceOrientationAction", null);
+            serializedModule.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(module);
+        }
+
+        /// <summary>
+        /// 直接写入 InputSystemUIInputModule 的隐藏序列化字段，确保 Prefab 保留持久动作引用。
+        /// </summary>
+        /// <param name="serializedModule">目标 UI 输入模块。</param>
+        /// <param name="propertyName">序列化字段名称。</param>
+        /// <param name="value">要写入的资产引用。</param>
+        private static void SetInputActionProperty(SerializedObject serializedModule, string propertyName, UnityEngine.Object value)
+        {
+            SerializedProperty property = serializedModule.FindProperty(propertyName);
+            if (property == null)
+            {
+                throw new InvalidOperationException($"InputSystemUIInputModule 缺少序列化字段：{propertyName}。");
+            }
+
+            property.objectReferenceValue = value;
+        }
+
+        /// <summary>
+        /// 从 Input Action Asset 导入产生的持久子资源中查找动作引用。
+        /// </summary>
+        /// <param name="actionName">动作名称。</param>
+        /// <returns>可序列化到 Root Prefab 的动作引用。</returns>
+        private static InputActionReference FindActionReference(string actionName)
+        {
+            InputActionReference reference = AssetDatabase.LoadAssetAtPath<InputActionReference>($"{UIActionReferencesRoot}/{actionName}.asset");
+            return reference != null ? reference : throw new InvalidOperationException($"缺少 UI 动作引用资产：{actionName}。");
+        }
+
+        /// <summary>
+        /// 为 UI Action 创建可持久序列化到 Prefab 的 InputActionReference 资产。
+        /// </summary>
+        private static void CreateInputActionReferences()
+        {
+            InputActionAsset asset = AssetDatabase.LoadAssetAtPath<InputActionAsset>(UIActionsPath);
+            if (asset == null)
+            {
+                throw new InvalidOperationException($"缺少 UI Input Action Asset：{UIActionsPath}。");
+            }
+
+            string[] names = { "Point", "Click", "Scroll", "Navigate", "Submit", "Cancel" };
+            for (int index = 0; index < names.Length; index++)
+            {
+                string actionName = names[index];
+                string path = $"{UIActionReferencesRoot}/{actionName}.asset";
+                InputActionReference reference = AssetDatabase.LoadAssetAtPath<InputActionReference>(path);
+                if (reference == null)
+                {
+                    reference = ScriptableObject.CreateInstance<InputActionReference>();
+                    AssetDatabase.CreateAsset(reference, path);
+                }
+
+                reference.Set(asset, "UI", actionName);
+                EditorUtility.SetDirty(reference);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
         }
 
         /// <summary>
@@ -531,13 +626,20 @@ namespace MiniCore.EditorTools.UI
         {
             MiniCoreStartupSettings settings = MiniCoreStartupCodeGenerator.GetOrCreateSettings();
             MiniCoreStartupCodeGenerator.SynchronizeSettings(settings);
-            MiniCoreAppServiceSettings ui = settings.Services.FirstOrDefault(item => item.AssemblyQualifiedTypeName.StartsWith(typeof(UIService).FullName + ",", StringComparison.Ordinal));
-            if (ui == null)
+            List<MiniCoreStartupCodeGenerator.AppServiceInfo> services = MiniCoreStartupCodeGenerator.DiscoverAppServices();
+            MiniCoreStartupCodeGenerator.AppServiceInfo uiProvider = services.FirstOrDefault(item => item.Type == typeof(UIService));
+            if (uiProvider == null)
             {
                 throw new InvalidOperationException("启动配置未发现 UIService。");
             }
 
-            ui.Enabled = true;
+            AppServiceProviderConfiguration.SelectProvider(settings, services, typeof(MiniCore.UI.IUIService), uiProvider);
+            MiniCoreAppServiceSettings ui = AppServiceProviderConfiguration.FindSettings(settings, typeof(UIService));
+            if (ui == null)
+            {
+                throw new InvalidOperationException("启动配置未同步 UIService 设置。");
+            }
+
             MiniCoreStartupArgumentSettings profileArgument = ui.Arguments.FirstOrDefault(item => string.Equals(item.MemberName, nameof(UIServiceInitArgs.ProfileAddress), StringComparison.Ordinal));
             if (profileArgument == null)
             {

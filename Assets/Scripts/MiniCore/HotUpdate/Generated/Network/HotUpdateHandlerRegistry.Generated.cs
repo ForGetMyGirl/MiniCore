@@ -22,7 +22,29 @@ namespace MiniCore.HotUpdate
             network.RegisterHandler(new global::MiniCore.HotUpdate.DemoNormalHandler());
             network.RegisterHandler(new global::MiniCore.HotUpdate.DisconnectNoticeHandler());
             network.RegisterHandler(new global::MiniCore.HotUpdate.TestHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberLobbyChangedHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberRoomSnapshotHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberMatchPrepareHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberMatchCountdownHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleSnapshotHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleEventHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberMatchResultHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberDisconnectHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleInputHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleDeltaHandler());
             network.RegisterHandler(new global::MiniCore.HotUpdate.DemoRpcHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberRegisterHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberLoginHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberResumeSessionHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberLobbySnapshotHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberCreateRoomHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberJoinRoomHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberLeaveRoomHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberUpdateRoomHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberSetReadyHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberStartMatchHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberSceneReadyHandler());
+            network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleResyncHandler());
         }
     }
 }

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19fc1b77201f491b86f1df3248c15ec5, type: 3}
+  m_Name: MiniBomberRuleConfig
+  m_EditorClassIdentifier:
+  maxPlayers: 4
+  minimumPlayers: 2
+  durationOptions: 780000002c01000058020000
+  killScore: 2
+  deathScore: -1
+  movementSpeedMillimetersPerSecond: 3500
+  playerRadiusMillimeters: 350
+  bombFuseMilliseconds: 2500
+  explosionDurationMilliseconds: 500
+  initialBombCapacity: 1
+  initialBombRange: 2
+  respawnDelayMilliseconds: 3000
+  respawnProtectionMilliseconds: 2000
+  enablePowerUps: 0

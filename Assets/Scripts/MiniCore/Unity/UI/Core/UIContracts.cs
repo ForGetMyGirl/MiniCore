@@ -428,9 +428,10 @@ namespace MiniCore.UI
     }
 
     /// <summary>
-    /// 业务持有的窗口操作句柄，不暴露具体 Unity View。
+    /// 业务持有的不可变窗口操作句柄，不暴露具体 Unity View。
+    /// 使用引用类型可避免复杂值类型跨热更新异步泛型边界时依赖 HybridCLR adjustor thunk。
     /// </summary>
-    public readonly struct UIWindowHandle : IEquatable<UIWindowHandle>
+    public sealed class UIWindowHandle : IEquatable<UIWindowHandle>
     {
         #region Public 公共成员
 
@@ -458,14 +459,17 @@ namespace MiniCore.UI
         /// </summary>
         /// <param name="other">待比较句柄。</param>
         /// <returns>实例身份相同时返回 true。</returns>
-        public bool Equals(UIWindowHandle other) => InstanceId.Equals(other.InstanceId);
+        public bool Equals(UIWindowHandle other)
+        {
+            return !ReferenceEquals(other, null) && InstanceId.Equals(other.InstanceId);
+        }
 
         /// <summary>
         /// 判断目标对象是否为相同句柄。
         /// </summary>
         /// <param name="obj">待比较对象。</param>
         /// <returns>对象为相同句柄时返回 true。</returns>
-        public override bool Equals(object obj) => obj is UIWindowHandle other && Equals(other);
+        public override bool Equals(object obj) => Equals(obj as UIWindowHandle);
 
         /// <summary>
         /// 获取句柄哈希值。
@@ -479,7 +483,15 @@ namespace MiniCore.UI
         /// <param name="left">左侧句柄。</param>
         /// <param name="right">右侧句柄。</param>
         /// <returns>实例身份相同时返回 true。</returns>
-        public static bool operator ==(UIWindowHandle left, UIWindowHandle right) => left.Equals(right);
+        public static bool operator ==(UIWindowHandle left, UIWindowHandle right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            return !ReferenceEquals(left, null) && !ReferenceEquals(right, null) && left.Equals(right);
+        }
 
         /// <summary>
         /// 判断两个窗口句柄是否指向不同实例。
@@ -487,7 +499,7 @@ namespace MiniCore.UI
         /// <param name="left">左侧句柄。</param>
         /// <param name="right">右侧句柄。</param>
         /// <returns>实例身份不同时返回 true。</returns>
-        public static bool operator !=(UIWindowHandle left, UIWindowHandle right) => !left.Equals(right);
+        public static bool operator !=(UIWindowHandle left, UIWindowHandle right) => !(left == right);
 
         #endregion
     }
@@ -524,6 +536,13 @@ namespace MiniCore.UI
     public interface IUIService : IAppService
     {
         /// <summary>
+        /// 按编辑器生成的稳定路由名称打开窗口，供数据驱动流程使用。
+        /// </summary>
+        /// <param name="routeName">窗口 Authoring 中的稳定 RouteName。</param>
+        /// <returns>活动窗口句柄。</returns>
+        MTask<UIWindowHandle> OpenAsync(string routeName);
+
+        /// <summary>
         /// 打开不带业务参数的窗口。
         /// </summary>
         /// <typeparam name="TRoute">生成的窗口路由。</typeparam>
@@ -544,6 +563,20 @@ namespace MiniCore.UI
         /// <typeparam name="TRoute">生成的窗口路由。</typeparam>
         /// <returns>导航完成任务。</returns>
         MTask NavigateAsync<TRoute>() where TRoute : IUIWindowRoute;
+
+        /// <summary>
+        /// 按稳定路由名称切换 Screen 导航组顶部窗口。
+        /// </summary>
+        /// <param name="routeName">窗口 Authoring 中的稳定 RouteName。</param>
+        /// <returns>导航完成任务。</returns>
+        MTask NavigateAsync(string routeName);
+
+        /// <summary>
+        /// 关闭指定导航组当前的 Screen 窗口，使应用进入没有全屏窗口的流程状态。
+        /// </summary>
+        /// <param name="navigationGroup">窗口 Authoring 中的导航组名称。</param>
+        /// <returns>当前 Screen 关闭完成任务；导航组为空时立即完成。</returns>
+        MTask CloseNavigationAsync(string navigationGroup);
 
         /// <summary>
         /// 预加载目标窗口资源和可配置数量的 View。

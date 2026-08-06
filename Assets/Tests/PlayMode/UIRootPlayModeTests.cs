@@ -113,6 +113,35 @@ namespace MiniCore.PlayModeTests
             yield return null;
         }
 
+        /// <summary>
+        /// 验证窗口每次打开时恢复为目标 Layer 的全拉伸子节点，清除 Prefab 固定分辨率残留。
+        /// </summary>
+        /// <returns>等待测试对象销毁的跨帧迭代器。</returns>
+        [UnityTest]
+        public IEnumerator WindowView_PrepareForOpenRestoresFullLayerStretch()
+        {
+            GameObject parentObject = new GameObject("Layer", typeof(RectTransform));
+            GameObject viewObject = new GameObject("Window", typeof(RectTransform), typeof(CanvasGroup), typeof(UIRootTestWindowView));
+            RectTransform rectTransform = (RectTransform)viewObject.transform;
+            rectTransform.SetParent(parentObject.transform, false);
+            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            rectTransform.sizeDelta = new Vector2(1920f, 1080f);
+            rectTransform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
+
+            viewObject.GetComponent<UIRootTestWindowView>().PrepareForOpen();
+
+            Assert.AreEqual(Vector2.zero, rectTransform.anchorMin);
+            Assert.AreEqual(Vector2.one, rectTransform.anchorMax);
+            Assert.AreEqual(Vector2.zero, rectTransform.offsetMin);
+            Assert.AreEqual(Vector2.zero, rectTransform.offsetMax);
+            Assert.AreEqual(Vector3.one, rectTransform.localScale);
+
+            Object.Destroy(viewObject);
+            Object.Destroy(parentObject);
+            yield return null;
+        }
+
         #endregion
 
         #region Private 私有成员

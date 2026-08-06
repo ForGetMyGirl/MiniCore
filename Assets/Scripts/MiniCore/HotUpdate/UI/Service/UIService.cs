@@ -16,7 +16,8 @@ namespace MiniCore.Service
         typeof(MiniCore.UI.IUIService),
         Description = "加载项目 UI Profile 和持久 Root，并提供强类型窗口生命周期、导航、缓存及资源租约。",
         RequiresServices = new[] { typeof(IResourceService) },
-        InitArgsType = typeof(UIServiceInitArgs))]
+        InitArgsType = typeof(UIServiceInitArgs),
+        RunInBatchMode = false)]
     public sealed class UIService : AAppService, MiniCore.UI.IUIService, IAsyncAppService, IUIWindowSessionHost
     {
         #region Private 私有成员
@@ -111,6 +112,16 @@ namespace MiniCore.Service
         #region Interface 接口实现
 
         /// <summary>
+        /// 按稳定路由名称打开数据驱动窗口。
+        /// </summary>
+        /// <param name="routeName">窗口 RouteName。</param>
+        /// <returns>活动窗口句柄。</returns>
+        public MTask<UIWindowHandle> OpenAsync(string routeName)
+        {
+            return OpenCoreAsync(UIWindowRegistry.Get(routeName), null, null);
+        }
+
+        /// <summary>
         /// 加载 Profile、持有 Root 资源并实例化持久化 ApplicationUIRoot。
         /// </summary>
         /// <returns>UI 运行时初始化完成任务。</returns>
@@ -189,9 +200,58 @@ namespace MiniCore.Service
             navigationGroups.TryGetValue(group, out UIWindowHandle previous);
             UIWindowHandle next = await OpenCoreAsync(definition, null, null);
             navigationGroups[group] = next;
-            if (previous.IsValid && previous != next)
+            if (previous != null && previous.IsValid && previous != next)
             {
                 await CloseAsync(previous);
+            }
+        }
+
+        /// <summary>
+        /// 按稳定路由名称导航到 Screen 窗口。
+        /// </summary>
+        /// <param name="routeName">窗口 RouteName。</param>
+        /// <returns>导航完成任务。</returns>
+        public async MTask NavigateAsync(string routeName)
+        {
+            EnsureInitialized();
+            UIWindowDefinition definition = UIWindowRegistry.Get(routeName);
+            string group = definition.NavigationGroup;
+            navigationGroups.TryGetValue(group, out UIWindowHandle previous);
+            UIWindowHandle next = await OpenCoreAsync(definition, null, null);
+            navigationGroups[group] = next;
+            if (previous != null && previous.IsValid && previous != next)
+            {
+                await CloseAsync(previous);
+            }
+        }
+
+        /// <summary>
+        /// 关闭指定导航组当前的 Screen，并只清理由该句柄占用的导航状态。
+        /// </summary>
+        /// <param name="navigationGroup">目标导航组名称。</param>
+        /// <returns>当前 Screen 关闭完成任务；导航组没有活动窗口时立即完成。</returns>
+        public async MTask CloseNavigationAsync(string navigationGroup)
+        {
+            EnsureInitialized();
+            if (string.IsNullOrWhiteSpace(navigationGroup))
+            {
+                throw new ArgumentException("导航组名称不能为空。", nameof(navigationGroup));
+            }
+
+            string group = navigationGroup.Trim();
+            if (!navigationGroups.TryGetValue(group, out UIWindowHandle handle))
+            {
+                return;
+            }
+
+            if (handle != null && handle.IsValid)
+            {
+                await CloseAsync(handle);
+            }
+
+            if (navigationGroups.TryGetValue(group, out UIWindowHandle current) && current == handle)
+            {
+                navigationGroups.Remove(group);
             }
         }
 
@@ -228,6 +288,11 @@ namespace MiniCore.Service
         public MTask CloseAsync(UIWindowHandle handle)
         {
             EnsureInitialized();
+            if (handle == null || !handle.IsValid)
+            {
+                return MTask.CompletedTask;
+            }
+
             return sessions.TryGetValue(handle.InstanceId, out UIWindowSession session) ? session.CloseAsync() : MTask.CompletedTask;
         }
 
@@ -239,6 +304,11 @@ namespace MiniCore.Service
         public bool Focus(UIWindowHandle handle)
         {
             EnsureInitialized();
+            if (handle == null || !handle.IsValid)
+            {
+                return false;
+            }
+
             return sessions.TryGetValue(handle.InstanceId, out UIWindowSession session) && session.Focus();
         }
 
