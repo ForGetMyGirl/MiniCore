@@ -5,13 +5,12 @@ using MiniCore.Service;
 namespace MiniCore.HotUpdate
 {
     /// <summary>
-    /// HotUpdate 源码变更期间使用的临时空 Handler 注册表。
-    /// 脚本编译完成后会由 OpcodeRegistryGenerator 自动替换为直接注册表。
+    /// 自动生成的 HotUpdate Handler 直接注册表。
     /// </summary>
     public static class HotUpdateHandlerRegistry
     {
         /// <summary>
-        /// 在首轮编译期间保持调用约定，实际 Handler 会在自动同步后的下一轮编译中注册。
+        /// 将当前 HotUpdate 程序集中的 Handler 注册到网络组件。
         /// </summary>
         /// <param name="network">目标网络消息组件。</param>
         public static void Register(INetworkService network)
@@ -20,8 +19,6 @@ namespace MiniCore.HotUpdate
             {
                 throw new System.ArgumentNullException(nameof(network));
             }
-<<<<<<< HEAD
-=======
             network.RegisterHandler(new global::MiniCore.HotUpdate.DemoNormalHandler());
             network.RegisterHandler(new global::MiniCore.HotUpdate.DisconnectNoticeHandler());
             network.RegisterHandler(new global::MiniCore.HotUpdate.TestHandler());
@@ -48,7 +45,6 @@ namespace MiniCore.HotUpdate
             network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberStartMatchHandler());
             network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberSceneReadyHandler());
             network.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleResyncHandler());
->>>>>>> master_UIFramework
         }
     }
 }
