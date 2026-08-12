@@ -1,11 +1,11 @@
 ---
 name: csharp-performance-conventions
-description: Apply MiniCore C# coding conventions when creating or editing C# code in this project. Use for gameplay, framework, editor, UI, hot-update, and network changes that require Chinese XML documentation for all methods, organize class members into regions by access scope and Unity reference fields, preserve existing file encodings, create new files as UTF-8 without BOM, and avoid avoidable allocations in hot paths such as Update.
+description: Apply the user's global C# coding and performance conventions whenever creating or editing C# code in any project, including Unity gameplay, framework, editor, UI, hot-update, and network code. Require Chinese XML documentation, one top-level type per file with narrow exceptions, member regions, encoding preservation, UTF-8 without BOM for new files, and avoidance of unnecessary hot-path allocations.
 ---
 
-# MiniCore C# 开发规范
+# 全局 C# 开发规范
 
-对本项目中创建或修改的 C# 文件执行以下规则；仅做文档、分析或非 C# 文件变更时不触发。
+对所有项目中创建或修改的 C# 文件执行以下规则；仅做文档、分析或非 C# 文件变更时不触发。
 
 ## 注释
 
@@ -38,6 +38,21 @@ description: Apply MiniCore C# coding conventions when creating or editing C# co
 - 若成员同时符合多个分区，优先级为 `UnityProperty`、`Interface 接口实现`、`Override 重写实现`、访问修饰符分区；不要重复放入多个分区。
 - 已有大段复杂逻辑中的功能型 `#region` 可以保留，但类顶层分区必须以访问作用域、`UnityProperty`、接口实现和重写实现为主。
 
+## 文件与类型组织
+
+- 默认一个 `.cs` 文件只声明一个顶级类型。类、结构、接口、枚举、委托和记录类型都遵守此规则。
+- 文件名与其中的顶级类型同名。例如 `Animal.cs` 只放 `Animal`，不要同时放入顶级的 `Dog`、`Cat` 或配套枚举；为它们分别创建对应文件，并按职责放入合适目录。
+- 不要为了减少文件数量，把多个业务类型、数据类型、接口、实现类或枚举堆在同一文件中。优先用目录表达模块和类别。
+- 新增类型时不要继续向已有的多类型文件中追加声明。修改旧的多类型文件时，若拆分属于当前改动范围且不会造成无关的大面积变更，应将涉及的顶级类型拆到独立文件。
+- `partial` 类型可以按生成代码、平台实现或明确职责拆成多个文件，但每个文件仍只包含这一个顶级类型。
+- 只有下列少数情况允许同一文件包含多个类型，并在无法从结构直接看出原因时添加简短说明：
+  - 同一协议或通讯契约中的纯消息 DTO，例如一组 `LoginRequest`、`LoginResponse`、`CreateRoomRequest`。这些类型必须作为同一协议单元共同生成、版本化或维护，不得借此形成无边界的消息大杂烩；文件名应描述该契约组，例如 `LoginMessages.cs`。
+  - 自动生成的代码，且文件布局由生成器、协议编译器或设计器决定。修改模板、Schema 或生成器，不要手工拆改生成产物。
+  - 只服务于一个宿主类型、没有独立领域含义且不应被外部复用的私有嵌套类型，例如内部状态枚举、比较器、缓存键或判别联合的私有分支。它们必须真正嵌套在宿主类型中，不能作为同文件的并列顶级类型。
+  - 集中封装原生互操作边界的嵌套声明，例如 `NativeMethods` 内与同一 ABI 紧密绑定的私有结构和枚举。若声明会被其他模块使用或具有独立语义，仍应拆分。
+- 公共或内部可复用的辅助类型、选项、结果、Attribute、枚举和扩展类通常都应独立成文件，即使当前只有一个调用方。
+- 无法确定是否属于例外时，选择拆分。例外应极少使用，并以语义不可分割或工具生成约束为依据，而不是以“文件少一些”为理由。
+
 ## 编码
 
 - 新建源文件默认使用 UTF-8（无 BOM）。
@@ -59,5 +74,6 @@ description: Apply MiniCore C# coding conventions when creating or editing C# co
 3. 检查方法参数是否有中文 `param` 说明，有返回值时是否有中文 `returns` 说明。
 4. 检查被修改类是否按访问作用域、`UnityProperty`、接口实现和重写实现整理完整 `#region`，且没有空分区。
 5. 检查继承 `MonoBehaviour` 或 Unity 相关基类的类是否把 Unity 引用字段集中放入 `UnityProperty` 分区。
-6. 确认新文件为 UTF-8（无 BOM），已有文件编码未被改变。
-7. 审查高频路径中的 `new`、LINQ、字符串拼接、闭包、装箱和临时集合；优先采用安全缓存或现有对象池。
+6. 检查每个新增顶级类型是否独占文件；若使用多类型文件例外，确认它确实符合协议、生成代码或私有嵌套等严格条件。
+7. 确认新文件为 UTF-8（无 BOM），已有文件编码未被改变。
+8. 审查高频路径中的 `new`、LINQ、字符串拼接、闭包、装箱和临时集合；优先采用安全缓存或现有对象池。

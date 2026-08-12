@@ -9,7 +9,7 @@ namespace MiniCore.Core
     /// <summary>
     /// 网络会话管理组件，创建、保存和释放 TCP、KCP、UDP 的客户端与服务端逻辑会话。
     /// </summary>
-    public class NetworkSessionComponent : AComponent, INetworkSessionService
+    public class NetworkSessionComponent : AComponent, INetworkSessionService, INetworkExecutorConfigurable
     {
         #region Private 私有成员
 
@@ -20,11 +20,14 @@ namespace MiniCore.Core
         private readonly HashSet<string> tcpServerSessionIds = new HashSet<string>(); // TCP 服务端会话标识。
         private readonly Dictionary<string, KcpServerTransport> kcpServerTransports = new Dictionary<string, KcpServerTransport>(); // KCP 服务端传输层。
         private readonly Dictionary<string, UdpServerTransport> udpServerTransports = new Dictionary<string, UdpServerTransport>(); // UDP 服务端传输层。
+        private readonly Dictionary<string, WebSocketServerTransport> webSocketServerTransports = new Dictionary<string, WebSocketServerTransport>(); // WebSocket 服务端传输层。
 
         private KcpServer kcpServer; // KCP 服务端监听器。
         private TcpServer tcpServer; // TCP 服务端监听器。
         private UdpServer udpServer; // UDP 服务端监听器。
+        private NativeWebSocketServer webSocketServer; // 原生 WebSocket 服务端监听器。
         private SynchronizationContext unityContext; // Unity 主线程同步上下文。
+        private IMTaskExecutor networkExecutor; // 网络中枢注入的异步执行器；独立使用时按运行环境选择默认执行器。
 
         #endregion
 
@@ -50,6 +53,7 @@ namespace MiniCore.Core
         {
             base.Awake();
             unityContext = SynchronizationContext.Current;
+            networkExecutor = NetworkExecutorResolver.Resolve(null);
         }
 
         /// <summary>
@@ -60,6 +64,7 @@ namespace MiniCore.Core
             StopKcpServer();
             StopTcpServer();
             StopUdpServer();
+            StopWebSocketServer();
 
             List<ISession> toDispose;
             lock (sessionLock)
@@ -71,6 +76,7 @@ namespace MiniCore.Core
                 tcpServerSessionIds.Clear();
                 kcpServerTransports.Clear();
                 udpServerTransports.Clear();
+                webSocketServerTransports.Clear();
             }
 
             foreach (var session in toDispose)
@@ -84,6 +90,15 @@ namespace MiniCore.Core
         #region Public 公共成员
 
         /// <summary>
+        /// 配置后续创建的监听器、传输和发送队列所使用的网络执行器。
+        /// </summary>
+        /// <param name="executor">由网络中枢持有并负责释放的执行器。</param>
+        void INetworkExecutorConfigurable.SetNetworkExecutor(IMTaskExecutor executor)
+        {
+            networkExecutor = executor ?? throw new ArgumentNullException(nameof(executor));
+        }
+
+        /// <summary>
         /// 连接远端并创建 TCP 客户端逻辑会话。
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
@@ -92,13 +107,22 @@ namespace MiniCore.Core
         /// <returns>执行处理后的结果。</returns>
         public async MTask<NetworkSession> CreateTcpSessionAsync(string sessionId, string host, int port)
         {
+            EnsureConnectSupported(NetworkTransportKind.Tcp);
             return await CreateClientSessionAsync(
                 sessionId,
                 async () =>
                 {
-                    var transport = new TcpTransport();
-                    await transport.ConnectAsync(host, port);
-                    return transport;
+                    var transport = new TcpTransport(networkExecutor);
+                    try
+                    {
+                        await transport.ConnectAsync(host, port);
+                        return transport;
+                    }
+                    catch
+                    {
+                        transport.Dispose();
+                        throw;
+                    }
                 });
         }
 
@@ -113,13 +137,22 @@ namespace MiniCore.Core
         /// <returns>执行处理后的结果。</returns>
         public async MTask<NetworkSession> CreateKcpSessionAsync(string sessionId, string host, int port, uint conv, KcpTransportConfig config = null)
         {
+            EnsureConnectSupported(NetworkTransportKind.Kcp);
             return await CreateClientSessionAsync(
                 sessionId,
                 async () =>
                 {
-                    var transport = new KcpTransport(conv, config);
-                    await transport.ConnectAsync(host, port);
-                    return transport;
+                    var transport = new KcpTransport(conv, config, networkExecutor);
+                    try
+                    {
+                        await transport.ConnectAsync(host, port);
+                        return transport;
+                    }
+                    catch
+                    {
+                        transport.Dispose();
+                        throw;
+                    }
                 });
         }
 
@@ -132,13 +165,49 @@ namespace MiniCore.Core
         /// <returns>执行处理后的结果。</returns>
         public async MTask<NetworkSession> CreateUdpSessionAsync(string sessionId, string host, int port)
         {
+            EnsureConnectSupported(NetworkTransportKind.Udp);
             return await CreateClientSessionAsync(
                 sessionId,
                 async () =>
                 {
-                    var transport = new UdpTransport();
-                    await transport.ConnectAsync(host, port);
-                    return transport;
+                    var transport = new UdpTransport(networkExecutor);
+                    try
+                    {
+                        await transport.ConnectAsync(host, port);
+                        return transport;
+                    }
+                    catch
+                    {
+                        transport.Dispose();
+                        throw;
+                    }
+                });
+        }
+
+        /// <summary>
+        /// 连接完整 WS/WSS 地址并创建客户端逻辑会话。
+        /// </summary>
+        /// <param name="sessionId">逻辑会话标识。</param>
+        /// <param name="url">包含路径的完整 WS/WSS 地址。</param>
+        /// <returns>已经完成握手并加入会话表的逻辑会话。</returns>
+        public async MTask<NetworkSession> CreateWebSocketSessionAsync(string sessionId, string url)
+        {
+            EnsureConnectSupported(NetworkTransportKind.WebSocket);
+            return await CreateClientSessionAsync(
+                sessionId,
+                async () =>
+                {
+                    var transport = new WebSocketTransport();
+                    try
+                    {
+                        await transport.ConnectAsync(url);
+                        return transport;
+                    }
+                    catch
+                    {
+                        transport.Dispose();
+                        throw;
+                    }
                 });
         }
 
@@ -151,12 +220,13 @@ namespace MiniCore.Core
         /// <returns>执行处理后的结果。</returns>
         public async MTask StartKcpServerAsync(string host, int port, KcpServerConfig config = null)
         {
+            EnsureListenSupported(NetworkTransportKind.Kcp);
             if (kcpServer != null)
             {
                 throw new InvalidOperationException("KcpServer already started.");
             }
 
-            kcpServer = new KcpServer(config);
+            kcpServer = new KcpServer(config, networkExecutor);
             kcpServer.OnSessionCreated += HandleKcpServerSessionCreated;
             kcpServer.OnSessionClosed += HandleKcpServerSessionClosed;
             kcpServer.OnDataReceived += HandleKcpServerDataReceived;
@@ -171,12 +241,13 @@ namespace MiniCore.Core
         /// <returns>执行处理后的结果。</returns>
         public async MTask StartTcpServerAsync(string host, int port)
         {
+            EnsureListenSupported(NetworkTransportKind.Tcp);
             if (tcpServer != null)
             {
                 throw new InvalidOperationException("TcpServer already started.");
             }
 
-            tcpServer = new TcpServer();
+            tcpServer = new TcpServer(networkExecutor);
             tcpServer.OnClientAccepted += HandleTcpClientAccepted;
             await tcpServer.StartAsync(host, port);
         }
@@ -190,16 +261,39 @@ namespace MiniCore.Core
         /// <returns>执行处理后的结果。</returns>
         public async MTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null)
         {
+            EnsureListenSupported(NetworkTransportKind.Udp);
             if (udpServer != null)
             {
                 throw new InvalidOperationException("UdpServer already started.");
             }
 
-            udpServer = new UdpServer(config);
+            udpServer = new UdpServer(config, networkExecutor);
             udpServer.OnSessionCreated += HandleUdpServerSessionCreated;
             udpServer.OnSessionClosed += HandleUdpServerSessionClosed;
             udpServer.OnDataReceived += HandleUdpServerDataReceived;
             await udpServer.StartAsync(host, port);
+        }
+
+        /// <summary>
+        /// 启动原生 WS/WSS 监听并订阅会话事件。
+        /// </summary>
+        /// <param name="host">监听地址。</param>
+        /// <param name="port">监听端口。</param>
+        /// <param name="config">路径、消息大小、握手和 TLS 配置。</param>
+        /// <returns>监听成功后完成的任务。</returns>
+        public async MTask StartWebSocketServerAsync(string host, int port, WebSocketServerConfig config = null)
+        {
+            EnsureListenSupported(NetworkTransportKind.WebSocket);
+            if (webSocketServer != null)
+            {
+                throw new InvalidOperationException("WebSocketServer already started.");
+            }
+
+            webSocketServer = new NativeWebSocketServer();
+            webSocketServer.OnSessionCreated += HandleWebSocketServerSessionCreated;
+            webSocketServer.OnSessionClosed += HandleWebSocketServerSessionClosed;
+            webSocketServer.OnDataReceived += HandleWebSocketServerDataReceived;
+            await webSocketServer.StartAsync(host, port, config);
         }
 
         /// <summary>
@@ -294,6 +388,39 @@ namespace MiniCore.Core
             foreach (var sessionId in udpSessionIds)
             {
                 bool removed = RemoveSessionInternal(sessionId, out var session);
+                session?.Dispose();
+                if (removed)
+                {
+                    DispatchServerSessionClosedOnce(sessionId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 停止 WebSocket 服务端并清理其逻辑会话。
+        /// </summary>
+        public void StopWebSocketServer()
+        {
+            if (webSocketServer == null)
+            {
+                return;
+            }
+
+            webSocketServer.OnSessionCreated -= HandleWebSocketServerSessionCreated;
+            webSocketServer.OnSessionClosed -= HandleWebSocketServerSessionClosed;
+            webSocketServer.OnDataReceived -= HandleWebSocketServerDataReceived;
+            webSocketServer.Stop();
+            webSocketServer = null;
+
+            List<string> sessionIds;
+            lock (sessionLock)
+            {
+                sessionIds = new List<string>(webSocketServerTransports.Keys);
+            }
+
+            foreach (string sessionId in sessionIds)
+            {
+                bool removed = RemoveSessionInternal(sessionId, out ISession session);
                 session?.Dispose();
                 if (removed)
                 {
@@ -399,6 +526,30 @@ namespace MiniCore.Core
         #region Private 私有成员
 
         /// <summary>
+        /// 在创建连接前校验当前运行环境具备目标传输能力。
+        /// </summary>
+        /// <param name="kind">目标传输类型。</param>
+        private static void EnsureConnectSupported(NetworkTransportKind kind)
+        {
+            if (!NetworkCapabilities.SupportsConnect(kind))
+            {
+                throw new PlatformNotSupportedException($"当前运行环境不支持 {kind} 主动连接。");
+            }
+        }
+
+        /// <summary>
+        /// 在创建监听器前校验当前运行环境具备目标传输能力。
+        /// </summary>
+        /// <param name="kind">目标传输类型。</param>
+        private static void EnsureListenSupported(NetworkTransportKind kind)
+        {
+            if (!NetworkCapabilities.SupportsListen(kind))
+            {
+                throw new PlatformNotSupportedException($"当前运行环境不支持 {kind} 监听器。");
+            }
+        }
+
+        /// <summary>
         /// 执行 HandleTcpClientAccepted 相关处理。
         /// </summary>
         /// <param name="serverSession">执行该方法所需的 serverSession 参数。</param>
@@ -410,7 +561,7 @@ namespace MiniCore.Core
             }
 
             string sessionId = serverSession.SessionId;
-            var transport = new TcpServerTransport(serverSession);
+            var transport = new TcpServerTransport(serverSession, networkExecutor);
             var session = new NetworkSession(sessionId, transport);
 
             if (!AddServerSessionInternal(serverSession, session, () => tcpServerSessionIds.Add(sessionId)))
@@ -559,6 +710,65 @@ namespace MiniCore.Core
         }
 
         /// <summary>
+        /// 为新 WebSocket 服务端会话创建统一传输和逻辑会话。
+        /// </summary>
+        /// <param name="serverSession">已经完成握手的服务端会话。</param>
+        private void HandleWebSocketServerSessionCreated(IServerSession serverSession)
+        {
+            if (serverSession == null)
+            {
+                return;
+            }
+
+            var transport = new WebSocketServerTransport(serverSession);
+            var session = new NetworkSession(serverSession.SessionId, transport);
+            if (!AddServerSessionInternal(
+                    serverSession,
+                    session,
+                    () => webSocketServerTransports.Add(serverSession.SessionId, transport)))
+            {
+                session.Dispose();
+                return;
+            }
+
+            DispatchToMainThread(() => OnServerSessionCreated?.Invoke(session));
+        }
+
+        /// <summary>
+        /// 清理已经关闭的 WebSocket 服务端逻辑会话。
+        /// </summary>
+        /// <param name="serverSession">已经关闭的服务端会话。</param>
+        private void HandleWebSocketServerSessionClosed(IServerSession serverSession)
+        {
+            if (serverSession != null)
+            {
+                RemoveServerSessionAndDispatch(serverSession);
+            }
+        }
+
+        /// <summary>
+        /// 将监听器拆出的 WebSocket 业务包推送给统一传输。
+        /// </summary>
+        /// <param name="serverSession">消息所属服务端会话。</param>
+        /// <param name="data">完整业务包正文。</param>
+        /// <returns>传输回调完成任务。</returns>
+        private MTask HandleWebSocketServerDataReceived(IServerSession serverSession, ReadOnlyMemory<byte> data)
+        {
+            if (serverSession == null || data.IsEmpty)
+            {
+                return MTask.CompletedTask;
+            }
+
+            WebSocketServerTransport transport;
+            lock (sessionLock)
+            {
+                webSocketServerTransports.TryGetValue(serverSession.SessionId, out transport);
+            }
+
+            return transport != null ? transport.PushReceivedAsync(data) : MTask.CompletedTask;
+        }
+
+        /// <summary>
         /// 执行 RemoveSessionInternal 相关处理。
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
@@ -579,6 +789,7 @@ namespace MiniCore.Core
                 tcpServerSessionIds.Remove(sessionId);
                 kcpServerTransports.Remove(sessionId);
                 udpServerTransports.Remove(sessionId);
+                webSocketServerTransports.Remove(sessionId);
                 return true;
             }
         }

@@ -10,7 +10,7 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 - **边界清晰**：Runtime、Protocol、Serialization 和 Network 保持纯 C#；Unity API 集中在适配层与业务层。
 - **启动简单**：编辑器按 AppService 接口分组单选 Provider，自动按依赖顺序生成初始化代码；项目只维护一个 `GameStartup`，复杂玩法可委托给玩法目录内的普通 Startup Component。
 - **异步结构化**：业务统一使用零第三方依赖的 `MTask`；任务自动继承父链与 Owner 生命周期，通常无需逐层传递取消令牌。
-- **业务可热更新**：Bootstrap 通过 YooAsset 和 HybridCLR 加载 `MiniCore.HotUpdate.dll`，Player 与业务程序集解耦。
+- **业务可热更新**：Bootstrap 通过 YooAsset 和 HybridCLR 按依赖顺序加载 `MiniCore.Protocol`、`MiniCore.HotUpdate` 及项目登记的其他热更新 DLL，Player 与业务程序集解耦。
 - **网络可验证**：内置 TCP、KCP、UDP、RPC、Protobuf、Handler 生成和本机/跨进程网络冒烟测试。
 
 ## 核心能力
@@ -18,13 +18,16 @@ MiniCore 以 Unity 为宿主，把项目运行时、网络、协议、资源热�
 | 模块 | 能力 |
 | --- | --- |
 | `MiniCore.Runtime` | `Global` 组件容器、Owner 生命周期、MTask/任务域/执行器、AppService/AppModule 契约、Timer、事件、日志、时间抽象 |
-| `MiniCore.Protocol` | Protobuf 消息、网络角色接口、Opcode 与 Parser 注册表 |
-| `MiniCore.Serialization` | Protobuf 序列化和 JSON 对照实现 |
-| `MiniCore.Network` | TCP / KCP / UDP、Session、RPC、心跳、Handler 派发 |
+| `MiniCore.Protocol` | 项目 Protobuf 消息、网络角色 partial 实现及无状态协议登记代码；作为独立热更新程序集先于业务程序集加载 |
+| `MiniCore.Serialization` | Protobuf / JSON 编解码器，以及 Protobuf Parser 适配 |
+| `MiniCore.Network` | TCP / KCP / UDP / WebSocket、Session、RPC、心跳、消息角色契约、协议 Registry、Handler 抽象与派发 |
 | `MiniCore.Unity` | Unity 生命周期、时间、日志、Mono/UI 适配，以及存档、HTTP、音频、设备和运行数据服务 |
-| `MiniCore.HotUpdate` | 资源、通用资产、UI 运行时、业务 Handler 与项目启动逻辑 |
+| `MiniCore.HotUpdate` | 资源与场景业务、UI 运行时、业务 Handler、Demo 和项目启动逻辑；依赖 `MiniCore.Protocol` |
 | `Project.Bootstrap` | YooAsset、HybridCLR、HotUpdate DLL 加载与 Player 启动 |
-| `MiniCore.Editor` | 启动模块、Proto、Opcode、HybridCLR 与构建工具 |
+| `MiniCore.HotUpdateAssembly.Editor` | 项目热更新程序集登记、依赖顺序和启动入口的共享 Editor 配置 |
+| `MiniCore.Protocol.Editor` | protoc 调用、稳定 Opcode、角色代码与协议登记代码生成 |
+| `MiniCore.Protocol.Handler.Editor` | 扫描全部已登记热更新程序集并生成业务 Handler 直接注册表 |
+| `MiniCore.Editor` | 启动、UI、HybridCLR、YooAsset 与通用构建工具 |
 
 ## 快速开始
 
@@ -115,7 +118,7 @@ HotUpdateScene
   → UpdateMainWindow
   → YooAsset 初始化与资源更新
   → HybridCLR AOT 元数据加载
-  → MiniCore.HotUpdate.dll 加载
+  → 已登记热更新 DLL 按依赖顺序加载
   → MiniCoreStartup.StartAsync()
   → 自动生成的统一 AppService 注册代码
   → GameStartup.StartAsync()
@@ -130,6 +133,7 @@ HotUpdateScene
 | 强类型事件、应用/局部频道、订阅生命周期与编辑器诊断 | [强类型事件中心](Docs/Eventing.md) |
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
+| WebGL、未来微信/抖音平台适配、WebSocket、存储与网关边界 | [WebGL 与小游戏平台适配](Docs/WebPlatformAdaptation.md) |
 | UI Root、窗口生命周期、强类型 API、Authoring 与 KCP 示例 | [UI 框架](Docs/UIFramework.md) |
 | 登录、大厅、房间、状态同步战斗、三端构建与热更新实战 | [MiniBomber 全链路 Demo](Docs/Demos/MiniBomber.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
@@ -139,7 +143,7 @@ HotUpdateScene
 
 服务化迁移、加密存档、HTTP 绝对地址规则和“本地运行数据记录”的行为，均以 [项目启动与服务配置](Docs/StartupModules.md) 为准。
 
-存档和本地运行数据通过“本地存储路径”服务统一定位。在启动配置的 `RelativePath` 填写开发者定义的相对目录，例如 `MyGame` 或 `Company/MyGame`；最终路径为 `Application.persistentDataPath/RelativePath`。代码默认值为兼容旧项目的 `MiniCore`，详情见 [本地存储路径](Docs/StartupModules.md#本地存储路径)。
+存档业务使用平台无关的逻辑键/字节存储；原生环境由“本地存储路径”定位文件，浏览器 WebGL 使用 IndexedDB。保护存档以 Protobuf 等二进制数据为输入，使用 AES 加密和 HMAC 防篡改，详情见 [加密存档](Docs/StartupModules.md#加密存档)。
 
 ## 技术栈
 

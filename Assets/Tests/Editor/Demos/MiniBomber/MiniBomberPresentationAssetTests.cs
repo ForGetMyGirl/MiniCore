@@ -26,10 +26,10 @@ namespace MiniCore.Tests.Editor.Demos.MiniBomber
         private const string LinkerConfigPath = "Assets/Linker/MiniCore.link.xml"; // 动态资源类型保留配置路径。
         private const string NativeTypePreserverPath = "Assets/Scripts/Project/Bootstrap/UnityEngineTypePreserver.cs"; // Unity 原生模块显式保护入口路径。
         private const string BootstrapPath = "Assets/Scripts/Project/Bootstrap/UpdateMainWindow.cs"; // 热更新 Bootstrap 启动流程路径。
-        private const string BomberInputPath = "Assets/Scripts/MiniCore/Unity/Demos/MiniBomber/Input/BomberInputComponent.cs"; // 移动端输入采样实现路径。
+        private const string BomberInputPath = "Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/Input/BomberInputComponent.cs"; // 移动端输入采样实现路径。
         private const string ClientStartupPath = "Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Entry/MiniBomberClientStartupComponent.cs"; // 客户端启动入口路径。
         private const string BattlePresentationPath = "Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/Presentation/MiniBomberBattlePresentationComponent.cs"; // 战斗世界表现桥接路径。
-        private const string WindowPresenterPath = "Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/Presenter/MiniBomberWindowPresenters.cs"; // 战斗 HUD 性能信息实现路径。
+        private const string WindowPresenterPath = "Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Client/UI/Battle/BattleHudWindowPresenter.cs"; // 战斗 HUD 性能信息实现路径。
 
         #endregion
 

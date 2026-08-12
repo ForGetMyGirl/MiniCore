@@ -33,7 +33,7 @@ namespace MiniCore.Model
             return obj.GetType().GetField(fieldName).FieldType;
         }
 
-        //public static Type GetFieldTypeByNameIgnoreCase(object obj, string fieldName) { 
+        //public static Type GetFieldTypeByNameIgnoreCase(object obj, string fieldName) {
         //    return obj.GetType().GetField()
         //}
 
@@ -89,7 +89,6 @@ namespace MiniCore.Model
             return obj.GetType().GetProperty(propertyName).GetValue(obj);
         }
 
-
         /// <summary>
         /// 通过属性名设置属性值,忽略大小写
         /// </summary>
@@ -105,7 +104,6 @@ namespace MiniCore.Model
             }
             type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase).SetValue(obj, value);
         }
-
 
         public static List<Type> GetTypesOfMessageHandlers(Type type)
         {
@@ -139,7 +137,6 @@ namespace MiniCore.Model
             var assmeblies = AppDomain.CurrentDomain.GetAssemblies();
             Assembly assembly = assmeblies.Where(a => a.FullName.Contains(asmName)).First();
             Type[] types = assembly.GetTypes();
-
 
             /* List<Type> results = new List<Type>();
 

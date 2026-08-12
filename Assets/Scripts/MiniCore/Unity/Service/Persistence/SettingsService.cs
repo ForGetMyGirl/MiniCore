@@ -3,6 +3,8 @@ using System.Threading;
 using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Serialization;
+using MiniCore.Service.Persistence.Generated;
 
 namespace MiniCore.Service
 {
@@ -72,8 +74,8 @@ namespace MiniCore.Service
         /// <returns>加载完成任务。</returns>
         public async MTask LoadAsync()
         {
-            ClientSettings loaded = await saveService.LoadAsync<ClientSettings>(SettingsSlot);
-            current = loaded ?? new ClientSettings();
+            ClientSettingsSaveData loaded = await saveService.LoadProtobufAsync<ClientSettingsSaveData>(SettingsSlot);
+            current = loaded == null ? new ClientSettings() : FromSaveData(loaded);
             Changed?.Invoke(current);
         }
 
@@ -85,8 +87,60 @@ namespace MiniCore.Service
         public async MTask SaveAsync(ClientSettings settings)
         {
             current = settings ?? throw new ArgumentNullException(nameof(settings));
-            await saveService.SaveAsync(SettingsSlot, current);
+            await saveService.SaveProtobufAsync(SettingsSlot, ToSaveData(current));
             Changed?.Invoke(current);
+        }
+
+        #endregion
+
+        #region Private 私有成员
+
+        /// <summary>
+        /// 将运行时设置映射为稳定的 Protobuf 持久化结构。
+        /// </summary>
+        /// <param name="settings">运行时设置。</param>
+        /// <returns>可直接编码保存的 Protobuf 消息。</returns>
+        private static ClientSettingsSaveData ToSaveData(ClientSettings settings)
+        {
+            return new ClientSettingsSaveData
+            {
+                Version = settings.Version,
+                QualityLevel = settings.QualityLevel ?? string.Empty,
+                TargetFrameRate = settings.TargetFrameRate,
+                VSyncCount = settings.VSyncCount,
+                ScreenWidth = settings.ScreenWidth,
+                ScreenHeight = settings.ScreenHeight,
+                FullScreen = settings.FullScreen,
+                BgmVolume = settings.BgmVolume,
+                SfxVolume = settings.SfxVolume,
+                UiVolume = settings.UiVolume,
+                VibrationEnabled = settings.VibrationEnabled,
+                Language = settings.Language ?? string.Empty
+            };
+        }
+
+        /// <summary>
+        /// 将 Protobuf 持久化结构映射为运行时设置。
+        /// </summary>
+        /// <param name="data">已经解析的持久化消息。</param>
+        /// <returns>独立运行时设置对象。</returns>
+        private static ClientSettings FromSaveData(ClientSettingsSaveData data)
+        {
+            return new ClientSettings
+            {
+                Version = data.Version,
+                QualityLevel = data.QualityLevel,
+                TargetFrameRate = data.TargetFrameRate,
+                VSyncCount = data.VSyncCount,
+                ScreenWidth = data.ScreenWidth,
+                ScreenHeight = data.ScreenHeight,
+                FullScreen = data.FullScreen,
+                BgmVolume = data.BgmVolume,
+                SfxVolume = data.SfxVolume,
+                UiVolume = data.UiVolume,
+                VibrationEnabled = data.VibrationEnabled,
+                Language = data.Language
+            };
         }
 
         #endregion

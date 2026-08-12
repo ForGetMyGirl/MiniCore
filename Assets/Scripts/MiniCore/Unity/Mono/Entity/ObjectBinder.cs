@@ -75,7 +75,6 @@ namespace MiniCore
                     keyValuePairs[key].RemoveAt(index);
                 }
 
-
             }
         }
 

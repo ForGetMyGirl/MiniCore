@@ -11,8 +11,12 @@ Assets/Scripts/MiniCore/
 └── HotUpdate/Network/Handler/    # 业务 AMHandler / ARpcHandler
 ```
 
-关键入口：`Network/Core/NetworkMessageComponent.cs`、`Network/Handler/AMHandler.cs`、`Network/Handler/ARpcHandler.cs`、`Protocol/Model/Opcode/OpcodeRegistry.cs`、`Editor/Protocol/ProtoCodeGenerator.cs`、`Editor/OpcodeRegistryGenerator.cs`。
+关键入口：`Network/Core/NetworkService.cs`、`Network/Protocol/NetworkProtocolBuilder.cs`、`Network/Protocol/NetworkProtocolRegistry.cs`、`Network/Handler/AMHandler.cs`、`Network/Handler/ARpcHandler.cs`、`Editor/Protocol/ProtoCodeGenerator.cs`、`Editor/Protocol/Opcode/OpcodeRegistryGenerator.cs`。
 
-- 新协议从 `Proto/` 开始；生成后不得手改 `Protocol/Generated/`。
-- Opcode 由已编译的 HotUpdate Handler 反向绑定；不手改 `OpcodeManifest.json` 或 Handler 注册表。
+- 新协议从 `Proto/` 开始；只有 `//[INormalMessage]`、`//[IRpcRequest]`、`//[IRpcResponse]` 标记的消息进入网络注册。生成后不得手改 `Protocol/Generated/`。
+- `ProtoCodeGenerator` 按消息完整类型名维护 `Proto/Manifest/OpcodeManifest.json`：Normal 使用 `[100001, 200001)`，RPC 使用 `[200001, uint.MaxValue)`。已登记类型的角色不能跨区间变化，已删除编号不复用。
+- `MiniCore.Protocol` 只保存 PB、角色 partial 和无状态消息登记；消息角色契约、Opcode 到类型的不可变 Registry 与 Handler 基类属于 `MiniCore.Network`，Protobuf Parser 适配属于 `MiniCore.Serialization`。
+- 每个 `NetworkService` 通过 `NetworkProtocolBuilder` 合并项目协议登记与 Handler 直接登记并原子提交。Handler 不分配 Opcode；无 Handler 的合法出站消息仍可发送。
+- `OpcodeHandlerRegistryInvalidator` 监视 `MiniCoreHotUpdateAssemblySettings` 中全部已登记程序集，源码导入、删除或移入移出时先写安全空表，编译后再由 `OpcodeRegistryGenerator` 扫描并生成直接构造代码。
+- 不手改 `OpcodeManifest.json`、`ProjectSettings/MiniCoreProtocolGeneratedFiles.json` 或 Handler 注册表。所有权清单只允许清理已登记旧输出根目录中的固定生成文件，并验证生成标记。
 - 标记、RPC 字段和生成时机以 `Docs/NetworkLayerAnalysis.md` 为准；回归入口见 `Docs/NetworkSmokeTesting.md` 与 `Assets/Tests/Editor`。

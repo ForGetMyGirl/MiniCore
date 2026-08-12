@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package minicore.persistence;
+option csharp_namespace = "MiniCore.Service.Persistence.Generated";
+
+// 客户端通用设置的本地持久化结构。
+message ClientSettingsSaveData {
+  int32 version = 1;
+  string quality_level = 2;
+  int32 target_frame_rate = 3;
+  int32 v_sync_count = 4;
+  int32 screen_width = 5;
+  int32 screen_height = 6;
+  bool full_screen = 7;
+  float bgm_volume = 8;
+  float sfx_volume = 9;
+  float ui_volume = 10;
+  bool vibration_enabled = 11;
+  string language = 12;
+}

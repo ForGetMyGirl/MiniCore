@@ -8,36 +8,6 @@ using UnityEngine;
 
 namespace MiniCore.Core
 {
-    /// <summary>
-    /// 接口用于表明是Excel格式表
-    /// </summary>
-    public interface IExcelConfig
-    {
-    }
-
-    public interface ICsvTable
-    {
-        int Id { get; set; }
-    }
-
-    public class CsvTable<T> : IExcelConfig where T : ICsvTable
-    {
-        /// <summary>
-        /// 行数
-        /// </summary>
-        public int DataCount { get => RawDatas.Count; }
-
-        /// <summary>
-        /// 第二行的字段名数组，为了查找数据对应的字段名
-        /// </summary>
-        public string[] FieldNames { get; set; }
-
-        /// <summary>
-        /// 每行的数据
-        /// </summary>
-        public List<T> RawDatas { get; set; }
-    }
-
 
     public static class ExcelTool
     {
@@ -84,9 +54,6 @@ namespace MiniCore.Core
                 RawDatas = new List<T>()
             };
 
-
-
-
             //string[] allLines = context.Split('\n');
             CsvDataSet allLineDataSet = new CsvDataSet(context, '\n');  //获取所有行数据
 
@@ -126,7 +93,6 @@ namespace MiniCore.Core
                 }
                 #endregion
 
-
                 //理论上这个耗时操作应该开启异步
 
                 //这里应该是从第三行开始
@@ -145,8 +111,6 @@ namespace MiniCore.Core
                         string colValue = rawDataSet.Next();    //当前列（一个格子）的值
                                                                 //解析当前列的数据类型
                         string fieldName = csvTable.FieldNames[columnIndex++];
-
-
 
                         #region 将格子中的数据放到对应的字段值中
 
@@ -246,7 +210,6 @@ namespace MiniCore.Core
 
                 ReflectionUtils.SetPropertyValueByNameIgnoreCase(obj, propertyName, myArr);
 
-
             }
             else if (type.IsGenericType && type == typeof(List<>).MakeGenericType(type.GetGenericArguments()[0]))
             {
@@ -267,7 +230,6 @@ namespace MiniCore.Core
                     methodInfo.Invoke(listObj, new object[] { oneUnitData });   //Add 数据
                 }
                 ReflectionUtils.SetPropertyValueByNameIgnoreCase(obj, propertyName, listObj);
-
 
             }
             else if (type.IsEnum)
@@ -298,49 +260,5 @@ namespace MiniCore.Core
 
         #endregion
     }
-
-    /// <summary>
-    /// CSV行数据集
-    /// 构造：传入读取的行数据和可选参数：分隔符
-    /// </summary>
-    public class CsvDataSet
-    {
-
-        private string[] datas;
-
-        public int CurrentIndex { get; set; }
-
-        /// <summary>
-        /// 数据长度
-        /// </summary>
-        public int DataCount { get => datas.Length; }
-
-        /// <summary>
-        /// 是否有下一组数据
-        /// </summary>
-        public bool HaveNext { get => CurrentIndex < DataCount; }
-
-        /// <summary>
-        /// 生成CsvDataSet对象
-        /// </summary>
-        /// <param name="data">数据</param>
-        /// <param name="splitChar">数据之间的分隔符</param>
-        public CsvDataSet(string data, char splitChar)
-        {
-            CurrentIndex = 0;
-            datas = data.Split(splitChar);
-        }
-
-        /// <summary>
-        /// 获取下一组数据，如果没有数据会抛出数组越界异常
-        /// </summary>
-        /// <returns></returns>
-        public string Next()
-        {
-            return datas[CurrentIndex++].TrimEnd('\r');
-        }
-
-    }
-
 
 }

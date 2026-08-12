@@ -32,6 +32,10 @@ namespace MiniCore.Core
         /// 创建 UDP 客户端逻辑会话。
         /// </summary>
         MTask<NetworkSession> CreateUdpSessionAsync(string sessionId, string host, int port);
+        /// <summary>
+        /// 创建 WebSocket 客户端逻辑会话。
+        /// </summary>
+        MTask<NetworkSession> CreateWebSocketSessionAsync(string sessionId, string url);
 
         /// <summary>
         /// 启动 KCP 服务端监听。
@@ -45,6 +49,10 @@ namespace MiniCore.Core
         /// 启动 UDP 服务端监听。
         /// </summary>
         MTask StartUdpServerAsync(string host, int port, UdpServerConfig config = null);
+        /// <summary>
+        /// 启动原生 WebSocket 服务端监听。
+        /// </summary>
+        MTask StartWebSocketServerAsync(string host, int port, WebSocketServerConfig config = null);
 
         /// <summary>
         /// 停止 KCP 服务端监听。
@@ -58,6 +66,10 @@ namespace MiniCore.Core
         /// 停止 UDP 服务端监听。
         /// </summary>
         void StopUdpServer();
+        /// <summary>
+        /// 停止 WebSocket 服务端监听。
+        /// </summary>
+        void StopWebSocketServer();
 
         /// <summary>
         /// 按标识查询逻辑会话。

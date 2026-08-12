@@ -1,0 +1,16 @@
+{
+    "Version": 2,
+    "Generator": "MiniCore.Protocol.ProtoCodeGenerator",
+    "OutputDirectory": "Assets/Scripts/MiniCore/Protocol/Generated",
+    "SourceDigest": "ce7f1220c2e586a57f65da5a496677a2a84dd09fa58e9a154e73d4f6a664a0cd",
+    "Files": [
+        "Assets/Scripts/MiniCore/Protocol/Generated/MiniBomber.ProtocolRegistration.g.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/MiniBomber.ProtocolRole.g.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/MiniBomber.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/MiniBomberPersistence.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/NetworkDemo.ProtocolRegistration.g.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/NetworkDemo.ProtocolRole.g.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/NetworkDemo.cs",
+        "Assets/Scripts/MiniCore/Protocol/Generated/ProjectProtocolRegistration.g.cs"
+    ]
+}

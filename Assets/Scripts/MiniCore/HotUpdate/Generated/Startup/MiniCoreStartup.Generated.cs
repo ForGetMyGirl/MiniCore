@@ -43,7 +43,10 @@ namespace MiniCore.HotUpdate
             global::MiniCore.Service.EncryptedSaveService service6 = Global.RegisterAppService<global::MiniCore.Service.ISaveService, global::MiniCore.Service.EncryptedSaveService>(new global::MiniCore.Service.EncryptedSaveServiceInitArgs { EncryptionKey = "wnm9527" });
             global::MiniCore.Service.LocalTelemetryFileService service7 = Global.RegisterAppService<global::MiniCore.Service.ITelemetryService, global::MiniCore.Service.LocalTelemetryFileService>(null);
             global::MiniCore.Service.NetworkService service8 = Global.RegisterAppService<global::MiniCore.Service.INetworkService, global::MiniCore.Service.NetworkService>(null);
-            HotUpdateHandlerRegistry.Register(service8);
+            var protocolBuilder8 = new global::MiniCore.Model.NetworkProtocolBuilder();
+            global::MiniCore.Protocol.Generated.ProjectProtocolRegistration.Register(protocolBuilder8);
+            HotUpdateHandlerRegistration.Register(protocolBuilder8);
+            service8.ConfigureProtocol(protocolBuilder8.Build());
             global::MiniCore.Service.SettingsService service9 = Global.RegisterAppService<global::MiniCore.Service.ISettingsService, global::MiniCore.Service.SettingsService>(null);
             await ((global::MiniCore.Service.IAsyncAppService)service9).InitializeAsync();
             global::MiniCore.Service.TimerService service10 = Global.RegisterAppService<global::MiniCore.Service.ITimerService, global::MiniCore.Service.TimerService>(null);

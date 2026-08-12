@@ -11,6 +11,12 @@
     <type fullname="MiniCore.Model.ARpcHandler`2" preserve="all" />
     <type fullname="MiniCore.Model.INetworkMessageHandlerInvoker" preserve="all" />
     <type fullname="MiniCore.Model.INetworkRpcHandlerInvoker" preserve="all" />
+    <type fullname="MiniCore.Model.INetworkMessage" preserve="all" />
+    <type fullname="MiniCore.Model.INormalMessage" preserve="all" />
+    <type fullname="MiniCore.Model.IRpcRequest" preserve="all" />
+    <type fullname="MiniCore.Model.IRpcResponse" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkProtocolBuilder" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkProtocolRegistry" preserve="all" />
     <type fullname="MiniCore.Model.INetworkTransport" preserve="all" />
     <type fullname="MiniCore.Model.KcpServerConfig" preserve="all" />
     <type fullname="MiniCore.Model.KcpTransportConfig" preserve="all" />
@@ -25,12 +31,12 @@
     <type fullname="MiniCore.Service.NetworkService" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Protocol">
-    <type fullname="MiniCore.Model.INormalMessage" preserve="all" />
-    <type fullname="MiniCore.Model.IRpcResponse" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.DemoNormalMessage" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.DemoRpcRequest" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.DemoRpcResponse" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.DisconnectNotice" preserve="all" />
+    <type fullname="MiniCore.Protocol.Generated.MiniBomberAccountDatabaseData" preserve="all" />
+    <type fullname="MiniCore.Protocol.Generated.MiniBomberAccountRecordData" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleBombDto" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleDelta" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleEventBatch" preserve="all" />
@@ -69,6 +75,7 @@
     <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomSnapshotNotice" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomState" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomSummaryDto" preserve="all" />
+    <type fullname="MiniCore.Protocol.Generated.MiniBomberSavedSessionData" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberSceneReadyRequest" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberSceneReadyResponse" preserve="all" />
     <type fullname="MiniCore.Protocol.Generated.MiniBomberSetReadyRequest" preserve="all" />
@@ -108,9 +115,9 @@
     <type fullname="MiniCore.Service.ITimerService" preserve="all" />
     <type fullname="MiniCore.Service.TimerService" preserve="all" />
     <type fullname="MiniCore.Threading.IMTaskExecutor" preserve="all" />
-    <type fullname="MiniCore.Threading.MDedicatedThreadExecutor" preserve="all" />
     <type fullname="MiniCore.Threading.MSharedTaskAwaiter`1" preserve="all" />
     <type fullname="MiniCore.Threading.MSharedTask`1" preserve="all" />
+    <type fullname="MiniCore.Threading.MSingleThreadExecutor" preserve="all" />
     <type fullname="MiniCore.Threading.MTask" preserve="all" />
     <type fullname="MiniCore.Threading.MTaskAwaiter" preserve="all" />
     <type fullname="MiniCore.Threading.MTaskAwaiter`1" preserve="all" />
@@ -126,19 +133,11 @@
     <type fullname="MiniCore.Threading.MTaskYieldAwaiter" preserve="all" />
     <type fullname="MiniCore.Threading.MTask`1" preserve="all" />
   </assembly>
+  <assembly fullname="MiniCore.Serialization">
+    <type fullname="MiniCore.Serialization.ProtobufSaveServiceExtensions" preserve="all" />
+  </assembly>
   <assembly fullname="MiniCore.Unity">
-    <type fullname="MiniCore.Demo.MiniBomber.BomberMapDefinition" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.MiniBomberCellType" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.MiniBomberRuleConfig" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.MiniBomberRuntimeConfig" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberBattleSceneBinding" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberBombView" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberCameraController" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberExplosionView" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberInputComponent" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberInputFrame" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberMapView" preserve="all" />
-    <type fullname="MiniCore.Demo.MiniBomber.Unity.BomberPlayerView" preserve="all" />
+    <type fullname="MiniCore.Service.Persistence.Generated.ClientSettingsSaveData" preserve="all" />
     <type fullname="MiniCore.Model.IListener" preserve="all" />
     <type fullname="MiniCore.Model.MonoSingleton`1" preserve="all" />
     <type fullname="MiniCore.Model.UnreadPropertyAttribute" preserve="all" />
@@ -192,11 +191,22 @@
   </assembly>
   <assembly fullname="System.Core">
     <type fullname="System.Collections.Generic.HashSet`1" preserve="all" />
+    <type fullname="System.Collections.Generic.HashSet`1/Enumerator" preserve="all" />
+  </assembly>
+  <assembly fullname="Unity.InputSystem">
+    <type fullname="UnityEngine.InputSystem.InputAction" preserve="all" />
+    <type fullname="UnityEngine.InputSystem.InputAction/CallbackContext" preserve="all" />
+    <type fullname="UnityEngine.InputSystem.InputActionAsset" preserve="all" />
+    <type fullname="UnityEngine.InputSystem.InputActionMap" preserve="all" />
   </assembly>
   <assembly fullname="Unity.TextMeshPro">
     <type fullname="TMPro.TMP_Dropdown" preserve="all" />
     <type fullname="TMPro.TMP_InputField" preserve="all" />
     <type fullname="TMPro.TMP_Text" preserve="all" />
+  </assembly>
+  <assembly fullname="UnityEngine.AnimationModule">
+    <type fullname="UnityEngine.Animator" preserve="all" />
+    <type fullname="UnityEngine.AnimatorCullingMode" preserve="all" />
   </assembly>
   <assembly fullname="UnityEngine.CoreModule">
     <type fullname="Unity.Profiling.ProfilerCategory" preserve="all" />
@@ -206,16 +216,19 @@
     <type fullname="UnityEngine.Application/LogCallback" preserve="all" />
     <type fullname="UnityEngine.Color" preserve="all" />
     <type fullname="UnityEngine.Component" preserve="all" />
+    <type fullname="UnityEngine.CreateAssetMenuAttribute" preserve="all" />
     <type fullname="UnityEngine.Debug" preserve="all" />
     <type fullname="UnityEngine.Events.UnityAction" preserve="all" />
     <type fullname="UnityEngine.GameObject" preserve="all" />
     <type fullname="UnityEngine.LogType" preserve="all" />
     <type fullname="UnityEngine.Mathf" preserve="all" />
     <type fullname="UnityEngine.Matrix4x4" preserve="all" />
+    <type fullname="UnityEngine.MinAttribute" preserve="all" />
     <type fullname="UnityEngine.MonoBehaviour" preserve="all" />
     <type fullname="UnityEngine.Object" preserve="all" />
     <type fullname="UnityEngine.QualitySettings" preserve="all" />
     <type fullname="UnityEngine.Quaternion" preserve="all" />
+    <type fullname="UnityEngine.RangeAttribute" preserve="all" />
     <type fullname="UnityEngine.Rect" preserve="all" />
     <type fullname="UnityEngine.RectTransform" preserve="all" />
     <type fullname="UnityEngine.Resources" preserve="all" />
@@ -223,6 +236,9 @@
     <type fullname="UnityEngine.SceneManagement.LoadSceneMode" preserve="all" />
     <type fullname="UnityEngine.SceneManagement.LocalPhysicsMode" preserve="all" />
     <type fullname="UnityEngine.Screen" preserve="all" />
+    <type fullname="UnityEngine.ScriptableObject" preserve="all" />
+    <type fullname="UnityEngine.SerializeField" preserve="all" />
+    <type fullname="UnityEngine.SkinnedMeshRenderer" preserve="all" />
     <type fullname="UnityEngine.SystemInfo" preserve="all" />
     <type fullname="UnityEngine.TextAsset" preserve="all" />
     <type fullname="UnityEngine.Time" preserve="all" />
@@ -269,6 +285,7 @@
     <type fullname="System.Action" preserve="all" />
     <type fullname="System.Action`1" preserve="all" />
     <type fullname="System.Activator" preserve="all" />
+    <type fullname="System.AggregateException" preserve="all" />
     <type fullname="System.ArgumentException" preserve="all" />
     <type fullname="System.ArgumentNullException" preserve="all" />
     <type fullname="System.ArgumentOutOfRangeException" preserve="all" />
@@ -309,7 +326,6 @@
     <type fullname="System.Func`1" preserve="all" />
     <type fullname="System.Func`2" preserve="all" />
     <type fullname="System.Globalization.CultureInfo" preserve="all" />
-    <type fullname="System.Guid" preserve="all" />
     <type fullname="System.IDisposable" preserve="all" />
     <type fullname="System.IEquatable`1" preserve="all" />
     <type fullname="System.IFormatProvider" preserve="all" />

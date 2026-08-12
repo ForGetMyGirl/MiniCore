@@ -67,7 +67,7 @@
 
 ## 6. 发布在线热更新包
 
-项目启动时由 `UpdateMainWindow` 初始化 `DefaultPackage`，在 Host 模式依次请求远端版本、更新清单、下载缺失资源，然后加载 AOT 元数据与 `MiniCore.HotUpdate.dll`。因此，在线热更发布的是 **YooAsset 的完整新包版本**，不是单独上传一个 DLL。
+项目启动时由 `UpdateMainWindow` 初始化 `DefaultPackage`，在 Host 模式依次请求远端版本、更新清单、下载缺失资源，然后加载 AOT 元数据，并按项目登记的依赖顺序加载 `MiniCore.Protocol`、`MiniCore.HotUpdate` 及其他热更新 DLL。因此，在线热更发布的是 **YooAsset 的完整新包版本**，不是单独上传一个 DLL。
 
 1. 按改动范围执行第 3 节“完整生成”或第 4 节“热更编译”菜单。
 2. 在 YooAsset 构建输出中找到本次 Android / `DefaultPackage` / 时间戳版本目录；两个菜单都使用 UTC `yyyyMMddHHmmss` 作为包版本。
@@ -125,5 +125,14 @@
          是 → 热更编译 (Compile Active Target + Build) → Build 首包 或 发布新资源包
          否 → 直接 Build（如仅改 Player 设置、签名或图标）
 ```
+
+## 10. 验证记录
+
+### 2026-08-12（实例协议注册与多热更新程序集生成链）
+
+- 症状：最终隔离编译报错，项目内 Google.Protobuf 版本无法使用 `CodedOutputStream(byte[], offset, length)` 构造函数。
+- 根因：该版本只提供整数组写入构造函数；直接写调用方数组头部又会破坏网络帧前缀。
+- 修复：`ProtobufSerializer.SerializeInto` 先校验精确正文长度，再使用 `ArrayPool<byte>` 池化缓冲编码并复制到目标区间；没有保留不兼容构造函数，也不产生每包临时数组。
+- 验证：Unity `2021.3.45f2` 隔离工程完整脚本编译通过；PB 生成成功，覆盖 `3` 个项目 Proto 和 `39` 个网络协议注册项；Handler 二阶段生成确认 `26` 项且无需更新；开发导航重新生成。按本次要求未运行测试，实际 Player、多 DLL YooAsset 产物和端到端加载仍需在对应构建流程中验证。
 
 相关文档：[架构总览](Architecture.md)、[网络与协议](NetworkLayerAnalysis.md)、[网络冒烟测试](NetworkSmokeTesting.md)、[性能测试指南](PerformanceTestingGuide.md)。

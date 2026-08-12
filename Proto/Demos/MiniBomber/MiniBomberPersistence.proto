@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package minicore.persistence;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+// MiniBomber 客户端断线恢复信息。
+message MiniBomberSavedSessionData {
+  string host = 1;
+  int32 port = 2;
+  int64 player_id = 3;
+  string player_name = 4;
+  string session_token = 5;
+}
+
+// MiniBomber Demo 服务端账号记录。
+message MiniBomberAccountRecordData {
+  int64 player_id = 1;
+  string account = 2;
+  string player_name = 3;
+  string password_salt = 4;
+  string password_hash = 5;
+}
+
+// MiniBomber Demo 服务端账号库。
+message MiniBomberAccountDatabaseData {
+  int64 next_player_id = 1;
+  repeated MiniBomberAccountRecordData accounts = 2;
+}

@@ -2,53 +2,58 @@
 
 > 自动生成，勿手改。结构变动后在 Unity 点击 `MiniCore/AI/Generate Development Navigation` 更新。
 
-- AppModule：`ApplicationEventBusModule` — `Assets/Scripts/MiniCore/Runtime/Model/Eventing/Eventing.cs`
-- AppService：`AssetService` — `Assets/Scripts/MiniCore/HotUpdate/Service/AssetService.cs`
+- AppModule：`ApplicationEventBusModule` — `Assets/Scripts/MiniCore/Runtime/Model/Eventing/Bus/ApplicationEventBusModule.cs`
+- AppService：`AssetService` — `Assets/Scripts/MiniCore/HotUpdate/Service/Resource/AssetService.cs`
 - AppService：`AudioService` — `Assets/Scripts/MiniCore/Unity/Service/Audio/AudioService.cs`
 - AppService：`ConfigurationService` — `Assets/Scripts/MiniCore/HotUpdate/Client/Configuration/ConfigurationService.cs`
 - AppService：`DeviceSettingsService` — `Assets/Scripts/MiniCore/Unity/Service/Device/DeviceSettingsService.cs`
 - AppService：`EncryptedSaveService` — `Assets/Scripts/MiniCore/Unity/Service/Persistence/EncryptedSaveService.cs`
 - AppService：`LocalTelemetryFileService` — `Assets/Scripts/MiniCore/Unity/Service/Telemetry/LocalTelemetryFileService.cs`
-- AppService：`NetworkService` — `Assets/Scripts/MiniCore/Network/Core/NetworkMessageComponent.cs`
+- AppService：`NetworkService` — `Assets/Scripts/MiniCore/Network/Core/NetworkService.cs`
 - AppService：`SettingsService` — `Assets/Scripts/MiniCore/Unity/Service/Persistence/SettingsService.cs`
 - AppService：`StoragePathService` — `Assets/Scripts/MiniCore/Unity/Service/Persistence/StoragePathService.cs`
-- AppService：`TimerService` — `Assets/Scripts/MiniCore/Runtime/Time/TimerComponent.cs`
+- AppService：`TimerService` — `Assets/Scripts/MiniCore/Runtime/Time/TimerService.cs`
 - AppService：`UIService` — `Assets/Scripts/MiniCore/HotUpdate/UI/Service/UIService.cs`
-- AppService：`UnityWebRequestHttpService` — `Assets/Scripts/MiniCore/Unity/Service/Http/HttpService.cs`
-- AppService：`YooAssetResourceService` — `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetResourceService.cs`
-- AppService：`YooAssetSceneService` — `Assets/Scripts/MiniCore/HotUpdate/Service/YooAssetSceneService.cs`
+- AppService：`UnityWebRequestHttpService` — `Assets/Scripts/MiniCore/Unity/Service/Http/UnityWebRequestHttpService.cs`
+- AppService：`YooAssetResourceService` — `Assets/Scripts/MiniCore/HotUpdate/Service/Resource/YooAssetResourceService.cs`
+- AppService：`YooAssetSceneService` — `Assets/Scripts/MiniCore/HotUpdate/Service/Scene/YooAssetSceneService.cs`
 - ComponentCatalog：`GlobalListenerComponent` — `Assets/Scripts/MiniCore/HotUpdate/Client/UI/Core/GlobalListenerComponent.cs`
 - Handler：`DemoNormalHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Network/Handler/DemoNormalHandler.cs`
 - Handler：`DemoRpcHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Network/Handler/DemoRpcHandler.cs`
 - Handler：`DisconnectNoticeHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Network/Handler/DisconnectNoticeHandler.cs`
-- Handler：`MiniBomberBattleEventHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberBattleInputHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberBattleSnapshotHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberCreateRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberDisconnectHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberJoinRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberLeaveRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberLobbyChangedHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberLobbySnapshotHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberLoginHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberMatchCountdownHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberMatchPrepareHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberMatchResultHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberRegisterHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberResumeSessionHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberRoomSnapshotHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberClientHandlers.cs`
-- Handler：`MiniBomberSceneReadyHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberSetReadyHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberStartMatchHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
-- Handler：`MiniBomberUpdateRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/MiniBomberServerHandlers.cs`
+- Handler：`MiniBomberBattleDeltaHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberBattleDeltaHandler.cs`
+- Handler：`MiniBomberBattleEventHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberBattleEventHandler.cs`
+- Handler：`MiniBomberBattleInputHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberBattleInputHandler.cs`
+- Handler：`MiniBomberBattleResyncHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberBattleResyncHandler.cs`
+- Handler：`MiniBomberBattleSnapshotHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberBattleSnapshotHandler.cs`
+- Handler：`MiniBomberCreateRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberCreateRoomHandler.cs`
+- Handler：`MiniBomberDisconnectHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Connection/MiniBomberDisconnectHandler.cs`
+- Handler：`MiniBomberJoinRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberJoinRoomHandler.cs`
+- Handler：`MiniBomberLeaveRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberLeaveRoomHandler.cs`
+- Handler：`MiniBomberLobbyChangedHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberLobbyChangedHandler.cs`
+- Handler：`MiniBomberLobbySnapshotHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberLobbySnapshotHandler.cs`
+- Handler：`MiniBomberLoginHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Account/MiniBomberLoginHandler.cs`
+- Handler：`MiniBomberMatchCountdownHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberMatchCountdownHandler.cs`
+- Handler：`MiniBomberMatchPrepareHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberMatchPrepareHandler.cs`
+- Handler：`MiniBomberMatchResultHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberMatchResultHandler.cs`
+- Handler：`MiniBomberRegisterHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Account/MiniBomberRegisterHandler.cs`
+- Handler：`MiniBomberResumeSessionHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Account/MiniBomberResumeSessionHandler.cs`
+- Handler：`MiniBomberRoomSnapshotHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberRoomSnapshotHandler.cs`
+- Handler：`MiniBomberSceneReadyHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Battle/MiniBomberSceneReadyHandler.cs`
+- Handler：`MiniBomberSetReadyHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberSetReadyHandler.cs`
+- Handler：`MiniBomberStartMatchHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberStartMatchHandler.cs`
+- Handler：`MiniBomberUpdateRoomHandler` (ARpcHandler) — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Network/Handler/Lobby/MiniBomberUpdateRoomHandler.cs`
 - Handler：`TestHandler` (AMHandler) — `Assets/Scripts/MiniCore/HotUpdate/Network/Handler/TestHandler.cs`
 - MenuItem：`GameObject/MiniCore/RootCanvas` — `Assets/Scripts/MiniCore/Editor/UI/UIFrameworkAssetGenerator.cs`
-- MenuItem：`MiniCore/Build/Prepare DefaultPackage` — `Assets/Scripts/MiniCore/Editor/HybridCLR/HybridClrYooAssetBuildCommand.cs`
-- MenuItem：`MiniCore/Demos/MiniBomber/Create Default Assets` — `Assets/Scripts/MiniCore/Editor/Demos/MiniBomber/MiniBomberDemoAssetGenerator.cs`
+- MenuItem：`MiniCore/Build/DefaultPackage/完整生成 (Generate All + Build)` — `Assets/Scripts/MiniCore/Editor/HybridCLR/HybridClrYooAssetBuildCommand.cs`
+- MenuItem：`MiniCore/Build/DefaultPackage/热更编译 (Compile Active Target + Build)` — `Assets/Scripts/MiniCore/Editor/HybridCLR/HybridClrYooAssetBuildCommand.cs`
+- MenuItem：`MiniCore/Demos/MiniBomber/Create Default Assets` — `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Editor/MiniBomberDemoAssetGenerator.cs`
+- MenuItem：`MiniCore/HotUpdate/创建并登记热更新模块` — `Assets/Scripts/MiniCore/Editor/HybridCLR/MiniCoreHotUpdateAssemblyModuleWindow.cs`
+- MenuItem：`MiniCore/HotUpdate/同步 HybridCLR 与 Bootstrap 登记` — `Assets/Scripts/MiniCore/Editor/HybridCLR/HybridClrYooAssetBuildCommand.cs`
 - MenuItem：`MiniCore/Performance/History` — `Assets/Scripts/MiniCore/Editor/Performance/BenchmarkPerformanceHistoryWindow.cs`
 - MenuItem：`MiniCore/Protocol/Generate All` — `Assets/Scripts/MiniCore/Editor/Protocol/ProtoCodeGenerator.cs`
 - MenuItem：`MiniCore/UI/Create Window` — `Assets/Scripts/MiniCore/Editor/UI/UIWindowCreationWindow.cs`
 - MenuItem：`MiniCore/UI/Generate Project UI Assets` — `Assets/Scripts/MiniCore/Editor/UI/UIFrameworkAssetGenerator.cs`
 - MenuItem：`MiniCore/UI/Generate Window Registry` — `Assets/Scripts/MiniCore/Editor/UI/UIWindowRegistryGenerator.cs`
 - MenuItem：`MiniCore/UI/RootCanvas` — `Assets/Scripts/MiniCore/Editor/UI/UIFrameworkAssetGenerator.cs`
-- MenuItem：`MiniCore/项目启动配置` — `Assets/Scripts/MiniCore/Editor/MiniCoreStartupWindow.cs`
+- MenuItem：`MiniCore/项目启动配置` — `Assets/Scripts/MiniCore/Editor/Startup/MiniCoreStartupWindow.cs`

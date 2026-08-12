@@ -70,7 +70,7 @@ BCL 或第三方 API 确实要求 Token 时，仅在适配层调用 `MTaskExtern
 ## 线程与性能
 
 ```csharp
-using (MDedicatedThreadExecutor serializer = MTaskExecutors.CreateDedicated("MiniCore.Serialization"))
+using (MSingleThreadExecutor serializer = MTaskExecutors.CreateSingleThread("MiniCore.Serialization"))
 {
     await MTask.SwitchTo(serializer);
     SerializeSnapshot();
@@ -82,7 +82,11 @@ await MTask.SwitchTo(MTaskExecutors.ThreadPool);
 CalculateWithoutUnityAccess();
 ```
 
-`MTaskExecutors.Unity` 由 `UnityGlobalDriver.Update` 抽取；`NetworkService` 创建并持有自己的独占执行器。`CreateDedicated` 每次调用才创建一条长期工作线程，调用模块必须在释放时 Dispose；`ThreadPool` 复用 CLR 线程池而不创建固定线程。`SwitchTo` 只改变当前任务后续代码的执行位置，等待它的父任务仍回到父方捕获的执行器。
+`MTaskExecutors.Unity` 由 `UnityGlobalDriver.Update` 抽取；`NetworkService` 通过 MTask 工厂创建、登记并持有自己的 I/O 执行器租约。线程创建、调度、诊断和退出兜底仍由 MTask 管理，网络只决定租约生命周期并把执行器注入自己的监听器/Transport。无需线程亲和性的会话发送泵在原生环境复用共享 ThreadPool，浏览器则回落 Unity 主循环。
+
+`CreateSingleThread` 会创建一条长期后台工作线程，并保证所有投递按顺序在该线程执行。它不同于共享 `ThreadPool`；每次调用都会创建新线程，调用模块必须在释放时 Dispose。`SwitchTo` 只改变当前任务后续代码的执行位置，等待它的父任务仍回到父方捕获的执行器。
+
+浏览器 WebGL 不创建托管线程，但仍使用相同的 MTask、Owner、Delay、Yield 和取消语义。`MTaskExecutors.SupportsThreads` 返回 false；`TryGetThreadPool` / `TryCreateSingleThread` 用于可降级模块，显式访问 `ThreadPool` 或调用 `CreateSingleThread` 会抛出 `PlatformNotSupportedException`。可降级模块应使用 Unity 主循环执行器，不以运行时判断绕过尚未隔离的线程代码。
 
 独占执行器使用信号驱动的事件循环。存在下一枚计时器时只等待到它的到期时间；已经有计时器到期时立即处理就绪续体；没有计时器和普通续体时使用无限等待，不做固定周期轮询。`Post`、`Schedule` 和 `Dispose` 都会发出唤醒信号，`AutoResetEvent` 会保留发生在进入等待之前的信号，因此新工作不会被空闲等待遗漏。`MTask.Delay` 仍受操作系统线程调度影响，不保证精确到指定毫秒，但不会再额外叠加空闲轮询周期。
 

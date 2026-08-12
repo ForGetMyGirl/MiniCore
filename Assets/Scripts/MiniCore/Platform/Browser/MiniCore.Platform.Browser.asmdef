@@ -1,0 +1,14 @@
+{
+  "name": "MiniCore.Platform.Browser",
+  "rootNamespace": "",
+  "references": ["MiniCore.Runtime", "MiniCore.Network"],
+  "includePlatforms": ["WebGL"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

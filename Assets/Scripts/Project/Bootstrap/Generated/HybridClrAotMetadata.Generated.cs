@@ -10,9 +10,24 @@ namespace MiniCore.Bootstrap
         #region Public 公共成员
 
         /// <summary>
-        /// YooAsset 中热更新程序集的固定加载地址。
+        /// 包含最终启动入口的程序集名称。
         /// </summary>
-        public const string HotUpdateDllAddress = "HotUpdate";
+        public const string StartupAssemblyName = "MiniCore.HotUpdate";
+
+        /// <summary>
+        /// Bootstrap 反射调用的启动类型完整名称。
+        /// </summary>
+        public const string StartupTypeName = "MiniCore.HotUpdate.MiniCoreStartup";
+
+        /// <summary>
+        /// Bootstrap 反射调用的启动静态方法名称。
+        /// </summary>
+        public const string StartupMethodName = "StartAsync";
+
+        /// <summary>
+        /// YooAsset 中按依赖顺序加载的热更新程序集独立地址。
+        /// </summary>
+        public static IReadOnlyList<string> HotUpdateAssemblyAddresses => _hotUpdateAssemblyAddresses;
 
         /// <summary>
         /// 当前构建目标需要在加载热更新程序集前补充的 AOT 元数据地址。
@@ -22,6 +37,12 @@ namespace MiniCore.Bootstrap
         #endregion
 
         #region Private 私有成员
+
+        private static readonly string[] _hotUpdateAssemblyAddresses =
+        {
+            "MiniCore.Protocol.dll",
+            "MiniCore.HotUpdate.dll",
+        };
 
         private static readonly string[] _aotMetadataAddresses =
         {

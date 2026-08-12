@@ -4,6 +4,7 @@ using MiniCore.Eventing;
 using MiniCore.Service;
 using MiniCore.HotUpdate;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
 using MiniCore.Threading;
 using NUnit.Framework;
 using UnityEngine;
@@ -49,7 +50,10 @@ namespace MiniCore.EditorTests
 
             Global.RegisterAppModule<IApplicationEventBus, ApplicationEventBusModule>();
             NetworkService network = Global.RegisterAppService<INetworkService, NetworkService>();
-            HotUpdateHandlerRegistry.Register(network);
+            var protocolBuilder = new NetworkProtocolBuilder();
+            ProjectProtocolRegistration.Register(protocolBuilder);
+            HotUpdateHandlerRegistration.Register(protocolBuilder);
+            network.ConfigureProtocol(protocolBuilder.Build());
 
             runnerObject = new GameObject("NetworkLoopbackIntegrationTests");
             runner = runnerObject.AddComponent<NetworkSmokeTestRunner>();

@@ -2,52 +2,41 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using MiniCore.Threading;
 using MiniCore.Core;
 using MiniCore.Model;
-using Newtonsoft.Json;
+using MiniCore.Threading;
+using MiniCore.Unity;
 
 namespace MiniCore.Service
 {
     /// <summary>
-    /// 加密存档服务的启动参数。
+    /// 使用 AES-CBC 加密、HMAC-SHA256 防篡改并通过平台后端保存二进制数据的应用服务。
+    /// 客户端内置密钥只能提高篡改和直接读取成本，不能替代服务端可信校验。
     /// </summary>
-    public sealed class EncryptedSaveServiceInitArgs : ComponentInitArgs
-    {
-        #region Public 公共成员
-
-        /// <summary>
-        /// 获取或设置由开发者填写的稳定加密口令。
-        /// 修改该值后，使用旧值写入的存档将无法读取；该值会明文保存在启动配置和生成代码中。
-        /// </summary>
-        public string EncryptionKey { get; set; } = string.Empty;
-
-        #endregion
-    }
-
-    /// <summary>
-    /// 使用 AES-CBC 与 HMAC-SHA256 保存版本化 JSON 数据的应用服务。
-    /// 开发者填写的启动口令经 SHA-256 派生主密钥，再按槽位派生实际密钥。
-    /// </summary>
-    [AppService("加密存档", typeof(ISaveService), Description = "使用开发者配置的密钥加密并校验版本化本地存档。", RequiresServices = new[] { typeof(IStoragePathService) }, InitArgsType = typeof(EncryptedSaveServiceInitArgs))]
+    [AppService(
+        "保护存档",
+        typeof(ISaveService),
+        Description = "加密、校验并通过当前平台后端保存 Protobuf 等二进制数据。",
+        InitArgsType = typeof(EncryptedSaveServiceInitArgs))]
     public sealed class EncryptedSaveService : AAppService, ISaveService
     {
         #region Private 私有成员
 
-        private const int CurrentFormatVersion = 1; // 当前加密文件格式版本。
-        private byte[] masterKey; // 由开发者启动口令派生的 32 字节主密钥。
-        private IStoragePathService storagePathService; // 本地持久化路径服务。
+        private const byte CurrentFormatVersion = 2; // 当前保护文件格式版本，不兼容旧 JSON 存档。
+        private const int MagicLength = 4; // 固定格式标识长度。
+        private const int IvLength = 16; // AES-CBC 初始化向量长度。
+        private const int TagLength = 32; // HMAC-SHA256 标签长度。
+        private static readonly byte[] Magic = { (byte)'M', (byte)'C', (byte)'S', (byte)'B' }; // MiniCore Save Binary 格式标识。
+        private byte[] masterKey; // 由开发者口令派生的内存主密钥。
+        private IStorageBackend storageBackend; // 当前运行平台的逻辑键二进制后端。
         private ITelemetryService telemetry; // 可选遥测服务。
-        private string rootPath; // 所有逻辑存档槽位的根目录。
 
         #endregion
 
         #region Override 重写实现
 
         /// <summary>
-        /// 该服务必须通过包含加密口令的启动参数初始化。
+        /// 无启动参数时明确拒绝创建，避免使用固定框架默认密钥。
         /// </summary>
         public override void Awake()
         {
@@ -55,21 +44,21 @@ namespace MiniCore.Service
         }
 
         /// <summary>
-        /// 使用开发者配置的加密口令初始化存档服务。
+        /// 使用开发者配置的稳定口令初始化二进制保护服务。
         /// </summary>
-        /// <param name="args">加密存档服务启动参数。</param>
+        /// <param name="args">包含稳定口令的启动参数。</param>
         public override void Awake(ComponentInitArgs args)
         {
             if (!(args is EncryptedSaveServiceInitArgs saveArgs))
             {
-                throw new ArgumentException("加密存档服务必须使用 EncryptedSaveServiceInitArgs 初始化。", nameof(args));
+                throw new ArgumentException("保护存档服务必须使用 EncryptedSaveServiceInitArgs 初始化。", nameof(args));
             }
 
             Initialize(saveArgs.EncryptionKey);
         }
 
         /// <summary>
-        /// 释放当前服务持有的引用并清除内存中的主密钥。
+        /// 清除内存主密钥并释放服务引用。
         /// </summary>
         protected override void OnDispose()
         {
@@ -79,7 +68,7 @@ namespace MiniCore.Service
                 masterKey = null;
             }
 
-            storagePathService = null;
+            storageBackend = null;
             telemetry = null;
         }
 
@@ -88,56 +77,43 @@ namespace MiniCore.Service
         #region Interface 接口实现
 
         /// <summary>
-        /// 将对象序列化、加密并以原子替换方式写入指定逻辑槽位。
+        /// 加密并认证二进制数据后写入指定逻辑槽位。
         /// </summary>
-        /// <typeparam name="T">待保存对象类型。</typeparam>
-        /// <param name="slotName">逻辑存档槽位名称。</param>
-        /// <param name="data">待保存对象。</param>
-        /// <returns>保存完成任务。</returns>
-        public async MTask SaveAsync<T>(string slotName, T data)
+        /// <param name="slotName">逻辑槽位名称。</param>
+        /// <param name="data">Protobuf 等调用方已经编码完成的二进制数据。</param>
+        /// <returns>平台写入事务完成任务。</returns>
+        public async MTask SaveAsync(string slotName, byte[] data)
         {
-            CancellationToken token = MTaskExternal.GetCancellationToken();
-            token.ThrowIfCancellationRequested();
-            string path = GetSlotPath(slotName);
-            byte[] payload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
-            byte[] key = GetKey(slotName);
-            byte[] encrypted = Encrypt(payload, key);
-            string temporaryPath = path + ".tmp";
-
-            await Task.Run(() =>
+            ValidateSlotName(slotName);
+            if (data == null)
             {
-                token.ThrowIfCancellationRequested();
-                File.WriteAllBytes(temporaryPath, encrypted);
-            }, token);
-            token.ThrowIfCancellationRequested();
+                throw new ArgumentNullException(nameof(data));
+            }
 
-            ReplaceAtomically(temporaryPath, path);
+            MTaskExternal.GetCancellationToken().ThrowIfCancellationRequested();
+            byte[] protectedBytes = Protect(slotName, data);
+            await storageBackend.WriteAsync(GetStorageKey(slotName), protectedBytes);
             telemetry?.Increment("save.write");
         }
 
         /// <summary>
-        /// 读取、校验、解密并反序列化指定逻辑槽位。
+        /// 读取、认证并解密指定逻辑槽位的二进制数据。
         /// </summary>
-        /// <typeparam name="T">目标对象类型。</typeparam>
-        /// <param name="slotName">逻辑存档槽位名称。</param>
-        /// <returns>槽位不存在时返回空；否则返回存档对象。</returns>
-        public async MTask<T> LoadAsync<T>(string slotName) where T : class
+        /// <param name="slotName">逻辑槽位名称。</param>
+        /// <returns>槽位不存在时返回空，否则返回独立明文字节数组。</returns>
+        public async MTask<byte[]> LoadAsync(string slotName)
         {
-            CancellationToken token = MTaskExternal.GetCancellationToken();
-            string path = GetSlotPath(slotName);
-            if (!File.Exists(path))
+            ValidateSlotName(slotName);
+            MTaskExternal.GetCancellationToken().ThrowIfCancellationRequested();
+            byte[] protectedBytes = await storageBackend.ReadAsync(GetStorageKey(slotName));
+            if (protectedBytes == null)
             {
                 return null;
             }
 
-            byte[] encrypted = await Task.Run(() =>
-            {
-                token.ThrowIfCancellationRequested();
-                return File.ReadAllBytes(path);
-            }, token);
-            byte[] payload = Decrypt(encrypted, GetKey(slotName));
+            byte[] data = Unprotect(slotName, protectedBytes);
             telemetry?.Increment("save.read");
-            return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(payload));
+            return data;
         }
 
         #endregion
@@ -145,145 +121,190 @@ namespace MiniCore.Service
         #region Private 私有成员
 
         /// <summary>
-        /// 验证槽位名称并生成其实际文件路径。
+        /// 派生内存主密钥并选择浏览器注册后端或原生文件后端。
         /// </summary>
-        /// <param name="slotName">逻辑槽位名称。</param>
-        /// <returns>安全的实际文件路径。</returns>
-        private string GetSlotPath(string slotName)
-        {
-            if (string.IsNullOrWhiteSpace(slotName) || slotName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || slotName.Contains(".."))
-            {
-                throw new ArgumentException("存档槽位名称无效。", nameof(slotName));
-            }
-
-            return Path.Combine(rootPath, slotName + ".mcs");
-        }
-
-        /// <summary>
-        /// 为逻辑槽位派生 AES 与 HMAC 使用的 32 字节密钥。
-        /// </summary>
-        /// <param name="slotName">逻辑槽位名称。</param>
-        /// <returns>长度为 32 的密钥。</returns>
-        private byte[] GetKey(string slotName)
-        {
-            if (masterKey == null || masterKey.Length != 32)
-            {
-                throw new InvalidOperationException("加密存档主密钥尚未初始化。");
-            }
-
-            byte[] slotBytes = Encoding.UTF8.GetBytes(slotName);
-            using HMACSHA256 hmac = new HMACSHA256(masterKey);
-            return hmac.ComputeHash(slotBytes);
-        }
-
-        /// <summary>
-        /// 验证开发者口令、派生主密钥并取得存档目录。
-        /// </summary>
-        /// <param name="encryptionKey">启动配置中填写的稳定加密口令。</param>
+        /// <param name="encryptionKey">开发者配置的稳定口令。</param>
         private void Initialize(string encryptionKey)
         {
             if (string.IsNullOrWhiteSpace(encryptionKey))
             {
-                throw new InvalidOperationException("启用加密存档前，必须在启动配置的 EncryptionKey 中填写稳定的加密口令。");
+                throw new InvalidOperationException("启用保护存档前必须配置稳定口令。");
+            }
+
+            if (!StorageBackendRegistry.TryCreate(out storageBackend))
+            {
+                if (!Global.TryGetService(this, out IStoragePathService pathService))
+                {
+                    throw new InvalidOperationException(
+                        "未注册当前平台的存储后端，也未配置可用于原生文件回退的 IStoragePathService。");
+                }
+
+                storageBackend = new FileStorageBackend(pathService.GetDirectory("Storage"));
             }
 
             byte[] source = Encoding.UTF8.GetBytes(encryptionKey);
-            using SHA256 sha256 = SHA256.Create();
-            masterKey = sha256.ComputeHash(source);
-            storagePathService = Global.GetService<IStoragePathService>(this);
-            Global.TryGetService(this, out telemetry);
-            rootPath = storagePathService.GetDirectory("Saves");
-        }
-
-        /// <summary>
-        /// 加密正文并在末尾附加 HMAC 完整性标签。
-        /// </summary>
-        /// <param name="payload">明文数据。</param>
-        /// <param name="key">32 字节主密钥。</param>
-        /// <returns>版本、IV、密文与认证标签组成的文件内容。</returns>
-        private static byte[] Encrypt(byte[] payload, byte[] key)
-        {
-            using Aes aes = Aes.Create();
-            aes.Key = key;
-            aes.GenerateIV();
-            using ICryptoTransform encryptor = aes.CreateEncryptor();
-            byte[] cipher = encryptor.TransformFinalBlock(payload, 0, payload.Length);
-            byte[] result = new byte[1 + aes.IV.Length + cipher.Length + 32];
-            result[0] = CurrentFormatVersion;
-            Buffer.BlockCopy(aes.IV, 0, result, 1, aes.IV.Length);
-            Buffer.BlockCopy(cipher, 0, result, 1 + aes.IV.Length, cipher.Length);
-            using HMACSHA256 hmac = new HMACSHA256(key);
-            byte[] tag = hmac.ComputeHash(result, 0, result.Length - 32);
-            Buffer.BlockCopy(tag, 0, result, result.Length - 32, tag.Length);
-            return result;
-        }
-
-        /// <summary>
-        /// 将完整临时文件替换为正式文件，优先使用文件系统原子替换能力。
-        /// </summary>
-        /// <param name="temporaryPath">已完整写入的临时文件。</param>
-        /// <param name="path">目标正式文件。</param>
-        private static void ReplaceAtomically(string temporaryPath, string path)
-        {
-            if (!File.Exists(path))
-            {
-                File.Move(temporaryPath, path);
-                return;
-            }
-
-            string backupPath = path + ".bak";
             try
             {
-                File.Replace(temporaryPath, path, backupPath, true);
-                if (File.Exists(backupPath))
+                using (SHA256 sha256 = SHA256.Create())
                 {
-                    File.Delete(backupPath);
+                    masterKey = sha256.ComputeHash(source);
                 }
             }
-            catch (PlatformNotSupportedException)
+            finally
             {
-                File.Delete(path);
-                File.Move(temporaryPath, path);
+                Array.Clear(source, 0, source.Length);
+            }
+
+            Global.TryGetService(this, out telemetry);
+        }
+
+        /// <summary>
+        /// 使用独立加密密钥和认证密钥生成 Encrypt-then-MAC 格式。
+        /// </summary>
+        /// <param name="slotName">密钥派生所绑定的逻辑槽位。</param>
+        /// <param name="data">明文二进制数据。</param>
+        /// <returns>格式头、IV、密文和认证标签组成的保护数据。</returns>
+        private byte[] Protect(string slotName, byte[] data)
+        {
+            byte[] encryptionKey = DeriveKey("enc", slotName);
+            byte[] authenticationKey = DeriveKey("mac", slotName);
+            try
+            {
+                using (Aes aes = Aes.Create())
+                {
+                    aes.Key = encryptionKey;
+                    aes.Mode = CipherMode.CBC;
+                    aes.Padding = PaddingMode.PKCS7;
+                    aes.GenerateIV();
+                    byte[] cipher;
+                    using (ICryptoTransform encryptor = aes.CreateEncryptor())
+                    {
+                        cipher = encryptor.TransformFinalBlock(data, 0, data.Length);
+                    }
+
+                    int tagOffset = checked(MagicLength + 1 + IvLength + cipher.Length);
+                    byte[] result = new byte[tagOffset + TagLength];
+                    Buffer.BlockCopy(Magic, 0, result, 0, MagicLength);
+                    result[MagicLength] = CurrentFormatVersion;
+                    Buffer.BlockCopy(aes.IV, 0, result, MagicLength + 1, IvLength);
+                    Buffer.BlockCopy(cipher, 0, result, MagicLength + 1 + IvLength, cipher.Length);
+                    using (HMACSHA256 hmac = new HMACSHA256(authenticationKey))
+                    {
+                        byte[] tag = hmac.ComputeHash(result, 0, tagOffset);
+                        Buffer.BlockCopy(tag, 0, result, tagOffset, tag.Length);
+                        Array.Clear(tag, 0, tag.Length);
+                    }
+
+                    Array.Clear(cipher, 0, cipher.Length);
+                    return result;
+                }
+            }
+            finally
+            {
+                Array.Clear(encryptionKey, 0, encryptionKey.Length);
+                Array.Clear(authenticationKey, 0, authenticationKey.Length);
             }
         }
 
         /// <summary>
-        /// 校验完整性标签后解密文件正文。
+        /// 先以固定时间比较认证标签，再解密通过校验的密文。
         /// </summary>
-        /// <param name="input">加密文件内容。</param>
-        /// <param name="key">32 字节主密钥。</param>
-        /// <returns>解密后的明文数据。</returns>
-        private static byte[] Decrypt(byte[] input, byte[] key)
+        /// <param name="slotName">密钥派生所绑定的逻辑槽位。</param>
+        /// <param name="input">完整保护数据。</param>
+        /// <returns>通过认证后的明文字节。</returns>
+        private byte[] Unprotect(string slotName, byte[] input)
         {
-            if (input == null || input.Length < 1 + 16 + 32 || input[0] != CurrentFormatVersion)
+            int minimumLength = MagicLength + 1 + IvLength + 16 + TagLength;
+            if (input == null || input.Length < minimumLength || !HasValidHeader(input))
             {
                 throw new InvalidDataException("存档格式无效或版本不受支持。");
             }
 
-            int tagOffset = input.Length - 32;
-            using HMACSHA256 hmac = new HMACSHA256(key);
-            byte[] expected = hmac.ComputeHash(input, 0, tagOffset);
-            if (!FixedTimeEquals(expected, input, tagOffset))
+            byte[] encryptionKey = DeriveKey("enc", slotName);
+            byte[] authenticationKey = DeriveKey("mac", slotName);
+            try
             {
-                throw new InvalidDataException("存档完整性校验失败。");
-            }
+                int tagOffset = input.Length - TagLength;
+                byte[] expected;
+                using (HMACSHA256 hmac = new HMACSHA256(authenticationKey))
+                {
+                    expected = hmac.ComputeHash(input, 0, tagOffset);
+                }
 
-            byte[] iv = new byte[16];
-            Buffer.BlockCopy(input, 1, iv, 0, iv.Length);
-            int cipherLength = tagOffset - 1 - iv.Length;
-            using Aes aes = Aes.Create();
-            aes.Key = key;
-            aes.IV = iv;
-            using ICryptoTransform decryptor = aes.CreateDecryptor();
-            return decryptor.TransformFinalBlock(input, 17, cipherLength);
+                bool authenticated = FixedTimeEquals(expected, input, tagOffset);
+                Array.Clear(expected, 0, expected.Length);
+                if (!authenticated)
+                {
+                    throw new InvalidDataException("存档完整性校验失败，数据可能已被修改。");
+                }
+
+                byte[] iv = new byte[IvLength];
+                Buffer.BlockCopy(input, MagicLength + 1, iv, 0, IvLength);
+                int cipherOffset = MagicLength + 1 + IvLength;
+                int cipherLength = tagOffset - cipherOffset;
+                using (Aes aes = Aes.Create())
+                {
+                    aes.Key = encryptionKey;
+                    aes.IV = iv;
+                    aes.Mode = CipherMode.CBC;
+                    aes.Padding = PaddingMode.PKCS7;
+                    using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                    {
+                        return decryptor.TransformFinalBlock(input, cipherOffset, cipherLength);
+                    }
+                }
+            }
+            finally
+            {
+                Array.Clear(encryptionKey, 0, encryptionKey.Length);
+                Array.Clear(authenticationKey, 0, authenticationKey.Length);
+            }
         }
 
         /// <summary>
-        /// 使用固定遍历长度比较认证标签，避免将首个不匹配位置暴露给调用方。
+        /// 按用途和槽位从内存主密钥派生独立子密钥。
         /// </summary>
-        /// <param name="expected">根据密文计算出的标签。</param>
-        /// <param name="input">包含实际标签的文件内容。</param>
-        /// <param name="offset">实际标签在文件内容中的起始位置。</param>
+        /// <param name="purpose">稳定用途标签。</param>
+        /// <param name="slotName">逻辑槽位。</param>
+        /// <returns>32 字节子密钥。</returns>
+        private byte[] DeriveKey(string purpose, string slotName)
+        {
+            byte[] context = Encoding.UTF8.GetBytes(purpose + "\0" + slotName);
+            try
+            {
+                using (HMACSHA256 hmac = new HMACSHA256(masterKey))
+                {
+                    return hmac.ComputeHash(context);
+                }
+            }
+            finally
+            {
+                Array.Clear(context, 0, context.Length);
+            }
+        }
+
+        /// <summary>
+        /// 校验固定格式标识和版本。
+        /// </summary>
+        /// <param name="input">完整保护数据。</param>
+        /// <returns>格式头有效时返回 true。</returns>
+        private static bool HasValidHeader(byte[] input)
+        {
+            int difference = input[MagicLength] ^ CurrentFormatVersion;
+            for (int index = 0; index < MagicLength; index++)
+            {
+                difference |= input[index] ^ Magic[index];
+            }
+
+            return difference == 0;
+        }
+
+        /// <summary>
+        /// 使用固定遍历长度比较认证标签。
+        /// </summary>
+        /// <param name="expected">本地计算标签。</param>
+        /// <param name="input">包含实际标签的完整数据。</param>
+        /// <param name="offset">实际标签起始位置。</param>
         /// <returns>标签完全一致时返回 true。</returns>
         private static bool FixedTimeEquals(byte[] expected, byte[] input, int offset)
         {
@@ -294,6 +315,31 @@ namespace MiniCore.Service
             }
 
             return difference == 0;
+        }
+
+        /// <summary>
+        /// 校验业务槽位名称不包含路径语义。
+        /// </summary>
+        /// <param name="slotName">待校验槽位。</param>
+        private static void ValidateSlotName(string slotName)
+        {
+            if (string.IsNullOrWhiteSpace(slotName)
+                || slotName.Contains("..")
+                || slotName.IndexOf('/') >= 0
+                || slotName.IndexOf('\\') >= 0)
+            {
+                throw new ArgumentException("存档槽位名称无效。", nameof(slotName));
+            }
+        }
+
+        /// <summary>
+        /// 为平台后端生成不包含实际路径的稳定逻辑键。
+        /// </summary>
+        /// <param name="slotName">已校验的槽位名称。</param>
+        /// <returns>平台无关逻辑键。</returns>
+        private static string GetStorageKey(string slotName)
+        {
+            return "save:" + slotName;
         }
 
         #endregion

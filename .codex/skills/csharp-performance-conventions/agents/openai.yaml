@@ -1,4 +1,4 @@
 interface:
-  display_name: "C# 开发规范"
-  short_description: "执行 MiniCore 的注释、编码和 GC 控制规范。"
-  default_prompt: "按 MiniCore C# 开发规范实现本次代码变更。"
+  display_name: "C# 全局开发规范"
+  short_description: "执行全局 C# 注释、单类型文件、编码与高频路径性能规范。"
+  default_prompt: "使用 $csharp-performance-conventions 按全局 C# 编码与性能规范完成本次代码变更。"

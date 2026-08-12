@@ -1,28 +1,31 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 using MiniCore.Model;
-using MiniCore.Core;
-
+using UnityEngine;
 
 namespace MiniCore.HotUpdate
 {
-public class TestBall : MonoBehaviour, IPoolObject
-{
-    bool IPoolObject.IsUseful { get; set; }
-    string IPoolObject.GroupName { get; set; }
-
-
-    void IPoolObject.Clear()
+    /// <summary>
+    /// 用于演示对象池生命周期的测试球组件。
+    /// </summary>
+    public sealed class TestBall : MonoBehaviour, IPoolObject
     {
-        gameObject.SetActive(false);
-    }
+        #region Interface 接口实现
 
-    void IPoolObject.Init()
-    {
-        LogSwitch.Info($"鐢熸垚浜嗕竴涓猅estBall瀵硅薄锛屽綋鍓嶅璞″悕绉帮細{name}锛屽綋鍓嶄綅缃細{transform.position}");
-        gameObject.SetActive(true);
-    }
-}
+        /// <summary>
+        /// 清理本次租用状态并隐藏对象。
+        /// </summary>
+        void IPoolObject.Clear()
+        {
+            gameObject.SetActive(false);
+        }
 
+        /// <summary>
+        /// 初始化新一次租用并显示对象。
+        /// </summary>
+        void IPoolObject.Init()
+        {
+            gameObject.SetActive(true);
+        }
+
+        #endregion
+    }
 }

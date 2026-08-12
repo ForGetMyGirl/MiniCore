@@ -163,7 +163,7 @@
 
 | 项目 | 记录 |
 | --- | --- |
-| 优化范围 | `Network/Transport/Entity/Common/ByteBufferPool.cs`，不改变 TCP、UDP、KCP 和网络组件对 `Rent/Return` 的调用方式。 |
+| 优化范围 | `Network/Transport/Common/ByteBufferPool.cs`，不改变 TCP、UDP、KCP、WebSocket 和网络组件对 `Rent/Return` 的调用方式。 |
 | 原始问题 | 旧实现使用 `ConcurrentStack<byte[]>` 保存空闲数组。数组本身被复用，但每次 `Push` 会产生短命的并发容器内部节点。 |
 | 归因证据 | 10,000 次、512 B 的 `Buffer.BlockCopy` 为 `0.156 ms / GC() = 5`；`ConcurrentQueue` 入出队为 `0.464 ms / GC() = 5`；旧缓冲池仅 `Rent/Return` 为 `1.506 ms / GC() = 10005`。因此稳定分配来自缓冲池容器，而非复制或收包队列。 |
 | 实施方案 | 每个大小桶替换为内部加锁的 `byte[][]` 槽位栈；稳定阶段只读写已有数组引用，不创建并发栈节点。外部调用方不需要加锁。 |
@@ -183,7 +183,7 @@
 | 出站发送调度 | 每会话唯一发送泵在共享线程池等待底层异步写入；同会话有序、不同会话可并行，Unity 主线程只负责业务调用与入队。 | 监控线程池排队、每会话出站等待和 Socket 发送耗时；不能退回主线程或合并为全局单发送线程。 |
 | 收包缓冲复用 | `EnqueueIncoming` 从 `ByteBufferPool.Shared` 租用数组，处理完成后归还；每桶使用内部加锁的数组槽位栈。 | 单数组 1 MB、单桶 8 MB、全局 32 MB 上限已落实；后续补运行时命中率和容量统计。 |
 | Handler 派发 | `AMHandler`、`ARpcHandler` 通过非泛型 invoker 契约直调，避免每包 `MethodInfo.Invoke` 和 `object[]` 参数数组。 | 启动阶段仍会反射扫描；是否生成直连注册代码由压测决定。 |
-| Opcode 兼容性 | 使用稳定 manifest 和生成的 `OpcodeRegistry.Generated.cs`。 | 构建校验和协议版本治理应持续维护。 |
+| Opcode 兼容性 | 使用稳定 manifest 和每 Proto 生成的无状态协议注册代码。 | 构建校验和协议版本治理应持续维护。 |
 | 组件生命周期 | `Global` 通过 owner 记录直接引用计数，提供 `Get/GetOrAdd/Remove/ReleaseAll/Pin/Unpin/ForceRemove`。 | 增加泄漏诊断和常驻组件审计。 |
 
 ## 阶段 0：建立性能基线与观测
@@ -338,7 +338,7 @@
 
 ## 阶段 6：生成式 Handler 绑定（已完成，持续监控）
 
-当前实现已在 Editor 编译后扫描 `MiniCore.HotUpdate` 的 `AMHandler<T>` 与 `ARpcHandler<TRequest,TResponse>`，生成 `HotUpdateHandlerRegistry.Generated.cs` 与 `OpcodeRegistry.Generated.cs`。运行时直接构造并注册 Handler，不扫描 AppDomain，不以字符串或 `Activator` 创建 Handler。
+当前实现由 Proto 网络角色生成稳定 Opcode 与无状态消息注册代码；Editor 编译后扫描全部已登记热更新程序集的 `AMHandler<T>` 与 `ARpcHandler<TRequest,TResponse>`，只生成 `HotUpdateHandlerRegistration.Generated.cs`。运行时通过临时 Builder 原子合并消息和 Handler 并提交实例级不可变 Registry，不扫描 AppDomain，不以字符串或 `Activator` 创建 Handler。
 
 ### 持续项
 

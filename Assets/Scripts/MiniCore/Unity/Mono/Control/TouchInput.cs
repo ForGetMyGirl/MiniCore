@@ -50,8 +50,6 @@ namespace MiniCore.Model
         private Vector2 deltaTouchMovePosition;         //当前帧较上一帧的移动差值
         private Vector2 lastTouchPosition;
 
-
-
         private float lastTouchDistance;    //上一次双指的距离
         private float currentTouchDistance; //本次双指的距离
         private float deltaTouchDistance;   //本次跟上次双指距离的差值
@@ -105,7 +103,6 @@ namespace MiniCore.Model
                     isMoving = false;
                 }
             }
-
 
         }
 
@@ -168,7 +165,6 @@ namespace MiniCore.Model
             }
 
         }
-
 
     }
 

@@ -9,14 +9,15 @@ Unity/
 ├── Service/                      # 音频、设备、HTTP、存储、遥测
 ├── Startup/                      # MiniCoreStartupSettings 定义
 ├── Threading/                    # AMTaskBehaviour、YooAsset MTask 适配
-└── UI/                           # AUIBase、Presenter、窗口属性
+└── UI/                           # Interface、Presenter、View、Model、State、动画与布局
 HotUpdate/
-├── Service/                      # 资源、资产、场景绑定、UI、配置服务
+├── Service/Resource/             # 资源与资产服务
+├── Service/Scene/                # 场景服务
 ├── Client/                       # 配置、对象池、监听器
 └── UI/                           # 热更新业务窗口
 ```
 
-关键入口：`Unity/Driver/UnityGlobalDriver.cs`、`Unity/Startup/MiniCoreStartupSettings.cs`、`Unity/UI/Interface/AUIBase.cs`、`HotUpdate/Service/HotUpdateServiceContracts.cs`、`HotUpdate/Service/YooAssetResourceService.cs`、`HotUpdate/Service/UIService.cs`。
+关键入口：`Unity/Driver/UnityGlobalDriver.cs`、`Unity/Startup/MiniCoreStartupSettings.cs`、`Unity/UI/View/AUIWindowView.cs`、`Unity/UI/Interface/IUIService.cs`、`HotUpdate/Service/Resource/YooAssetResourceService.cs`、`HotUpdate/Service/Scene/YooAssetSceneService.cs`、`HotUpdate/UI/Service/UIService.cs`。
 
 - AppService 只能通过对应接口和 `Global.GetService<T>` 使用；启动设置在 `Assets/Settings/MiniCoreStartupSettings.asset`。
 - 资源、UI、场景绑定使用当前服务契约，不重新引入旧组件名称。

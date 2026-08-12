@@ -6,13 +6,13 @@
 Runtime/
 ├── Core/Global/                 # Global 静态门面、运行时和 Scope
 ├── Model/Component/             # AComponent、初始化参数、能力目录
-├── Model/Eventing/Eventing.cs   # 强类型同步/异步事件
-├── Service/                     # AppService、AppModule、组件组与契约
-├── Threading/                   # MTask、任务域、执行器、诊断
+├── Model/Eventing/              # Bus、Channel、订阅模型与事件接口
+├── Service/                     # Abstraction、Interface、Attribute、Registry、Group 与 Model
+├── Threading/                   # Core、Source、Awaitable、Builder、Sharing、Execution、Ownership 等
 └── Time/                        # 时间接口与 TimerService
 ```
 
-关键入口：`Core/Global/Global.cs`、`Model/Component/AComponent.cs`、`Service/AppServiceContracts.cs`、`Threading/MTask.cs`、`Model/Eventing/Eventing.cs`、`Time/TimerComponent.cs`。
+关键入口：`Core/Global/Global.cs`、`Model/Component/AComponent.cs`、`Service/Abstraction/AAppService.cs`、`Service/Interface/IAppService.cs`、`Threading/Core/MTask.cs`、`Threading/Ownership/MTaskDomain.cs`、`Model/Eventing/Bus/EventBusCore.cs`、`Time/TimerService.cs`。
 
 - 生命周期、owner 引用计数与 Scope：先读 `Docs/Architecture.md` 的 Global 章节。
 - 异步、取消、Share/Forget、线程切换：先读 `Docs/MTask.md`。

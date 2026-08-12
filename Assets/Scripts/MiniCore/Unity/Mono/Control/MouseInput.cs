@@ -66,7 +66,6 @@ namespace MiniCore.Model
         public void MouseMoveUpdate()
         {
 
-
             mouseX = Input.GetAxis("Mouse X");
             mouseY = Input.GetAxis("Mouse Y");
 
@@ -90,13 +89,12 @@ namespace MiniCore.Model
             mouseOutput.ValueX = Mathf.Lerp(mouseOutput.ValueX, 0, moveLerpDamp);
             mouseOutput.ValueY = Mathf.Lerp(mouseOutput.ValueY, 0, moveLerpDamp);
 
-            if (Mathf.Abs(mouseOutput.ValueX) <= scrollReachedValue)      //接近0 
+            if (Mathf.Abs(mouseOutput.ValueX) <= scrollReachedValue)      //接近0
                 mouseOutput.ValueX = 0;
             if (Mathf.Abs(mouseOutput.ValueY) <= scrollReachedValue)
                 mouseOutput.ValueY = 0;
 
         }
-
 
         /// <summary>
         /// 监听鼠标滚轮滚动事件，添加了缓动
@@ -120,10 +118,9 @@ namespace MiniCore.Model
 
             mouseScrollValue = Mathf.Lerp(mouseScrollValue, 0, scrollLerpDamp);
 
-            if (Mathf.Abs(mouseScrollValue) <= moveReachedValue)      //接近0 
+            if (Mathf.Abs(mouseScrollValue) <= moveReachedValue)      //接近0
                 mouseScrollValue = 0;
         }
-
 
         private void Update()
         {
@@ -139,17 +136,6 @@ namespace MiniCore.Model
             }
 
         }
-
-
-    }
-
-
-
-    public struct MouseOutput
-    {
-        public float ValueX { get; set; }
-        public float ValueY { get; set; }
-
 
     }
 }

@@ -2,18 +2,6 @@ using MiniCore.Protocol.Generated;
 
 namespace MiniCore.Demo.MiniBomber
 {
-    /// <summary>
-    /// 客户端应用战斗同步消息的结果。
-    /// </summary>
-    public enum MiniBomberReplicationApplyResult
-    {
-        /// <summary>消息已应用。</summary>
-        Applied,
-        /// <summary>消息为重复或旧消息，已安全忽略。</summary>
-        Ignored,
-        /// <summary>基线或事件序列不连续，需要请求完整关键帧。</summary>
-        RequiresResync
-    }
 
     /// <summary>
     /// 不依赖 Unity 和网络服务的 MiniBomber 客户端复制状态机。
@@ -22,10 +10,14 @@ namespace MiniCore.Demo.MiniBomber
     {
         #region Public 公共成员
 
-        /// <summary>当前可供表现层读取的权威状态。</summary>
+        /// <summary>
+        /// 当前可供表现层读取的权威状态。
+        /// </summary>
         public MiniBomberBattleSnapshot Snapshot { get; private set; }
 
-        /// <summary>最后连续应用的可靠事件编号。</summary>
+        /// <summary>
+        /// 最后连续应用的可靠事件编号。
+        /// </summary>
         public long LastEventId { get; private set; }
 
         /// <summary>

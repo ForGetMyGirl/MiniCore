@@ -18,7 +18,7 @@ Bootstrap 加载 HotUpdate DLL 后直接调用这条启动链；登录、大厅�
 
 服务或组件释放时，把关闭 Socket、停止监听器、解除外部 I/O 等同步动作放进 `OnDisposing()`；把依赖任务 finally 已退出的资源回收放进 `OnDispose()`。应用退出和 Editor 停止 Play Mode 为快速退出，只请求取消和停止专用执行器，不等待后台任务或线程完整收尾；因此退出路径不能承担存盘、遥测上传等必须完成的业务。
 
-模块需要独占线程时用 `MTaskExecutors.CreateDedicated(name)` 创建并由模块持有，在正常 `OnDispose()` 中释放；`MTask.SwitchTo(executor)` 只切换到已有执行器。不要把“网络线程”当作唯一选项，也不要在每次调用时新建线程。
+模块需要独立单线程时用 `MTaskExecutors.CreateSingleThread(name)` 创建并由模块持有，在正常 `OnDispose()` 中释放。无线程平台用 `TryCreateSingleThread` 探测并选择主循环方案；`MTask.SwitchTo(executor)` 只切换到已有执行器。不要把“网络线程”当作全局单例，也不要在每次调用时新建线程。
 
 ## 配置服务与能力目录
 
@@ -135,18 +135,20 @@ LoginResponse response = await http.SendJsonAsync<LoginRequest, LoginResponse>(
 
 ## 加密存档
 
-`EncryptedSaveService` 只依赖 `IStoragePathService`。它通过启动参数 `EncryptionKey` 接收开发者手动填写的稳定口令：服务先以 SHA-256 得到 32 字节主密钥，再以 HMAC-SHA256 按逻辑槽位派生工作密钥，最后使用 AES-CBC 加密并以 HMAC-SHA256 校验完整性。存档文件位于本地存储根目录的 `Saves` 子目录。
+`EncryptedSaveService` 对外保存二进制数据，Protobuf 业务使用 `SaveProtobufAsync` / `LoadProtobufAsync`。服务通过启动参数 `EncryptionKey` 得到 32 字节主密钥，再按逻辑槽位分别派生加密密钥和认证密钥，最后使用 AES-CBC 加密并以 HMAC-SHA256 校验完整性。摘要不能替代加密：AES 隐藏明文，HMAC 检测篡改。
+
+底层存储通过 `IStorageBackend` 的逻辑键 API 选择：普通原生 Player 使用 `StoragePathService` 下的 `Storage` 文件后端，浏览器 WebGL 由平台程序集注册 IndexedDB。业务和存档服务不取得浏览器文件路径。未来微信或抖音平台包只需注册对应存储后端，无须修改 Protobuf 和保护格式。
 
 启用流程：
 
-1. 在 **AppService** 中启用“本地存储路径”。如需改用产品数据目录，取消 `RelativePath` 的“使用 Args 代码默认值”，再填写目录名。
+1. 在 **AppService** 中启用“本地存储路径”，满足默认保护存档的原生后端依赖与确定性启动顺序。如需改用产品数据目录，取消 `RelativePath` 的“使用 Args 代码默认值”，再填写目录名；浏览器实际字节由预先注册的 IndexedDB 后端接管。
 2. 启用“加密存档”，展开其启动参数，取消 `EncryptionKey` 的“使用 Args 代码默认值”，然后填写一个稳定、非空的开发者口令。
 3. 如需自动加载客户端设置，再启用“客户端设置”。
 4. 保存启动参数并生成代码。生成器会先启动本地存储路径服务，再启动加密存档及其下游服务。
 
 `EncryptionKey` 变更后，使用旧值保存的所有加密存档都无法读取。参数会以明文保存在 `MiniCoreStartupSettings.asset`；勾选“覆盖默认值”后也会明文出现在生成的启动代码中。因此这套默认实现适合防止简单篡改和统一本地存档格式，**不能**防御逆向、篡改客户端或拥有本机文件访问权限的攻击者。
 
-若发行项目需要更强的密钥保护、跨设备迁移或服务端授权，应实现自己的 `ISaveService`，并通过 `[AppService]` 取代默认加密存档实现；不要把私钥、访问令牌或服务端凭据填写进启动配置。
+若发行项目需要更强的密钥保护、跨设备迁移或服务端授权，应实现自己的 `ISaveService`，并通过 `[AppService]` 取代默认保护存档实现；不要把私钥、访问令牌或服务端凭据填写进启动配置。默认保护格式不兼容旧 JSON 存档，不保留静默迁移分支。
 
 ## 编写项目启动逻辑
 

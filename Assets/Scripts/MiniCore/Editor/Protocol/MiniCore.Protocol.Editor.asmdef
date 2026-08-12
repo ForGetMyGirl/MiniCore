@@ -1,0 +1,14 @@
+{
+  "name": "MiniCore.Protocol.Editor",
+  "rootNamespace": "",
+  "references": ["MiniCore.HotUpdateAssembly.Editor"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

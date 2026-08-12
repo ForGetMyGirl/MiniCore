@@ -1,6 +1,5 @@
 using MiniCore.Threading;
 using System;
-using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using YooAsset;
@@ -9,30 +8,20 @@ using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Unity;
 
-public class UpdateMainWindow : AMTaskBehaviour
+/// <summary>
+/// 初始化 YooAsset、加载 AOT 元数据与全部热更新程序集，并调用项目启动入口。
+/// </summary>
+public sealed class UpdateMainWindow : AMTaskBehaviour
 {
-    #region Private 私有成员
-
-    [SerializeField]
-    private string hotUpdateDllPath = HybridClrAotMetadata.HotUpdateDllAddress; // YooAsset 中热更新 DLL 的固定地址。
-
-    private const string HotUpdateStartupTypeName = "MiniCore.HotUpdate.MiniCoreStartup"; // 热更新 DLL 中固定的静态启动类型。
-    private const string HotUpdateStartupMethodName = "StartAsync"; // 热更新静态启动方法名称。
+    #region UnityProperty Unity 引用属性
 
     [SerializeField]
     private BundlePackageMode bundlePackageMode; // YooAsset 运行模式。
 
-    private ResourcePackage package; // 当前运行的 YooAsset 资源包。
-    private long totalBytes; // 当前下载任务的总字节数。
-
-    #endregion
-
-    #region Public 公共成员
-
-    [Tooltip("热更新包名")]
     /// <summary>
     /// 默认加载的 YooAsset 资源包名称。
     /// </summary>
+    [Tooltip("热更新包名")]
     public string packageName;
 
     /// <summary>
@@ -45,16 +34,23 @@ public class UpdateMainWindow : AMTaskBehaviour
     /// </summary>
     public string fallbackServerURL;
 
-    [Tooltip("最大并发下载数")]
     /// <summary>
     /// 单次资源更新允许的最大并发下载数。
     /// </summary>
+    [Tooltip("最大并发下载数")]
     public int downloadMaxNum;
 
     /// <summary>
     /// 单个资源下载失败后的重试次数。
     /// </summary>
     public int failedTryAgain;
+
+    #endregion
+
+    #region Private 私有成员
+
+    private ResourcePackage package; // 当前运行的 YooAsset 资源包。
+    private long totalBytes; // 当前下载任务的总字节数。
 
     #endregion
 
@@ -379,25 +375,50 @@ public class UpdateMainWindow : AMTaskBehaviour
             }
 
             AssetHandle handle = package.LoadAssetAsync<TextAsset>(dll);
-            await handle.ToMTask();
-            TextAsset dllText = handle.AssetObject as TextAsset;
-            if (dllText == null)
+            try
             {
-                throw new InvalidOperationException($"未找到 AOT 元数据：{dll}");
+                await handle.ToMTask();
+                TextAsset dllText = handle.AssetObject as TextAsset;
+                if (dllText == null)
+                {
+                    throw new InvalidOperationException($"未找到 AOT 元数据：{dll}");
+                }
+
+                HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(
+                    dllText.bytes,
+                    HybridCLR.HomologousImageMode.SuperSet);
+            }
+            finally
+            {
+                handle.Release();
+            }
+        }
+
+        foreach (string address in HybridClrAotMetadata.HotUpdateAssemblyAddresses)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                throw new InvalidOperationException("热更新程序集地址表包含空地址。");
             }
 
-            HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(dllText.bytes, HybridCLR.HomologousImageMode.SuperSet);
+            AssetHandle handle = package.LoadAssetAsync<TextAsset>(address);
+            try
+            {
+                await handle.ToMTask();
+                TextAsset assemblyAsset = handle.AssetObject as TextAsset;
+                if (assemblyAsset == null)
+                {
+                    throw new InvalidOperationException($"未找到热更新 DLL：{address}");
+                }
+
+                Assembly.Load(assemblyAsset.bytes);
+            }
+            finally
+            {
+                handle.Release();
+            }
         }
 
-        AssetHandle hotUpdateHandle = package.LoadAssetAsync<TextAsset>(hotUpdateDllPath);
-        await hotUpdateHandle.ToMTask();
-        TextAsset hotUpdateText = hotUpdateHandle.AssetObject as TextAsset;
-        if (hotUpdateText == null)
-        {
-            throw new InvalidOperationException($"未找到 HotUpdate DLL：{hotUpdateDllPath}");
-        }
-
-        Assembly.Load(hotUpdateText.bytes);
         SetPromptInfo("加载完成，准备进入游戏...");
     }
 #endif
@@ -408,27 +429,55 @@ public class UpdateMainWindow : AMTaskBehaviour
     /// <returns>入口启动完成任务。</returns>
     private async MTask StartHotUpdateAsync()
     {
-        Type startupType = AppDomain.CurrentDomain.GetAssemblies()
-            .Select(assembly => assembly.GetType(HotUpdateStartupTypeName, false))
-            .FirstOrDefault(type => type != null);
-        if (startupType == null)
+        Assembly startupAssembly = FindLoadedAssembly(HybridClrAotMetadata.StartupAssemblyName);
+        if (startupAssembly == null)
         {
-            throw new InvalidOperationException($"未找到 HotUpdate 启动类型：{HotUpdateStartupTypeName}");
+            throw new InvalidOperationException($"未加载 HotUpdate 启动程序集：{HybridClrAotMetadata.StartupAssemblyName}");
         }
 
-        MethodInfo startMethod = startupType.GetMethod(HotUpdateStartupMethodName, BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+        Type startupType = startupAssembly.GetType(HybridClrAotMetadata.StartupTypeName, false);
+        if (startupType == null)
+        {
+            throw new InvalidOperationException($"未找到 HotUpdate 启动类型：{HybridClrAotMetadata.StartupTypeName}");
+        }
+
+        MethodInfo startMethod = startupType.GetMethod(
+            HybridClrAotMetadata.StartupMethodName,
+            BindingFlags.Public | BindingFlags.Static,
+            null,
+            Type.EmptyTypes,
+            null);
         if (startMethod == null)
         {
-            throw new InvalidOperationException($"HotUpdate 启动类型缺少无参静态 MTask 方法：{startupType.FullName}.{HotUpdateStartupMethodName}");
+            throw new InvalidOperationException($"HotUpdate 启动类型缺少无参静态 MTask 方法：{startupType.FullName}.{HybridClrAotMetadata.StartupMethodName}");
         }
 
         object invokeResult = startMethod.Invoke(null, null);
         if (!(invokeResult is MTask startTask))
         {
-            throw new InvalidOperationException($"HotUpdate 启动方法必须返回 {nameof(MTask)}：{startupType.FullName}.{HotUpdateStartupMethodName}");
+            throw new InvalidOperationException($"HotUpdate 启动方法必须返回 {nameof(MTask)}：{startupType.FullName}.{HybridClrAotMetadata.StartupMethodName}");
         }
 
         await startTask;
+    }
+
+    /// <summary>
+    /// 按程序集简单名称查找已经由 Unity 或 Bootstrap 加载的程序集。
+    /// </summary>
+    /// <param name="assemblyName">不含 DLL 后缀的程序集名称。</param>
+    /// <returns>找到的程序集；尚未加载时返回空。</returns>
+    private static Assembly FindLoadedAssembly(string assemblyName)
+    {
+        Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        for (int index = 0; index < assemblies.Length; index++)
+        {
+            if (string.Equals(assemblies[index].GetName().Name, assemblyName, StringComparison.Ordinal))
+            {
+                return assemblies[index];
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -438,55 +487,6 @@ public class UpdateMainWindow : AMTaskBehaviour
     private void SetPromptInfo(string msg)
     {
         LogSwitch.Info($"[Bootstrap] {msg}");
-    }
-
-    #endregion
-}
-
-class RemoteServices : IRemoteServices
-{
-    #region Private 私有成员
-
-    private readonly string _resourcesServerURL;
-    private readonly string _fallbackServerURL;
-
-    #endregion
-
-    #region Public 公共成员
-
-    /// <summary>
-    /// 使用主、备用服务器地址创建 YooAsset 远端服务。
-    /// </summary>
-    /// <param name="resourcesServerUrl">主资源服务器地址。</param>
-    /// <param name="fallbackServerUrl">备用资源服务器地址。</param>
-    public RemoteServices(string resourcesServerUrl, string fallbackServerUrl)
-    {
-        _resourcesServerURL = resourcesServerUrl;
-        _fallbackServerURL = fallbackServerUrl;
-    }
-
-    #endregion
-
-    #region Interface 接口实现
-
-    /// <summary>
-    /// 获取指定资源文件的备用下载地址。
-    /// </summary>
-    /// <param name="fileName">资源文件名。</param>
-    /// <returns>备用服务器中的资源完整地址。</returns>
-    string IRemoteServices.GetRemoteFallbackURL(string fileName)
-    {
-        return $"{_fallbackServerURL}/{fileName}";
-    }
-
-    /// <summary>
-    /// 获取指定资源文件的主下载地址。
-    /// </summary>
-    /// <param name="fileName">资源文件名。</param>
-    /// <returns>主服务器中的资源完整地址。</returns>
-    string IRemoteServices.GetRemoteMainURL(string fileName)
-    {
-        return $"{_resourcesServerURL}/{fileName}";
     }
 
     #endregion

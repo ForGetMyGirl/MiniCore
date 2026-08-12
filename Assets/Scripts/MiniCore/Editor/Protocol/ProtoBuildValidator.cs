@@ -1,22 +1,19 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
 namespace MiniCore.EditorTools
 {
     /// <summary>
-    /// 校验 Proto 注解、RPC 固定字段与已提交生成代码的一致性。
+    /// 校验框架内部与项目业务 Proto 的生成产物、角色和注册代码。
     /// </summary>
-    internal static class ProtoBuildValidator
+    public static class ProtoBuildValidator
     {
         #region Private 私有成员
 
         private const string ProtoRoot = "Proto";
-        private const string GeneratedMessageDirectory = "Assets/Scripts/MiniCore/Protocol/Generated/Message";
-        private const string GeneratedRoleDirectory = "Assets/Scripts/MiniCore/Protocol/Generated/Role";
-        private const string GeneratedRegistryDirectory = "Assets/Scripts/MiniCore/Protocol/Generated/Registry";
-        private static readonly Regex MessageRegex = new Regex(@"//\[(INormalMessage|IRpcRequest|IRpcResponse)\]\s*\r?\n\s*message\s+(\w+)\s*\{(?<body>.*?)\}", RegexOptions.Singleline | RegexOptions.Compiled); // Proto 注解消息匹配器。
+        private const string ClientSettingsGeneratedPath = "Assets/Scripts/MiniCore/Unity/Service/Persistence/Generated/ClientSettings.cs";
+        private static readonly Regex MessageRegex = new Regex(@"//\[(INormalMessage|IRpcRequest|IRpcResponse)\]\s*\r?\n\s*message\s+(\w+)\s*\{(?<body>.*?)\}", RegexOptions.Singleline | RegexOptions.Compiled); // 网络角色注解匹配器。
         private static readonly Regex CodeFieldRegex = new Regex(@"\bint32\s+code\s*=\s*1\s*;", RegexOptions.Compiled); // RPC Code 固定字段匹配器。
         private static readonly Regex MsgFieldRegex = new Regex(@"\bstring\s+msg\s*=\s*2\s*;", RegexOptions.Compiled); // RPC Msg 固定字段匹配器。
 
@@ -25,77 +22,86 @@ namespace MiniCore.EditorTools
         #region Internal 内部成员
 
         /// <summary>
-        /// 校验所有 Proto 文件及其 C# 生成产物。
+        /// 校验所有 Proto 及当前配置输出目录中的生成文件。
         /// </summary>
         /// <param name="error">校验失败原因。</param>
-        /// <returns>全部内容有效时返回 true。</returns>
-        internal static bool Validate(out string error)
+        /// <returns>全部生成文件有效时返回 true。</returns>
+        public static bool Validate(out string error)
         {
             try
             {
-                string root = GetFullPath(ProtoRoot);
-                if (!Directory.Exists(root))
+                if (!File.Exists(GetFullPath(ClientSettingsGeneratedPath)))
                 {
-                    error = $"缺少 Proto 根目录：{ProtoRoot}";
+                    error = "缺少框架内部 ClientSettings PB 生成文件，请执行 MiniCore/Protocol/Generate All。";
                     return false;
                 }
 
-                string registryDirectory = GetFullPath(GeneratedRegistryDirectory);
-                if (!Directory.Exists(GetFullPath(GeneratedMessageDirectory)) || !Directory.Exists(GetFullPath(GeneratedRoleDirectory)) || !Directory.Exists(registryDirectory))
+                string outputDirectory = GetFullPath(MiniCoreProtocolSettings.instance.ProjectOutputDirectory);
+                if (!Directory.Exists(outputDirectory))
                 {
-                    error = "缺少 Protocol 生成目录，请先执行 protoc 并生成角色与 Parser 注册表。";
+                    error = "项目业务 Proto 输出目录不存在，请先生成协议。";
                     return false;
                 }
 
-                string registryContent = ReadAllFiles(registryDirectory);
-                string[] protoFiles = ProtoCodeGenerator.GetBusinessProtoFiles(root);
-                if (protoFiles.Length == 0)
+                string projectRegistrationPath = Path.Combine(outputDirectory, "ProjectProtocolRegistration.g.cs");
+                if (!File.Exists(projectRegistrationPath))
                 {
-                    error = $"未找到 Proto 文件：{ProtoRoot}";
+                    error = "缺少项目统一协议注册入口，请重新生成协议。";
                     return false;
                 }
 
-                foreach (string protoFile in protoFiles)
+                string projectRegistration = File.ReadAllText(projectRegistrationPath);
+                string[] protoFiles = ProtoCodeGenerator.GetBusinessProtoFiles(GetFullPath(ProtoRoot));
+                for (int fileIndex = 0; fileIndex < protoFiles.Length; fileIndex++)
                 {
-                    string content = File.ReadAllText(protoFile);
-                    MatchCollection matches = MessageRegex.Matches(content);
+                    string protoFile = protoFiles[fileIndex];
+                    string stem = Path.GetFileNameWithoutExtension(protoFile);
+                    string messagePath = Path.Combine(outputDirectory, stem + ".cs");
+                    if (!File.Exists(messagePath))
+                    {
+                        error = $"缺少 Proto 消息生成文件：{ToProjectPath(protoFile)}。";
+                        return false;
+                    }
+
+                    string protoContent = File.ReadAllText(protoFile);
+                    MatchCollection matches = MessageRegex.Matches(protoContent);
                     if (matches.Count == 0)
                     {
-                        error = $"Proto 文件未找到角色注解消息：{ToProjectPath(protoFile)}";
+                        continue;
+                    }
+
+                    string rolePath = Path.Combine(outputDirectory, stem + ".ProtocolRole.g.cs");
+                    string registrationPath = Path.Combine(outputDirectory, stem + ".ProtocolRegistration.g.cs");
+                    if (!File.Exists(rolePath) || !File.Exists(registrationPath))
+                    {
+                        error = $"缺少 {stem} 的角色或协议注册生成文件。";
                         return false;
                     }
 
-                    string generatedMessage = Path.Combine(GetFullPath(GeneratedMessageDirectory), Path.GetFileNameWithoutExtension(protoFile) + ".cs");
-                    string generatedRole = Path.Combine(GetFullPath(GeneratedRoleDirectory), Path.GetFileNameWithoutExtension(protoFile) + ".ProtocolRole.g.cs");
-                    if (!File.Exists(generatedMessage) || !File.Exists(generatedRole))
+                    string roleContent = File.ReadAllText(rolePath);
+                    string registrationContent = File.ReadAllText(registrationPath);
+                    if (projectRegistration.IndexOf(stem + "ProtocolRegistration.Register", StringComparison.Ordinal) < 0)
                     {
-                        error = $"Proto 生成产物缺失：{ToProjectPath(protoFile)}";
+                        error = $"项目统一协议注册入口缺少 {stem}。";
                         return false;
                     }
 
-                    string roleContent = File.ReadAllText(generatedRole);
-                    for (int index = 0; index < matches.Count; index++)
+                    for (int messageIndex = 0; messageIndex < matches.Count; messageIndex++)
                     {
-                        Match match = matches[index];
+                        Match match = matches[messageIndex];
                         string role = match.Groups[1].Value;
-                        string messageName = match.Groups[2].Value;
+                        string name = match.Groups[2].Value;
                         string body = match.Groups["body"].Value;
                         if (role == "IRpcResponse" && (!CodeFieldRegex.IsMatch(body) || !MsgFieldRegex.IsMatch(body)))
                         {
-                            error = $"RPC 响应 {messageName} 必须定义 int32 code = 1; 与 string msg = 2;：{ToProjectPath(protoFile)}";
+                            error = $"RPC 响应 {name} 缺少固定 code/msg 字段：{ToProjectPath(protoFile)}。";
                             return false;
                         }
 
-                        string expectedRole = role == "INormalMessage" ? "INormalMessage" : role;
-                        if (roleContent.IndexOf($"partial class {messageName} : {expectedRole}", StringComparison.Ordinal) < 0)
+                        if (roleContent.IndexOf($"partial class {name} : {role}", StringComparison.Ordinal) < 0 ||
+                            registrationContent.IndexOf($"RegisterMessage<{name}>", StringComparison.Ordinal) < 0)
                         {
-                            error = $"Proto 角色生成代码过期：{messageName} 未实现 {expectedRole}。";
-                            return false;
-                        }
-
-                        if (registryContent.IndexOf($"Register({messageName}.Parser);", StringComparison.Ordinal) < 0)
-                        {
-                            error = $"Protobuf Parser 注册表缺少消息：{messageName}。";
+                            error = $"协议 {name} 的角色或注册生成代码已过期。";
                             return false;
                         }
                     }
@@ -116,41 +122,20 @@ namespace MiniCore.EditorTools
         #region Private 私有成员
 
         /// <summary>
-        /// 读取目录中全部 C# 生成文件内容。
+        /// 将项目相对路径转换为完整路径。
         /// </summary>
-        /// <param name="directory">目标目录。</param>
-        /// <returns>拼接后的文本。</returns>
-        private static string ReadAllFiles(string directory)
-        {
-            var contents = new List<string>();
-            string[] files = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories);
-            for (int index = 0; index < files.Length; index++)
-            {
-                contents.Add(File.ReadAllText(files[index]));
-            }
-
-            return string.Join(Environment.NewLine, contents);
-        }
-
-        /// <summary>
-        /// 将项目相对路径转换为绝对路径。
-        /// </summary>
-        /// <param name="path">项目相对路径。</param>
-        /// <returns>绝对路径。</returns>
         private static string GetFullPath(string path)
         {
             return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
         }
 
         /// <summary>
-        /// 将绝对路径转换为项目相对路径供错误信息使用。
+        /// 将完整路径转换为项目相对路径。
         /// </summary>
-        /// <param name="path">绝对路径。</param>
-        /// <returns>项目相对路径。</returns>
         private static string ToProjectPath(string path)
         {
-            string projectRoot = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            return path.StartsWith(projectRoot, StringComparison.Ordinal) ? path.Substring(projectRoot.Length) : path;
+            string root = Directory.GetCurrentDirectory().TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return path.StartsWith(root, StringComparison.Ordinal) ? path.Substring(root.Length).Replace('\\', '/') : path;
         }
 
         #endregion

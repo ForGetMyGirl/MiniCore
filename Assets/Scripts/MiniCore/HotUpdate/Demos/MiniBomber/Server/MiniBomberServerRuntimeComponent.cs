@@ -54,7 +54,9 @@ namespace MiniCore.Demo.MiniBomber
 
         #region Public 公共成员
 
-        /// <summary>当前运行时是否完成初始化。</summary>
+        /// <summary>
+        /// 当前运行时是否完成初始化。
+        /// </summary>
         public bool IsInitialized => initialized;
 
         /// <summary>

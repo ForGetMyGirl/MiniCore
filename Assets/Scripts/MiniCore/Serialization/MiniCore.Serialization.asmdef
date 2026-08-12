@@ -1,7 +1,7 @@
 {
   "name": "MiniCore.Serialization",
   "rootNamespace": "",
-  "references": ["MiniCore.Runtime", "MiniCore.Protocol"],
+  "references": ["MiniCore.Runtime"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

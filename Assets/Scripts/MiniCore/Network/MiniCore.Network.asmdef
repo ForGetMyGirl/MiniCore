@@ -1,7 +1,7 @@
 {
   "name": "MiniCore.Network",
   "rootNamespace": "",
-  "references": ["MiniCore.Runtime", "MiniCore.Protocol", "MiniCore.Serialization"],
+  "references": ["MiniCore.Runtime", "MiniCore.Serialization"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": true,
@@ -10,5 +10,5 @@
   "autoReferenced": true,
   "defineConstraints": [],
   "versionDefines": [],
-  "noEngineReferences": false
+  "noEngineReferences": true
 }

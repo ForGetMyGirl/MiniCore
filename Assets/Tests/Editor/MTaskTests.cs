@@ -187,7 +187,7 @@ namespace MiniCore.EditorTests
         public void SwitchTo_DedicatedAndMain_UsesExpectedThreads()
         {
             int mainThreadId = Thread.CurrentThread.ManagedThreadId;
-            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.Worker");
+            using MSingleThreadExecutor worker = MTaskExecutors.CreateSingleThread("MTask.Tests.Worker");
 
             (int workerThreadId, int resumedThreadId) = Run(SwitchExecutorsAsync(worker, mainExecutor));
 
@@ -213,10 +213,10 @@ namespace MiniCore.EditorTests
         /// 验证不同模块持有的独占执行器不会共享同一条工作线程。
         /// </summary>
         [Test]
-        public void CreateDedicated_MultipleExecutors_UseIndependentThreads()
+        public void CreateSingleThread_MultipleExecutors_UseIndependentThreads()
         {
-            using MDedicatedThreadExecutor first = MTaskExecutors.CreateDedicated("MTask.Tests.First");
-            using MDedicatedThreadExecutor second = MTaskExecutors.CreateDedicated("MTask.Tests.Second");
+            using MSingleThreadExecutor first = MTaskExecutors.CreateSingleThread("MTask.Tests.First");
+            using MSingleThreadExecutor second = MTaskExecutors.CreateSingleThread("MTask.Tests.Second");
 
             (int firstThreadId, int secondThreadId) = Run(SwitchBetweenDedicatedExecutorsAsync(first, second));
 
@@ -229,7 +229,7 @@ namespace MiniCore.EditorTests
         [Test]
         public void Delay_DedicatedExecutor_ResumesWithoutIdleFallbackDelay()
         {
-            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.Delay");
+            using MSingleThreadExecutor worker = MTaskExecutors.CreateSingleThread("MTask.Tests.Delay");
             Stopwatch stopwatch = Stopwatch.StartNew();
 
             Run(DelayOnDedicatedExecutorAsync(worker, mainExecutor));
@@ -243,7 +243,7 @@ namespace MiniCore.EditorTests
         [Test]
         public void Post_DedicatedExecutor_WakesInfiniteIdleWait()
         {
-            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.IdleWake");
+            using MSingleThreadExecutor worker = MTaskExecutors.CreateSingleThread("MTask.Tests.IdleWake");
             using ManualResetEventSlim entered = new ManualResetEventSlim(false);
             using ManualResetEventSlim completed = new ManualResetEventSlim(false);
             worker.Post(entered.Set);
@@ -263,7 +263,7 @@ namespace MiniCore.EditorTests
         [Test]
         public void Dispose_DedicatedExecutor_FromOwnedThread_ExitsCleanly()
         {
-            using MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.SelfDispose");
+            using MSingleThreadExecutor worker = MTaskExecutors.CreateSingleThread("MTask.Tests.SelfDispose");
             using ManualResetEventSlim disposeReturned = new ManualResetEventSlim(false);
 
             worker.Post(() =>
@@ -303,7 +303,7 @@ namespace MiniCore.EditorTests
         {
             using ManualResetEventSlim started = new ManualResetEventSlim(false);
             using ManualResetEventSlim finished = new ManualResetEventSlim(false);
-            MDedicatedThreadExecutor worker = MTaskExecutors.CreateDedicated("MTask.Tests.FastShutdown");
+            MSingleThreadExecutor worker = MTaskExecutors.CreateSingleThread("MTask.Tests.FastShutdown");
             worker.Post(() =>
             {
                 started.Set();

@@ -11,22 +11,6 @@ namespace MiniCore.Model
         where TResponse : IRpcResponse, new()
     {
         /// <summary>
-        /// 从 opcode 注册表解析当前请求类型对应的协议号。
-        /// </summary>
-        public virtual uint Opcode
-        {
-            get
-            {
-                var msgType = typeof(TRequest);
-                if (OpcodeRegistry.TryGetOpcodeByMessage(msgType, out uint code))
-                {
-                    return code;
-                }
-                throw new InvalidOperationException($"Missing opcode mapping for {msgType.FullName}.");
-            }
-        }
-
-        /// <summary>
         /// 处理 RPC 请求并填充响应对象。
         /// </summary>
         /// <param name="session">执行该方法所需的 session 参数。</param>

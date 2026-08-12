@@ -2,110 +2,13 @@ using System;
 using System.Collections.Generic;
 using MiniCore.Core;
 using MiniCore.Model;
+using MiniCore.Protocol.Generated;
+using MiniCore.Serialization;
 using MiniCore.Service;
 using MiniCore.Threading;
 
 namespace MiniCore.Demo.MiniBomber
 {
-    /// <summary>
-    /// MiniBomber 服务器账号数据库序列化根对象。
-    /// </summary>
-    [Serializable]
-    public sealed class MiniBomberAccountDatabase
-    {
-        #region Public 公共成员
-
-        /// <summary>
-        /// 获取或设置下一个可分配玩家身份。
-        /// </summary>
-        public long NextPlayerId { get; set; } = 1;
-
-        /// <summary>
-        /// 获取或设置全部已注册账号。
-        /// </summary>
-        public List<MiniBomberAccountRecord> Accounts { get; set; } = new List<MiniBomberAccountRecord>();
-
-        #endregion
-    }
-
-    /// <summary>
-    /// 服务器持久化的单个 MiniBomber 账号记录。
-    /// </summary>
-    [Serializable]
-    public sealed class MiniBomberAccountRecord
-    {
-        #region Public 公共成员
-
-        /// <summary>
-        /// 获取或设置稳定玩家身份。
-        /// </summary>
-        public long PlayerId { get; set; }
-
-        /// <summary>
-        /// 获取或设置登录账号。
-        /// </summary>
-        public string Account { get; set; }
-
-        /// <summary>
-        /// 获取或设置游戏内唯一玩家名。
-        /// </summary>
-        public string PlayerName { get; set; }
-
-        /// <summary>
-        /// 获取或设置 Base64 随机盐。
-        /// </summary>
-        public string PasswordSalt { get; set; }
-
-        /// <summary>
-        /// 获取或设置 Base64 SHA-256 密码摘要。
-        /// </summary>
-        public string PasswordHash { get; set; }
-
-        #endregion
-    }
-
-    /// <summary>
-    /// MiniBomber 注册操作结果。
-    /// </summary>
-    public readonly struct MiniBomberRegisterResult
-    {
-        #region Public 公共成员
-
-        /// <summary>
-        /// 获取注册业务错误码。
-        /// </summary>
-        public int Code { get; }
-
-        /// <summary>
-        /// 获取面向用户的注册结果消息。
-        /// </summary>
-        public string Message { get; }
-
-        /// <summary>
-        /// 获取成功创建的账号记录。
-        /// </summary>
-        public MiniBomberAccountRecord Account { get; }
-
-        /// <summary>
-        /// 获取注册操作是否成功。
-        /// </summary>
-        public bool Succeeded => Code == MiniBomberErrorCode.Success;
-
-        /// <summary>
-        /// 创建注册结果。
-        /// </summary>
-        /// <param name="code">业务错误码。</param>
-        /// <param name="message">面向用户的结果消息。</param>
-        /// <param name="account">成功创建的账号。</param>
-        public MiniBomberRegisterResult(int code, string message, MiniBomberAccountRecord account)
-        {
-            Code = code;
-            Message = message;
-            Account = account;
-        }
-
-        #endregion
-    }
 
     /// <summary>
     /// 使用 MiniCore 加密存档服务持久化的内网 Demo 账号仓库。
@@ -126,7 +29,8 @@ namespace MiniCore.Demo.MiniBomber
             }
 
             saveService = Global.GetService<ISaveService>(this);
-            database = await saveService.LoadAsync<MiniBomberAccountDatabase>(MiniBomberConstants.AccountDatabaseSlot) ?? new MiniBomberAccountDatabase();
+            MiniBomberAccountDatabaseData savedDatabase = await saveService.LoadProtobufAsync<MiniBomberAccountDatabaseData>(MiniBomberConstants.AccountDatabaseSlot);
+            database = savedDatabase == null ? new MiniBomberAccountDatabase() : FromSaveData(savedDatabase);
             database.Accounts ??= new List<MiniBomberAccountRecord>();
             for (int index = 0; index < database.Accounts.Count; index++)
             {
@@ -191,7 +95,7 @@ namespace MiniCore.Demo.MiniBomber
             byPlayerId.Add(record.PlayerId, record);
             try
             {
-                await saveService.SaveAsync(MiniBomberConstants.AccountDatabaseSlot, database);
+                await saveService.SaveProtobufAsync(MiniBomberConstants.AccountDatabaseSlot, ToSaveData(database));
             }
             catch
             {
@@ -283,6 +187,65 @@ namespace MiniCore.Demo.MiniBomber
             {
                 throw new InvalidOperationException("MiniBomber 账号仓库尚未初始化。");
             }
+        }
+
+        /// <summary>
+        /// 将运行时账号库映射为稳定的 Protobuf 持久化结构。
+        /// </summary>
+        /// <param name="source">当前内存账号库。</param>
+        /// <returns>可直接编码保存的 Protobuf 消息。</returns>
+        private static MiniBomberAccountDatabaseData ToSaveData(MiniBomberAccountDatabase source)
+        {
+            var result = new MiniBomberAccountDatabaseData
+            {
+                NextPlayerId = source.NextPlayerId
+            };
+            for (int index = 0; index < source.Accounts.Count; index++)
+            {
+                MiniBomberAccountRecord record = source.Accounts[index];
+                if (record == null)
+                {
+                    continue;
+                }
+
+                result.Accounts.Add(new MiniBomberAccountRecordData
+                {
+                    PlayerId = record.PlayerId,
+                    Account = record.Account ?? string.Empty,
+                    PlayerName = record.PlayerName ?? string.Empty,
+                    PasswordSalt = record.PasswordSalt ?? string.Empty,
+                    PasswordHash = record.PasswordHash ?? string.Empty
+                });
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 将 Protobuf 持久化结构映射为运行时账号库。
+        /// </summary>
+        /// <param name="source">已经解析的持久化消息。</param>
+        /// <returns>独立的运行时账号库。</returns>
+        private static MiniBomberAccountDatabase FromSaveData(MiniBomberAccountDatabaseData source)
+        {
+            var result = new MiniBomberAccountDatabase
+            {
+                NextPlayerId = source.NextPlayerId
+            };
+            for (int index = 0; index < source.Accounts.Count; index++)
+            {
+                MiniBomberAccountRecordData record = source.Accounts[index];
+                result.Accounts.Add(new MiniBomberAccountRecord
+                {
+                    PlayerId = record.PlayerId,
+                    Account = record.Account,
+                    PlayerName = record.PlayerName,
+                    PasswordSalt = record.PasswordSalt,
+                    PasswordHash = record.PasswordHash
+                });
+            }
+
+            return result;
         }
 
         /// <summary>

@@ -1,31 +1,23 @@
-﻿
 namespace MiniCore.Model
 {
-
+    /// <summary>
+    /// 可由 GameObject 对象池租用和归还的组件契约。
+    /// 资源地址和分组由管理器持有，不写回业务组件。
+    /// </summary>
     public interface IPoolObject
     {
+        #region Public 公共成员
 
         /// <summary>
-        /// 当前池对象是否可用
-        /// </summary>
-        bool IsUseful { get; set; }
-
-        /// <summary>
-        /// 初始化
+        /// 对象被租用后执行运行状态初始化。
         /// </summary>
         void Init();
 
         /// <summary>
-        /// 清空
+        /// 对象归还前清理本次使用状态。
         /// </summary>
         void Clear();
 
-        /// <summary>
-        /// 分组名
-        /// </summary>
-        string GroupName { get; set; }
-
+        #endregion
     }
-
-
 }

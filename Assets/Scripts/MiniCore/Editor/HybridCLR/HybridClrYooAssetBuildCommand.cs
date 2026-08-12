@@ -23,9 +23,9 @@ namespace MiniCore.EditorTools
         #region Private 私有成员
 
         private const string PackageName = "DefaultPackage";
-        private const string HotUpdateAssemblyName = "MiniCore.HotUpdate";
-        private const string HotUpdateAssetPath = "Assets/AssetRes/Dlls/HotUpdate.bytes";
-        private const string LegacyHotUpdateAssetPath = "Assets/AssetRes/Dlls/MiniCore.HotUpdate.dll.bytes";
+        private const string HotUpdateAssetDirectory = "Assets/AssetRes/Dlls/HotUpdate";
+        private const string ObsoleteHotUpdateAssetPath = "Assets/AssetRes/Dlls/HotUpdate.bytes";
+        private const string ObsoleteNamedHotUpdateAssetPath = "Assets/AssetRes/Dlls/MiniCore.HotUpdate.dll.bytes";
         private const string AotMetadataAssetDirectory = "Assets/AssetRes/Dlls/AOT";
         private const string AotMetadataRegistryPath = "Assets/Scripts/Project/Bootstrap/Generated/HybridClrAotMetadata.Generated.cs";
         private const string AotGenericReferenceTypeName = "AOTGenericReferences";
@@ -42,6 +42,7 @@ namespace MiniCore.EditorTools
         [MenuItem("MiniCore/Build/DefaultPackage/完整生成 (Generate All + Build)", priority = 2200)]
         public static void GenerateAllAndBuildDefaultPackage()
         {
+            HybridClrBuildValidator.EnsureConfigured();
             PrebuildCommand.GenerateAll();
             BuildDefaultPackageFromGeneratedArtifacts();
             Debug.Log("MiniCore DefaultPackage 完整构建完成：已执行 HybridCLR Generate All 并打包。");
@@ -53,6 +54,7 @@ namespace MiniCore.EditorTools
         [MenuItem("MiniCore/Build/DefaultPackage/热更编译 (Compile Active Target + Build)", priority = 2201)]
         public static void CompileActiveTargetAndBuildDefaultPackage()
         {
+            HybridClrBuildValidator.EnsureConfigured();
             CompileDllCommand.CompileDllActiveBuildTarget();
             BuildDefaultPackageFromGeneratedArtifacts();
             Debug.Log("MiniCore DefaultPackage 热更构建完成：已编译当前平台 HotUpdate DLL 并打包。");
@@ -65,6 +67,13 @@ namespace MiniCore.EditorTools
         /// <returns>所有运行时产物均可发布时返回 true。</returns>
         public static bool ValidateRuntimeArtifacts(out string error)
         {
+            MiniCoreHotUpdateAssemblySettings settings = MiniCoreHotUpdateAssemblySettings.Current;
+            settings.EnsureDefaultEntries();
+            if (!settings.TryValidate(out error))
+            {
+                return false;
+            }
+
             string[] aotAssemblyPaths;
             try
             {
@@ -76,7 +85,20 @@ namespace MiniCore.EditorTools
                 return false;
             }
 
-            return ValidateRuntimeArtifacts(aotAssemblyPaths, out error);
+            return ValidateRuntimeArtifacts(settings.GetEntriesInLoadOrder(), aotAssemblyPaths, out error);
+        }
+
+        /// <summary>
+        /// 使用当前项目登记和 AOT 资源目录重新生成 Bootstrap 运行时地址表。
+        /// </summary>
+        [MenuItem("MiniCore/HotUpdate/同步 HybridCLR 与 Bootstrap 登记", priority = 2151)]
+        public static void RegenerateRuntimeRegistryFromCurrentAssets()
+        {
+            HybridClrBuildValidator.EnsureConfigured();
+            MiniCoreHotUpdateAssemblyEntry[] entries = MiniCoreHotUpdateAssemblySettings.Current.GetEntriesInLoadOrder();
+            string[] aotAssemblyPaths = GetCurrentAotMetadataAssetPaths();
+            WriteAotMetadataRegistry(entries, aotAssemblyPaths);
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         }
 
         #endregion
@@ -88,9 +110,11 @@ namespace MiniCore.EditorTools
         /// </summary>
         private static void BuildDefaultPackageFromGeneratedArtifacts()
         {
-            string[] aotAssemblyPaths = SynchronizeHybridClrArtifacts();
+            HybridClrBuildValidator.EnsureConfigured();
+            MiniCoreHotUpdateAssemblyEntry[] entries = MiniCoreHotUpdateAssemblySettings.Current.GetEntriesInLoadOrder();
+            string[] aotAssemblyPaths = SynchronizeHybridClrArtifacts(entries);
             BuildDefaultPackage();
-            if (!ValidateRuntimeArtifacts(aotAssemblyPaths, out string error))
+            if (!ValidateRuntimeArtifacts(entries, aotAssemblyPaths, out string error))
             {
                 throw new BuildFailedException(error);
             }
@@ -99,19 +123,23 @@ namespace MiniCore.EditorTools
         /// <summary>
         /// 同步当前目标平台的热更新 DLL 和 AOT 元数据，并写出运行时地址表。
         /// </summary>
+        /// <param name="entries">按依赖顺序排列的热更新程序集登记。</param>
         /// <returns>当前目标平台的 AOT 程序集完整路径。</returns>
-        private static string[] SynchronizeHybridClrArtifacts()
+        private static string[] SynchronizeHybridClrArtifacts(MiniCoreHotUpdateAssemblyEntry[] entries)
         {
-            string hotUpdateSourcePath = GetHotUpdateDllPath();
             string[] aotAssemblyPaths = GetAotAssemblyPaths();
 
-            EnsureParentDirectory(HotUpdateAssetPath);
-            File.Copy(hotUpdateSourcePath, HotUpdateAssetPath, true);
-
-            if (File.Exists(LegacyHotUpdateAssetPath))
+            RecreateAssetDirectory(HotUpdateAssetDirectory);
+            for (int index = 0; index < entries.Length; index++)
             {
-                AssetDatabase.DeleteAsset(LegacyHotUpdateAssetPath);
+                MiniCoreHotUpdateAssemblyEntry entry = entries[index];
+                string sourcePath = GetHotUpdateDllPath(entry.AssemblyName);
+                string targetPath = GetHotUpdateAssetPath(entry.AssemblyName);
+                File.Copy(sourcePath, targetPath, true);
             }
+
+            DeleteAssetIfPresent(ObsoleteHotUpdateAssetPath);
+            DeleteAssetIfPresent(ObsoleteNamedHotUpdateAssetPath);
 
             if (Directory.Exists(AotMetadataAssetDirectory))
             {
@@ -126,7 +154,7 @@ namespace MiniCore.EditorTools
                 File.Copy(sourcePath, targetPath, true);
             }
 
-            WriteAotMetadataRegistry(aotAssemblyPaths);
+            WriteAotMetadataRegistry(entries, aotAssemblyPaths);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             return aotAssemblyPaths;
         }
@@ -168,25 +196,39 @@ namespace MiniCore.EditorTools
         /// <summary>
         /// 校验已同步 DLL、生成地址表和首包清单的完整性。
         /// </summary>
+        /// <param name="entries">按依赖顺序排列的热更新程序集登记。</param>
         /// <param name="aotAssemblyPaths">当前目标平台的 AOT 程序集完整路径。</param>
         /// <param name="error">校验失败原因。</param>
         /// <returns>产物完全一致时返回 true。</returns>
-        private static bool ValidateRuntimeArtifacts(string[] aotAssemblyPaths, out string error)
+        private static bool ValidateRuntimeArtifacts(
+            MiniCoreHotUpdateAssemblyEntry[] entries,
+            string[] aotAssemblyPaths,
+            out string error)
         {
-            string hotUpdateSourcePath;
-            try
+            for (int index = 0; index < entries.Length; index++)
             {
-                hotUpdateSourcePath = GetHotUpdateDllPath();
-            }
-            catch (Exception exception)
-            {
-                error = exception.Message;
-                return false;
+                MiniCoreHotUpdateAssemblyEntry entry = entries[index];
+                string hotUpdateSourcePath;
+                try
+                {
+                    hotUpdateSourcePath = GetHotUpdateDllPath(entry.AssemblyName);
+                }
+                catch (Exception exception)
+                {
+                    error = exception.Message;
+                    return false;
+                }
+
+                string hotUpdateAssetPath = GetHotUpdateAssetPath(entry.AssemblyName);
+                if (!FileContentsEqual(hotUpdateSourcePath, hotUpdateAssetPath))
+                {
+                    error = $"YooAsset 热更新 DLL 未同步：{hotUpdateAssetPath}";
+                    return false;
+                }
             }
 
-            if (!FileContentsEqual(hotUpdateSourcePath, HotUpdateAssetPath))
+            if (!HasExactHotUpdateAssets(entries, out error))
             {
-                error = $"YooAsset 热更新 DLL 未同步：{HotUpdateAssetPath}";
                 return false;
             }
 
@@ -225,20 +267,21 @@ namespace MiniCore.EditorTools
         /// <summary>
         /// 获取当前目标平台生成的热更新 DLL 路径。
         /// </summary>
+        /// <param name="assemblyName">不含 DLL 后缀的程序集名称。</param>
         /// <returns>热更新 DLL 的完整路径。</returns>
-        private static string GetHotUpdateDllPath()
+        private static string GetHotUpdateDllPath(string assemblyName)
         {
             string outputDirectory = SettingsUtil.GetHotUpdateDllsOutputDirByTarget(EditorUserBuildSettings.activeBuildTarget);
-            string hotUpdatePath = Path.Combine(outputDirectory, HotUpdateAssemblyName + ".dll");
+            string hotUpdatePath = Path.Combine(outputDirectory, assemblyName + ".dll");
             if (File.Exists(hotUpdatePath))
             {
                 return hotUpdatePath;
             }
 
-            hotUpdatePath = Path.Combine(outputDirectory, HotUpdateAssemblyName + ".dll.bytes");
+            hotUpdatePath = Path.Combine(outputDirectory, assemblyName + ".dll.bytes");
             if (!File.Exists(hotUpdatePath))
             {
-                throw new FileNotFoundException("缺少 HybridCLR HotUpdate DLL，请先执行 HybridCLR/CompileDll/当前目标平台。", hotUpdatePath);
+                throw new FileNotFoundException($"缺少 HybridCLR 热更新 DLL：{assemblyName}。请先编译当前目标平台热更新程序集。", hotUpdatePath);
             }
 
             return hotUpdatePath;
@@ -363,11 +406,82 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
+        /// 验证热更新资源目录只包含当前登记的独立 DLL bytes 资产。
+        /// </summary>
+        /// <param name="entries">当前按依赖顺序排列的程序集登记。</param>
+        /// <param name="error">校验失败原因。</param>
+        /// <returns>目录内容与登记表完全一致时返回 true。</returns>
+        private static bool HasExactHotUpdateAssets(
+            MiniCoreHotUpdateAssemblyEntry[] entries,
+            out string error)
+        {
+            if (!Directory.Exists(HotUpdateAssetDirectory))
+            {
+                error = $"缺少 YooAsset 热更新 DLL 目录：{HotUpdateAssetDirectory}";
+                return false;
+            }
+
+            var expectedNames = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < entries.Length; index++)
+            {
+                expectedNames.Add(entries[index].AssemblyName + ".dll.bytes");
+            }
+
+            string[] assetPaths = Directory.GetFiles(
+                HotUpdateAssetDirectory,
+                "*.dll.bytes",
+                SearchOption.TopDirectoryOnly);
+            if (assetPaths.Length != expectedNames.Count)
+            {
+                error = $"YooAsset 热更新 DLL 数量错误：期望 {expectedNames.Count}，实际 {assetPaths.Length}。";
+                return false;
+            }
+
+            for (int index = 0; index < assetPaths.Length; index++)
+            {
+                string assetName = Path.GetFileName(assetPaths[index]);
+                if (!expectedNames.Contains(assetName))
+                {
+                    error = $"YooAsset 存在未登记热更新 DLL：{assetName}";
+                    return false;
+                }
+            }
+
+            if (File.Exists(ObsoleteHotUpdateAssetPath)
+                || File.Exists(ObsoleteNamedHotUpdateAssetPath))
+            {
+                error = "YooAsset 目录仍存在已经废弃的单 DLL 热更新资产，请重新执行完整构建。";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        /// <summary>
         /// 写出 Bootstrap 在 Player 中加载 AOT 元数据所需的稳定地址表。
         /// </summary>
         /// <param name="aotAssemblyPaths">当前目标平台的 AOT 程序集完整路径。</param>
-        private static void WriteAotMetadataRegistry(string[] aotAssemblyPaths)
+        /// <param name="entries">按依赖顺序排列的热更新程序集登记。</param>
+        private static void WriteAotMetadataRegistry(
+            MiniCoreHotUpdateAssemblyEntry[] entries,
+            string[] aotAssemblyPaths)
         {
+            MiniCoreHotUpdateAssemblyEntry startupEntry = null;
+            for (int index = 0; index < entries.Length; index++)
+            {
+                if (entries[index].IsStartup)
+                {
+                    startupEntry = entries[index];
+                    break;
+                }
+            }
+
+            if (startupEntry == null)
+            {
+                throw new InvalidOperationException("热更新程序集登记缺少启动入口。");
+            }
+
             StringBuilder builder = new StringBuilder(4096);
             builder.AppendLine("using System.Collections.Generic;");
             builder.AppendLine();
@@ -381,9 +495,30 @@ namespace MiniCore.EditorTools
             builder.AppendLine("        #region Public 公共成员");
             builder.AppendLine();
             builder.AppendLine("        /// <summary>");
-            builder.AppendLine("        /// YooAsset 中热更新程序集的固定加载地址。");
+            builder.AppendLine("        /// 包含最终启动入口的程序集名称。");
             builder.AppendLine("        /// </summary>");
-            builder.AppendLine("        public const string HotUpdateDllAddress = \"HotUpdate\";");
+            builder.Append("        public const string StartupAssemblyName = \"");
+            builder.Append(EscapeCSharpString(startupEntry.AssemblyName));
+            builder.AppendLine("\";");
+            builder.AppendLine();
+            builder.AppendLine("        /// <summary>");
+            builder.AppendLine("        /// Bootstrap 反射调用的启动类型完整名称。");
+            builder.AppendLine("        /// </summary>");
+            builder.Append("        public const string StartupTypeName = \"");
+            builder.Append(EscapeCSharpString(startupEntry.StartupTypeName));
+            builder.AppendLine("\";");
+            builder.AppendLine();
+            builder.AppendLine("        /// <summary>");
+            builder.AppendLine("        /// Bootstrap 反射调用的启动静态方法名称。");
+            builder.AppendLine("        /// </summary>");
+            builder.Append("        public const string StartupMethodName = \"");
+            builder.Append(EscapeCSharpString(startupEntry.StartupMethodName));
+            builder.AppendLine("\";");
+            builder.AppendLine();
+            builder.AppendLine("        /// <summary>");
+            builder.AppendLine("        /// YooAsset 中按依赖顺序加载的热更新程序集独立地址。");
+            builder.AppendLine("        /// </summary>");
+            builder.AppendLine("        public static IReadOnlyList<string> HotUpdateAssemblyAddresses => _hotUpdateAssemblyAddresses;");
             builder.AppendLine();
             builder.AppendLine("        /// <summary>");
             builder.AppendLine("        /// 当前构建目标需要在加载热更新程序集前补充的 AOT 元数据地址。");
@@ -394,12 +529,23 @@ namespace MiniCore.EditorTools
             builder.AppendLine();
             builder.AppendLine("        #region Private 私有成员");
             builder.AppendLine();
+            builder.AppendLine("        private static readonly string[] _hotUpdateAssemblyAddresses =");
+            builder.AppendLine("        {");
+            for (int index = 0; index < entries.Length; index++)
+            {
+                builder.Append("            \"");
+                builder.Append(EscapeCSharpString(GetHotUpdateAssetAddress(entries[index].AssemblyName)));
+                builder.AppendLine("\",");
+            }
+
+            builder.AppendLine("        };");
+            builder.AppendLine();
             builder.AppendLine("        private static readonly string[] _aotMetadataAddresses =");
             builder.AppendLine("        {");
             for (int index = 0; index < aotAssemblyPaths.Length; index++)
             {
                 builder.Append("            \"");
-                builder.Append(Path.GetFileName(aotAssemblyPaths[index]));
+                builder.Append(EscapeCSharpString(GetAotMetadataAddress(aotAssemblyPaths[index])));
                 builder.AppendLine("\",");
             }
 
@@ -409,6 +555,100 @@ namespace MiniCore.EditorTools
             builder.AppendLine("    }");
             builder.AppendLine("}");
             WriteAllTextIfChanged(AotMetadataRegistryPath, builder.ToString());
+        }
+
+        /// <summary>
+        /// 读取当前 AOT 资源目录中的 DLL bytes 路径并保持稳定顺序。
+        /// </summary>
+        /// <returns>用于重新生成运行时表的当前 AOT 资产路径。</returns>
+        private static string[] GetCurrentAotMetadataAssetPaths()
+        {
+            if (!Directory.Exists(AotMetadataAssetDirectory))
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] paths = Directory.GetFiles(
+                AotMetadataAssetDirectory,
+                "*.dll.bytes",
+                SearchOption.TopDirectoryOnly);
+            Array.Sort(paths, StringComparer.Ordinal);
+            return paths;
+        }
+
+        /// <summary>
+        /// 将 AOT 源 DLL 或已同步 bytes 路径转换为 YooAsset 地址。
+        /// </summary>
+        /// <param name="path">AOT 源文件或 bytes 资产路径。</param>
+        /// <returns>AddressByFileName 规则对应的 DLL 地址。</returns>
+        private static string GetAotMetadataAddress(string path)
+        {
+            string fileName = Path.GetFileName(path);
+            return fileName.EndsWith(".bytes", StringComparison.Ordinal)
+                ? fileName.Substring(0, fileName.Length - ".bytes".Length)
+                : fileName;
+        }
+
+        /// <summary>
+        /// 获取一个热更新 DLL 在 YooAsset 中的固定独立地址。
+        /// </summary>
+        /// <param name="assemblyName">不含 DLL 后缀的程序集名称。</param>
+        /// <returns>AddressByFileName 规则生成的资源地址。</returns>
+        private static string GetHotUpdateAssetAddress(string assemblyName)
+        {
+            return assemblyName + ".dll";
+        }
+
+        /// <summary>
+        /// 获取一个热更新 DLL 在 Assets 下的 bytes 文件路径。
+        /// </summary>
+        /// <param name="assemblyName">不含 DLL 后缀的程序集名称。</param>
+        /// <returns>独立 DLL bytes 资产路径。</returns>
+        private static string GetHotUpdateAssetPath(string assemblyName)
+        {
+            return Path.Combine(
+                HotUpdateAssetDirectory,
+                GetHotUpdateAssetAddress(assemblyName) + ".bytes");
+        }
+
+        /// <summary>
+        /// 删除旧目录后创建空的资产输出目录。
+        /// </summary>
+        /// <param name="assetDirectory">Assets 下的目标目录。</param>
+        private static void RecreateAssetDirectory(string assetDirectory)
+        {
+            if (AssetDatabase.IsValidFolder(assetDirectory))
+            {
+                AssetDatabase.DeleteAsset(assetDirectory);
+            }
+            else if (Directory.Exists(assetDirectory))
+            {
+                Directory.Delete(assetDirectory, true);
+            }
+
+            Directory.CreateDirectory(assetDirectory);
+        }
+
+        /// <summary>
+        /// 删除一个已经废弃的单 DLL 资产及其 meta。
+        /// </summary>
+        /// <param name="assetPath">待删除 Assets 路径。</param>
+        private static void DeleteAssetIfPresent(string assetPath)
+        {
+            if (File.Exists(assetPath) || AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) != null)
+            {
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+        }
+
+        /// <summary>
+        /// 转义写入 C# 字符串常量的项目配置文本。
+        /// </summary>
+        /// <param name="value">待转义文本。</param>
+        /// <returns>可安全置于双引号中的文本。</returns>
+        private static string EscapeCSharpString(string value)
+        {
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
         /// <summary>

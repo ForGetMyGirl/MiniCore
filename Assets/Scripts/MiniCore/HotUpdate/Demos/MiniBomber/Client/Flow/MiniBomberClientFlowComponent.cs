@@ -7,19 +7,6 @@ using MiniCore.Threading;
 
 namespace MiniCore.Demo.MiniBomber
 {
-    /// <summary>
-    /// MiniBomber 客户端高层流程状态。
-    /// </summary>
-    public enum MiniBomberClientFlowState
-    {
-        Login,
-        Lobby,
-        Room,
-        LoadingBattle,
-        Battle,
-        Result,
-        Reconnecting
-    }
 
     /// <summary>
     /// MiniBomber 客户端场景、房间、战斗与断线重连编排组件。
@@ -48,19 +35,29 @@ namespace MiniCore.Demo.MiniBomber
 
         #region Public 公共成员
 
-        /// <summary>流程状态变化事件。</summary>
+        /// <summary>
+        /// 流程状态变化事件。
+        /// </summary>
         public event Action Changed;
 
-        /// <summary>当前客户端流程状态。</summary>
+        /// <summary>
+        /// 当前客户端流程状态。
+        /// </summary>
         public MiniBomberClientFlowState State { get; private set; }
 
-        /// <summary>当前比赛倒计时消息。</summary>
+        /// <summary>
+        /// 当前比赛倒计时消息。
+        /// </summary>
         public MiniBomberMatchCountdownNotice Countdown { get; private set; }
 
-        /// <summary>当前重连尝试序号，从一开始。</summary>
+        /// <summary>
+        /// 当前重连尝试序号，从一开始。
+        /// </summary>
         public int ReconnectAttempt { get; private set; }
 
-        /// <summary>最近流程提示或错误。</summary>
+        /// <summary>
+        /// 最近流程提示或错误。
+        /// </summary>
         public string Message { get; private set; } = string.Empty;
 
         /// <summary>

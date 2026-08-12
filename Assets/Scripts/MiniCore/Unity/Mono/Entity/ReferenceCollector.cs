@@ -6,12 +6,6 @@ using Object = UnityEngine.Object;
 
 namespace MiniCore.Model
 {
-    [Serializable]
-    public class ReferenceData
-    {
-        public string key;
-        public Object value;
-    }
     public class ReferenceCollector : MonoBehaviour, ISerializationCallbackReceiver
     {
         //public TestSceneEntry testSceneEntry;

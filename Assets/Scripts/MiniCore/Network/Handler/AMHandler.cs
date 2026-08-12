@@ -9,22 +9,6 @@ namespace MiniCore.Model
     public abstract class AMHandler<TMessage> : INetworkMessageHandlerInvoker where TMessage : INormalMessage
     {
         /// <summary>
-        /// 从 opcode 注册表解析当前消息类型对应的协议号。
-        /// </summary>
-        public virtual uint Opcode
-        {
-            get
-            {
-                var msgType = typeof(TMessage);
-                if (OpcodeRegistry.TryGetOpcodeByMessage(msgType, out uint code))
-                {
-                    return code;
-                }
-                throw new InvalidOperationException($"Missing opcode mapping for {msgType.FullName}.");
-            }
-        }
-
-        /// <summary>
         /// 处理已反序列化的普通消息。
         /// </summary>
         /// <param name="session">执行该方法所需的 session 参数。</param>

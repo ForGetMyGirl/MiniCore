@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using Google.Protobuf;
 using MiniCore.Model;
 
@@ -9,6 +10,30 @@ namespace MiniCore.Serialization
     /// </summary>
     public sealed class ProtobufSerializer : INetworkSerializer
     {
+        #region Private 私有成员
+
+        private readonly IMessageParserResolver parserResolver; // 网络服务实例提供的不可变消息解析表。
+
+        #endregion
+
+        #region Public 公共成员
+
+        /// <summary>
+        /// 创建仅用于序列化的 Protobuf 编解码器。
+        /// </summary>
+        public ProtobufSerializer()
+        {
+        }
+
+        /// <summary>
+        /// 创建使用指定消息解析表的 Protobuf 编解码器。
+        /// </summary>
+        /// <param name="parserResolver">网络服务实例持有的消息解析表。</param>
+        public ProtobufSerializer(IMessageParserResolver parserResolver)
+        {
+            this.parserResolver = parserResolver ?? throw new ArgumentNullException(nameof(parserResolver));
+        }
+
         /// <summary>
         /// 将 Protobuf 消息编码为字节数组。
         /// </summary>
@@ -42,7 +67,7 @@ namespace MiniCore.Serialization
         }
 
         /// <summary>
-        /// 将 Protobuf 消息直接编码到调用方提供的数组区间，避免创建正文临时数组。
+        /// 将 Protobuf 消息编码到调用方提供的数组区间，并使用池化缓冲兼容不支持偏移数组写入的 Protobuf 版本。
         /// </summary>
         /// <typeparam name="T">需要编码的消息类型。</typeparam>
         /// <param name="message">需要编码的消息。</param>
@@ -61,20 +86,33 @@ namespace MiniCore.Serialization
                 throw new ArgumentNullException(nameof(buffer));
             }
 
-            if (offset < 0 || length < 0 || offset + length > buffer.Length)
+            if (offset < 0 || length < 0 || offset > buffer.Length - length)
             {
                 throw new ArgumentOutOfRangeException(nameof(length));
             }
 
-            using (var output = new CodedOutputStream(buffer))
+            int calculatedLength = protobufMessage.CalculateSize();
+            if (length != calculatedLength)
             {
-                protobufMessage.WriteTo(output);
-                output.Flush();
+                throw new ArgumentException(
+                    $"目标区间长度 {length} 与 Protobuf 精确编码长度 {calculatedLength} 不一致。",
+                    nameof(length));
             }
 
-            if (offset != 0 && length > 0)
+            byte[] temporaryBuffer = ArrayPool<byte>.Shared.Rent(Math.Max(length, 1));
+            try
             {
-                Buffer.BlockCopy(buffer, 0, buffer, offset, length);
+                using (var output = new CodedOutputStream(temporaryBuffer))
+                {
+                    protobufMessage.WriteTo(output);
+                    output.Flush();
+                }
+
+                Buffer.BlockCopy(temporaryBuffer, 0, buffer, offset, length);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(temporaryBuffer);
             }
         }
 
@@ -97,7 +135,14 @@ namespace MiniCore.Serialization
         /// <returns>解析后的消息。</returns>
         public object Deserialize(Type type, ReadOnlyMemory<byte> data)
         {
-            return ProtobufMessageRegistry.Parse(type, data);
+            if (parserResolver == null)
+            {
+                throw new InvalidOperationException("当前 ProtobufSerializer 未配置消息解析表，不能按运行时类型反序列化。");
+            }
+
+            return parserResolver.Parse(type, data);
         }
+
+        #endregion
     }
 }

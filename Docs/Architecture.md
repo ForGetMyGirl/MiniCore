@@ -6,8 +6,8 @@
 
 - 核心框架可以脱离 Unity 编译和运行；Unity 只负责适配生命周期、时间、日志、Mono/UI 组件。
 - 任意业务位置可以通过静态 `Global` 获取组件，但组件必须有明确 owner 与释放时机。
-- 客户端与 Dedicated Server 共用协议、网络、定时器与热更新业务程序集。
-- 业务消息使用 Protobuf；网络 Opcode 由实际 Handler 绑定自动生成，并保持历史稳定。
+- 不按 Client、Dedicated Server 或具体小游戏宿主拆框架角色；同一套能力可按运行环境连接、监听或同时执行两者。
+- 业务消息使用 Protobuf；带网络角色的 Proto 消息生成稳定 Opcode，Handler 只负责第二阶段业务绑定。
 - Player 不静态引用业务热更新类型。YooAsset 下载 DLL，HybridCLR 补充 AOT 元数据后，Bootstrap 反射一次启动业务入口。
 
 ## 2. 目录与程序集
@@ -15,15 +15,16 @@
 | 程序集 | 路径 | 是否引用 Unity | 作用 | 可以依赖 |
 | --- | --- | --- | --- | --- |
 | `MiniCore.Runtime` | `Assets/Scripts/MiniCore/Runtime` | 否 | `Global`、组件基类、Timer、强类型事件、日志门面、时间接口、热更入口契约 | 无 Unity；最底层公共模型 |
-| `MiniCore.Serialization` | `Assets/Scripts/MiniCore/Serialization` | 否 | `INetworkSerializer`、Protobuf 默认实现、Newtonsoft Json 对比实现 | Runtime、Protocol、第三方序列化库 |
-| `MiniCore.Protocol` | `Assets/Scripts/MiniCore/Protocol` | 否 | 消息角色接口、`OpcodeRegistry`、Proto 生成消息、Parser 注册表 | Runtime、Google.Protobuf |
-| `MiniCore.Network` | `Assets/Scripts/MiniCore/Network` | 否 | 收发、会话、RPC、心跳、Handler 基类、TCP/UDP/KCP | Runtime、Protocol、Serialization |
-| `MiniCore.Unity` | `Assets/Scripts/MiniCore/Unity` | 是 | `UnityGlobalDriver`、Unity 时间/日志、输入、Mono 与 UI 契约 | Runtime、Serialization；可使用 Unity API |
+| `MiniCore.Serialization` | `Assets/Scripts/MiniCore/Serialization` | 否 | `INetworkSerializer`、Parser 抽象、Protobuf 默认实现、Newtonsoft Json 对比实现 | Runtime、第三方序列化库 |
+| `MiniCore.Network` | `Assets/Scripts/MiniCore/Network` | 否 | 消息角色接口、实例协议 Registry、收发、会话、RPC、心跳、Handler、TCP/UDP/KCP/WebSocket | Runtime、Serialization |
+| `MiniCore.Protocol` | `Assets/Scripts/MiniCore/Protocol` | 否 | 独立热更新的项目 PB、角色 partial 与无状态协议注册代码 | Runtime、Serialization、Network、Google.Protobuf |
+| `MiniCore.Unity` | `Assets/Scripts/MiniCore/Unity` | 是 | `UnityGlobalDriver`、Unity 时间/日志、输入、Mono、UI、原生文件服务与框架 ClientSettings PB | Runtime、Serialization；可使用 Unity API |
+| `MiniCore.Platform.Browser` | `Assets/Scripts/MiniCore/Platform/Browser` | 是 | WebGL WebSocket 客户端适配器、IndexedDB 存储后端和 JavaScript 绑定 | Runtime、Network；只进入 WebGL Player |
 | `MiniCore.HotUpdate` | `Assets/Scripts/MiniCore/HotUpdate` | 是 | 客户端/服务端业务入口、资源/UI 业务、业务 Handler、生成 Handler 表 | Runtime、Protocol、Serialization、Network、Unity |
 | `Project.Bootstrap` | `Assets/Scripts/Project/Bootstrap` | 是 | 场景启动、YooAsset、HybridCLR、DLL 加载、调用统一 HotUpdate Entry | Runtime、Unity、YooAsset、HybridCLR；不可静态引用 HotUpdate |
 | `MiniCore.Editor` | `Assets/Scripts/MiniCore/Editor` | Editor | Proto、Opcode、HybridCLR、构建校验与工具窗口 | 运行时程序集与 UnityEditor |
 
-依赖方向只能从上向下，不能反向：`Runtime <- Protocol/Serialization <- Network <- HotUpdate`。`MiniCore.Unity` 是适配层，不应成为 Runtime/Protocol/Network 的依赖。
+依赖方向只能从上向下，不能反向：`Runtime <- Serialization <- Network <- Protocol <- HotUpdate`。`MiniCore.Unity` 是适配层，不应成为 Runtime/Serialization/Network/Protocol 的依赖。
 
 ```mermaid
 flowchart BT
@@ -32,17 +33,20 @@ flowchart BT
     Serialization["MiniCore.Serialization\nProtobuf / JSON"]
     Network["MiniCore.Network\n会话、传输、Handler"]
     Unity["MiniCore.Unity\nUnity 适配"]
+    Browser["MiniCore.Platform.Browser\nWebGL 客户端适配"]
     HotUpdate["MiniCore.HotUpdate\n业务与 Handler"]
     Bootstrap["Project.Bootstrap\nYooAsset + HybridCLR"]
 
-    Protocol --> Runtime
     Serialization --> Runtime
-    Serialization --> Protocol
     Network --> Runtime
-    Network --> Protocol
     Network --> Serialization
+    Protocol --> Runtime
+    Protocol --> Serialization
+    Protocol --> Network
     Unity --> Runtime
     Unity --> Serialization
+    Browser --> Runtime
+    Browser --> Network
     HotUpdate --> Network
     HotUpdate --> Unity
     HotUpdate --> Protocol
@@ -80,7 +84,7 @@ public sealed class BattleFlow : IDisposable
 
     public void Start()
     {
-        TimerComponent timer = scope.GetOrAdd<TimerComponent>();
+        TimerService timer = scope.GetOrAdd<TimerService>();
     }
 
     public void Dispose()
@@ -108,7 +112,7 @@ AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.G
 
 普通 `AComponent` 不属于启动配置左侧列表。若它是开发者可直接调用的能力，可用 `[ComponentCatalog("名称", Description = "具体职责")]` 将其只读展示在右侧项目能力目录；未标记类型和框架内部装配类型不会显示。
 
-启动配置保存 AppService 的启用状态和 Args 覆盖值。`StoragePathService` 统一提供存档和本地运行数据的根目录；`RelativePath` 只能填写相对于产品专属 `Application.persistentDataPath` 的目录，例如 `MyGame` 或 `Company/MyGame`，代码默认值为兼容旧项目的 `MiniCore`。`EncryptedSaveService` 只依赖 `IStoragePathService`，并通过开发者填写的 `EncryptionKey` 以 SHA-256 派生主密钥、以 HMAC-SHA256 按槽位派生工作密钥。该参数会明文保存在配置资产和生成代码中，适合本地防误改，不能作为对抗逆向或本机攻击的安全边界；修改后旧存档无法读取。具体启用与替换流程见 [项目启动与服务配置](StartupModules.md#加密存档)。
+启动配置保存 AppService 的启用状态和 Args 覆盖值。存储业务只使用 `IStorageBackend` 的逻辑键/字节 API：原生环境由 `StoragePathService` 提供文件根目录，浏览器由平台包注册 IndexedDB 后端。`ISaveService` 保存 Protobuf 等二进制数据；默认 `EncryptedSaveService` 按槽位派生独立 AES/HMAC 密钥，使用 AES-CBC 加密并以 HMAC-SHA256 防篡改。配置中的口令适合提高本地修改成本，不能作为对抗逆向或本机攻击的安全边界；修改后旧存档无法读取。具体规则见 [项目启动与服务配置](StartupModules.md#加密存档)和 [WebGL 与小游戏平台适配](WebPlatformAdaptation.md#5-存储与存档)。
 
 `ComponentGroup` 的键是 `(组件具体类型, GroupId)`。因此两个 MOBA 对局可各自拥有 `BattleComponent`、`RoomComponent` 与计时器实例；单位、子弹、怪物等高频对象仍应由 Battle 内部实体容器或对象池管理，而不应成为 Global 多实例组件。
 
@@ -116,7 +120,7 @@ AppService 只能由接口使用；在 Editor/Development 中，通过 `Global.G
 
 Runtime 公开异步 API 统一使用 `MTask` / `MTask<T>`。`AComponent`、AppService、AppModule、`GlobalScope`、`ComponentGroup` 与 Unity `AMTaskBehaviour` 都是任务 Owner；开发者不需要传递 `CancellationToken`、创建 Scope 或保存启动 Handle。Owner 入口由 IL 后处理器绑定，普通类中的 MTask 调用通过当前任务节点自动加入父子树；找不到父任务或 Owner 时才挂到应用根域，并在开发环境给出诊断。
 
-父方法退出会取消并等待未完成子任务的 `finally`；只有显式 `.Forget()` 的任务会转移到最近 Owner 监督域。普通 MTask 只能消费一次，需要多方等待时显式 `.Share()`。`MTaskExecutors.Unity`、模块自行持有的 `MTaskExecutors.CreateDedicated(name)` 与 `MTaskExecutors.ThreadPool` 可通过 `MTask.SwitchTo` 切换；切换只投递到既有执行器，不会按调用次数创建线程。BCL 确实要求 Token 时，只在外部适配边界使用 `MTaskExternal.GetCancellationToken()`。
+父方法退出会取消并等待未完成子任务的 `finally`；只有显式 `.Forget()` 的任务会转移到最近 Owner 监督域。普通 MTask 只能消费一次，需要多方等待时显式 `.Share()`。`MTaskExecutors.Unity`、模块自行持有的 `MTaskExecutors.CreateSingleThread(name)` 与 `MTaskExecutors.ThreadPool` 可通过 `MTask.SwitchTo` 切换；切换只投递到既有执行器，不会按调用次数创建线程。无线程平台继续使用同一 MTask API，显式线程请求会失败，支持降级的模块使用 `TryCreateSingleThread` / `TryGetThreadPool` 后切换到主循环执行器。BCL 确实要求 Token 时，只在外部适配边界使用 `MTaskExternal.GetCancellationToken()`。
 
 `MiniCore.Runtime` 的 MTask 核心是纯 C#，不直接依赖 UniTask、Burst 或 Cecil。Unity 2021.3 的 Owner 自动注入以 Editor-only 的 `MiniCore.MTask.CodeGen.dll` 随仓库交付，仅使用编辑器内置的 ILPostProcessor/Cecil API；它不进入 Player，也不要求导入项目额外安装包。完整用法、构建工具与限制见 [MTask 结构化异步](MTask.md)。
 
@@ -133,6 +137,12 @@ Runtime 公开异步 API 统一使用 `MTask` / `MTask<T>`。`AComponent`、AppS
 - Unity：`UnityGlobalDriver` 的 `Awake` 初始化 Unity 执行器、应用根任务域和 `Global`，`Update` 抽取 MTask 主线程队列后调用 `Global.Tick()`。应用退出或停止 Play Mode 时先进入 MTask 快速退出：取消任务、只抽取一次主线程队列且不等待专用线程 Join，再关闭 Global；运行期组件释放仍保持等待 finally 的完整语义。Tick 使用内部快照复用，不创建每帧 Context。
 - 非 Unity：宿主自行调用 `Global.Initialize(customTimeProvider)`，在自己的循环中调用 `Global.Tick()`，进程退出时 `Global.Shutdown()`。Runtime、Protocol、Serialization、Network 不需要 UnityEngine。
 
+### 平台能力而非平台角色
+
+框架不把 Dedicated Server、Android、浏览器、微信或抖音编码成互斥角色。网络保持统一 `INetworkService`：同一进程既可以监听下游连接，也可以主动连接其他服务。具体传输由 `NetworkCapabilities` 判断；普通浏览器 WebGL 当前只支持 WS/WSS 客户端，不支持 TCP/UDP/KCP 和监听器。
+
+平台 SDK 放入独立可选程序集并通过后端注册表接入，宏只停留在 asmdef、平台启动器和原生绑定处。当前普通浏览器实现及未来微信/抖音平台包的边界、网关与存储规则见 [WebGL 与小游戏平台适配](WebPlatformAdaptation.md)。
+
 ## 4. 启动与热更新链
 
 启动场景中的 `UpdateMainWindow` 是稳定 Bootstrap。它不直接引用 `MiniCore.HotUpdate` 中的具体业务类型。
@@ -143,15 +153,17 @@ sequenceDiagram
     participant Boot as UpdateMainWindow
     participant Yoo as YooAsset
     participant HCLR as HybridCLR
-    participant DLL as MiniCore.HotUpdate.dll
+    participant DLL as 热更新 DLL 列表
     participant Startup as MiniCoreStartup
 
     Scene->>Boot: Awake
     Boot->>Yoo: 初始化包 / 获取版本 / 更新清单 / 下载
     Boot->>HCLR: 加载配置的 AOT 元数据 DLL
-    Boot->>Yoo: LoadAssetAsync(HotUpdate.bytes)
-    Yoo-->>Boot: DLL bytes
-    Boot->>DLL: Assembly.Load(bytes)
+    loop 按依赖顺序加载每个登记程序集
+        Boot->>Yoo: LoadAssetAsync(程序集地址)
+        Yoo-->>Boot: DLL bytes
+        Boot->>DLL: Assembly.Load(bytes)
+    end
     Boot->>Startup: 反射一次调用静态 StartAsync
     Startup->>Startup: 装配统一启用模块并调用 GameStartup
 ```
@@ -170,9 +182,9 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 
 ### HybridCLR 与 YooAsset
 
-- `MiniCore.HotUpdate.dll` 必须作为 YooAsset 资源，以固定地址 `HotUpdate`（由 Bootstrap 生成配置定义）进入包。
+- `MiniCore.Protocol.dll`、`MiniCore.HotUpdate.dll` 和项目登记的其他热更新 DLL 分别作为 YooAsset 资源进入包；Bootstrap 生成配置保存地址、加载顺序和唯一启动入口。
 - AOT 补充元数据由 `HybridClrAotMetadata.Generated.cs` 中的地址表决定；只保留热更代码真实触发的泛型/反射/AOT 泛型调用所需 DLL。
-- 先加载 AOT 元数据，再加载 HotUpdate DLL，最后调用 Entry。
+- 先加载 AOT 元数据，再按 asmdef 依赖顺序加载全部热更新 DLL，最后只调用登记的启动程序集 Entry。
 - 改动 HotUpdate 业务后，要重新构建 DLL 并更新 YooAsset 包；仅改 C# 源码不会让已发布 Player 获得更新。
 
 ## 5. 协议、Handler 与 Opcode
@@ -180,12 +192,14 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 详细步骤见 [网络与协议](NetworkLayerAnalysis.md)。这里记录边界：
 
 - `.proto` 位于仓库根目录 `Proto/`，按业务域组织；不要再按 ClientToServer/ServerToClient 拆分。
-- 业务消息在 Proto 中标记 `//[INormalMessage]`、`//[IRpcRequest]`、`//[IRpcResponse]`。
+- 需要进入网络层的业务消息在 Proto 中标记 `//[INormalMessage]`、`//[IRpcRequest]`、`//[IRpcResponse]`；纯配置/存档 Protobuf 不加网络角色注解。
 - `IRpcResponse` 必须定义 `code = 1`、`msg = 2`。`RpcId` 不写入 Proto Body，而在 12 字节网络包头中传输，反序列化后写到生成 partial 的运行时属性。
-- `MiniCore > Protocol > Generate All` 使用仓库内置 `Proto/Tools/protoc-29.5` 生成 Message、Role 与 Parser Registry。
+- `Project/MiniCore/Protocol` 配置项目唯一输出目录；默认是 `Assets/Scripts/MiniCore/Protocol/Generated`。`MiniCore > Protocol > Generate All` 使用仓库内置 `Proto/Tools/protoc-29.5`，在同一目录生成 PB、Role 和每 Proto 注册代码。
+- `Proto/Internal/ClientSettings.proto` 固定输出到 `MiniCore.Unity`；MiniBomber 等项目存档 PB 跟随项目协议输出目录，但没有网络角色时不会获得 Opcode。
 - Handler 在 `MiniCore.HotUpdate` 中继承 `AMHandler<TMessage>` 或 `ARpcHandler<TRequest, TResponse>`。
-- 脚本编译后的 Editor 自动扫描 Handler，写入 `OpcodeManifest.json`、`OpcodeRegistry.Generated.cs` 和 `HotUpdateHandlerRegistry.Generated.cs`。
-- **仅绑定了 Handler 的消息才有运行时 Opcode。** RPC Handler 的 Request 和 Response 均会登记；未绑定消息不会被网络层发送。
+- Proto 生成阶段根据网络角色维护 `OpcodeManifest.json`；脚本编译后的 Editor 只扫描全部已登记热更新程序集并写入 `HotUpdateHandlerRegistration.Generated.cs`。
+- 每个 `NetworkService` 启动时创建临时 Builder，先灌入消息、Opcode、角色和 Parser，再灌入 Handler；完整校验后一次性提交不可变实例 Registry。
+- 有网络角色的消息即拥有稳定 Opcode；无 Handler 的合法出站消息也可发送。普通 DTO 和存档 PB 不进入网络 Registry。
 - 删除协议的号码保留在 Manifest，不能人工重用或重排。
 
 自动生成时使用直接 `new Handler()` 注册，运行时不扫描 AppDomain、不按字符串找 Handler、不用 `Activator.CreateInstance` 构造 Handler。为避免删除或改名 Handler 时旧生成表阻断首轮编译，Editor 会先生成安全空表，随后在编译成功后生成正确的直接注册表。
@@ -196,16 +210,20 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 
 | 内容 | 放置位置 |
 | --- | --- |
-| 纯组件、事件、计时、日志、时间抽象 | `Runtime/Core`、`Runtime/Model`、`Runtime/Time` |
-| 消息角色、Opcode、Protobuf 生成物 | `Protocol/Model`、`Protocol/Generated` |
+| 纯组件、事件、计时、日志、时间抽象 | `Runtime/Core`、`Runtime/Model`、`Runtime/Time`；事件按 Bus、Interface、Channel、Subscription 归档 |
+| MTask | `Runtime/Threading` 下按 Core、Source、Execution、Ownership、Sharing、Cancellation、Diagnostics 归档；命名空间保持 `MiniCore.Threading` |
+| 消息角色接口、实例协议 Registry | `Network/Protocol` |
+| 项目 PB、角色 partial、无状态协议注册 | Project Settings 配置的已登记热更新程序集目录；默认 `Protocol/Generated` |
 | 通用序列化器 | `Serialization/Interface`、`Serialization/Protobuf`、`Serialization/NewtonsoftJson` |
-| 网络会话、收发、Handler 基类、传输实现 | `Network/Core`、`Network/Handler`、`Network/Transport` |
+| 网络会话、收发、Handler 基类、TCP/UDP/KCP/WebSocket 传输 | `Network/Core`、`Network/Handler`、`Network/Transport` |
+| 普通浏览器 WebGL 平台后端 | `Platform/Browser`、`Plugins/MiniCore/Browser` |
 | Unity 生命周期、输入、UI 契约、Unity serializer、平台服务 | `Unity/Driver`、`Unity/Mono`、`Unity/UI`、`Unity/Serialization`、`Unity/Service` |
-| 热更新资源、通用资产服务 | `HotUpdate/Service` |
+| 热更新资源、通用资产服务 | `HotUpdate/Service/Resource`、`HotUpdate/Service/Scene` |
 | UI 运行时、窗口逻辑和生成注册表 | `HotUpdate/UI`、[UI 框架](UIFramework.md) |
 | 客户端对象池与其他业务 | `HotUpdate/Client` |
 | HotUpdate 项目启动入口 | `HotUpdate/Entry` |
 | 业务网络 Handler | `HotUpdate/Network/Handler` |
+| MiniBomber 示例 | 手写运行时代码集中于 `HotUpdate/Demos/MiniBomber`；Editor 工具通过目录内 asmref 归入 Editor；Proto、资源与测试保持各自程序集边界 |
 | Bootstrap 与生成的 AOT 地址表 | `Project/Bootstrap` |
 | Unity Editor 生成器、构建校验和性能工具 | `MiniCore/Editor` |
 
@@ -217,6 +235,7 @@ Server 通过 `-serverPort <port>` 指定端口，缺省为 `20000`。任一步�
 - 新增或修改的方法写中文多行 XML 文档；公共 API 同样需要中文说明。
 - 成员按 `UnityProperty`、`Public`、`Internal`、`Private`、`Interface`、`Override` 等 region 整理。
 - 新文件 UTF-8 无 BOM；已有文件保持原编码。
+- 除自动生成代码、同名泛型/partial 核心和确实紧耦合的窄例外外，一个源文件只放一个顶层类型。
 - `Update`、网络收发、队列处理、循环中避免 LINQ、闭包、临时集合和无必要 `new`。
 - 不回退用户已有改动；生成文件由生成器维护，业务代码不手改。
 

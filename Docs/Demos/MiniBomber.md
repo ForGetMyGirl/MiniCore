@@ -22,6 +22,12 @@
 - BattleScene 中的 Prefab、Input Actions、Camera 和地图引用。
 - 每个平台的签名、图标、远程资源 URL 和实际构建产物。
 
+### 源码与程序集边界
+
+Demo 的手写运行时代码统一位于 `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber`，按 `Entry`、`Domain`、`Client`、`Server`、`Network`、`Configuration` 分区。输入、场景绑定、世界表现和 ScriptableObject 配置也属于 Demo 自身，不再散落到 `MiniCore.Unity`。
+
+Demo 的 Editor 工具物理位于 `HotUpdate/Demos/MiniBomber/Editor`，但通过该目录的 `MiniCore.Editor.asmref` 编入 `MiniCore.Editor`，不会进入 HotUpdate Player 程序集。协议源仍位于 `Proto/Demos/MiniBomber`，生成消息仍属于 `MiniCore.Protocol`；协议是网络契约，不应为了目录集中而倒置为 HotUpdate 对 Protocol 的反向依赖。场景和 Prefab 继续位于 `Assets/Scenes/Demos/MiniBomber` 与 `Assets/AssetRes/Demos/MiniBomber`，Editor 测试继续位于 `Assets/Tests/Editor/Demos/MiniBomber`。
+
 ## 2. 启动与场景时序
 
 Bootstrap 只负责 YooAsset、AOT 补充元数据和 HotUpdate DLL。加载 DLL 后它直接调用 `MiniCoreStartup` 和 `GameStartup`，不再先进入一个中转业务场景。

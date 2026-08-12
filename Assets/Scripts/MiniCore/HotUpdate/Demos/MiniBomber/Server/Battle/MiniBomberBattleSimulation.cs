@@ -30,31 +30,49 @@ namespace MiniCore.Demo.MiniBomber
 
         #region Public 公共成员
 
-        /// <summary>当前比赛身份。</summary>
+        /// <summary>
+        /// 当前比赛身份。
+        /// </summary>
         public long MatchId { get; }
 
-        /// <summary>当前服务器逻辑 Tick。</summary>
+        /// <summary>
+        /// 当前服务器逻辑 Tick。
+        /// </summary>
         public long ServerTick { get; private set; }
 
-        /// <summary>比赛总逻辑 Tick 数。</summary>
+        /// <summary>
+        /// 比赛总逻辑 Tick 数。
+        /// </summary>
         public long DurationTicks { get; }
 
-        /// <summary>当前比赛是否结束。</summary>
+        /// <summary>
+        /// 当前比赛是否结束。
+        /// </summary>
         public bool IsFinished => isFinished;
 
-        /// <summary>稳定顺序的权威玩家状态。</summary>
+        /// <summary>
+        /// 稳定顺序的权威玩家状态。
+        /// </summary>
         public IReadOnlyList<MiniBomberPlayerState> Players => players;
 
-        /// <summary>当前活动炸弹状态。</summary>
+        /// <summary>
+        /// 当前活动炸弹状态。
+        /// </summary>
         public IReadOnlyList<MiniBomberBombState> Bombs => bombs;
 
-        /// <summary>最近一次 Tick 产生的离散事件。</summary>
+        /// <summary>
+        /// 最近一次 Tick 产生的离散事件。
+        /// </summary>
         public IReadOnlyList<MiniBomberSimulationEvent> Events => events;
 
-        /// <summary>当前已经产生的最后一个有序事件编号。</summary>
+        /// <summary>
+        /// 当前已经产生的最后一个有序事件编号。
+        /// </summary>
         public long LastEventId => nextEventId - 1;
 
-        /// <summary>比赛剩余毫秒数。</summary>
+        /// <summary>
+        /// 比赛剩余毫秒数。
+        /// </summary>
         public int RemainingMilliseconds
         {
             get
