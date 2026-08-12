@@ -43,7 +43,16 @@ namespace MiniCore.EditorTools
         public static void GenerateAllAndBuildDefaultPackage()
         {
             HybridClrBuildValidator.EnsureConfigured();
-            PrebuildCommand.GenerateAll();
+            HybridClrBuildValidator.BeginArtifactGeneration();
+            try
+            {
+                PrebuildCommand.GenerateAll();
+            }
+            finally
+            {
+                HybridClrBuildValidator.EndArtifactGeneration();
+            }
+
             BuildDefaultPackageFromGeneratedArtifacts();
             Debug.Log("MiniCore DefaultPackage 完整构建完成：已执行 HybridCLR Generate All 并打包。");
         }
@@ -222,7 +231,7 @@ namespace MiniCore.EditorTools
                 string hotUpdateAssetPath = GetHotUpdateAssetPath(entry.AssemblyName);
                 if (!FileContentsEqual(hotUpdateSourcePath, hotUpdateAssetPath))
                 {
-                    error = $"YooAsset 热更新 DLL 未同步：{hotUpdateAssetPath}";
+                    error = $"热更新程序集资源尚未同步到 YooAsset：{hotUpdateAssetPath}";
                     return false;
                 }
             }

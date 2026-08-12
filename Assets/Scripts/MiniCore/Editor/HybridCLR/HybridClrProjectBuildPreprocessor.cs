@@ -4,7 +4,7 @@ using UnityEditor.Build.Reporting;
 namespace MiniCore.EditorTools
 {
     /// <summary>
-    /// 在 Player 构建前独立同步并校验 HybridCLR、YooAsset 与 Bootstrap 热更新产物。
+    /// 在 Player 构建前校验 HybridCLR、YooAsset 与 Bootstrap 热更新产物。
     /// </summary>
     public sealed class HybridClrProjectBuildPreprocessor : IPreprocessBuildWithReport
     {
@@ -22,6 +22,11 @@ namespace MiniCore.EditorTools
         public void OnPreprocessBuild(BuildReport report)
         {
             HybridClrBuildValidator.EnsureConfigured();
+            if (HybridClrBuildValidator.IsGeneratingArtifacts)
+            {
+                return;
+            }
+
             if (!HybridClrBuildValidator.Validate(out string error))
             {
                 throw new BuildFailedException(error);

@@ -128,6 +128,13 @@
 
 ## 10. 验证记录
 
+### 2026-08-12（完整生成内部构建与最终资源校验分阶段）
+
+- 症状：点击“完整生成”时，HybridCLR 在 `GenerateStripedAOTDlls` 的内部 Player 构建阶段报告 `MiniCore.Protocol.dll.bytes` 尚未同步，流程在真正复制热更新 DLL 前中断。
+- 根因：项目的通用 Player 构建预处理器错误地把 HybridCLR 用于生成裁剪 AOT DLL 的临时构建当成最终 Player 构建，提前检查了只有后续同步阶段才会生成的 YooAsset `.dll.bytes`。
+- 修复：MiniCore 发起 `PrebuildCommand.GenerateAll` 时显式进入产物生成阶段；该阶段的内部构建仍同步并校验程序集登记，但跳过最终资源一致性检查。离开生成阶段后先同步 DLL、AOT 元数据和 Bootstrap 地址，再构建并校验 `DefaultPackage`；普通 Player 构建继续执行完整校验。
+- 验证：Unity `2021.3.45f2` 隔离工程脚本编译通过。按本次验证约束未执行完整 Player/DefaultPackage 构建；需要在原项目重新点击“完整生成”，以实际产物链确认后续 HybridCLR 与 YooAsset 阶段。
+
 ### 2026-08-12（实例协议注册与多热更新程序集生成链）
 
 - 症状：最终隔离编译报错，项目内 Google.Protobuf 版本无法使用 `CodedOutputStream(byte[], offset, length)` 构造函数。

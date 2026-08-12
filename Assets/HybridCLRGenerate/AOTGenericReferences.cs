@@ -8,9 +8,11 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 		"Google.Protobuf.dll",
 		"MiniCore.Network.dll",
 		"MiniCore.Runtime.dll",
+		"MiniCore.Serialization.dll",
 		"MiniCore.Unity.dll",
 		"Newtonsoft.Json.dll",
 		"System.Core.dll",
+		"Unity.InputSystem.dll",
 		"UnityEngine.CoreModule.dll",
 		"YooAsset.dll",
 		"mscorlib.dll",
@@ -77,11 +79,13 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Action<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Action<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Action<MiniCore.Demo.MiniBomber.Unity.BomberInputFrame>
+	// System.Action<UnityEngine.InputSystem.InputAction.CallbackContext>
 	// System.Action<float>
 	// System.Action<long>
 	// System.Action<object>
 	// System.ArraySegment.Enumerator<byte>
 	// System.ArraySegment<byte>
+	// System.Buffers.MemoryManager<byte>
 	// System.ByReference<byte>
 	// System.Collections.Concurrent.ConcurrentQueue.<Enumerate>d__28<object>
 	// System.Collections.Concurrent.ConcurrentQueue.Segment<object>
@@ -94,54 +98,73 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Comparer<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Collections.Generic.Comparer<long>
 	// System.Collections.Generic.Comparer<object>
+	// System.Collections.Generic.Dictionary.Enumerator<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.Dictionary.Enumerator<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.Dictionary.Enumerator<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.Dictionary.Enumerator<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.Dictionary.Enumerator<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.Dictionary.Enumerator<int,object>
 	// System.Collections.Generic.Dictionary.Enumerator<long,int>
 	// System.Collections.Generic.Dictionary.Enumerator<long,object>
 	// System.Collections.Generic.Dictionary.Enumerator<object,int>
 	// System.Collections.Generic.Dictionary.Enumerator<object,object>
+	// System.Collections.Generic.Dictionary.Enumerator<uint,object>
+	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<int,object>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<long,int>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<long,object>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<object,int>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<object,object>
+	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<uint,object>
+	// System.Collections.Generic.Dictionary.KeyCollection<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.Dictionary.KeyCollection<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.Dictionary.KeyCollection<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.Dictionary.KeyCollection<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.Dictionary.KeyCollection<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.Dictionary.KeyCollection<int,object>
 	// System.Collections.Generic.Dictionary.KeyCollection<long,int>
 	// System.Collections.Generic.Dictionary.KeyCollection<long,object>
 	// System.Collections.Generic.Dictionary.KeyCollection<object,int>
 	// System.Collections.Generic.Dictionary.KeyCollection<object,object>
+	// System.Collections.Generic.Dictionary.KeyCollection<uint,object>
+	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<int,object>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<long,int>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<long,object>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<object,int>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<object,object>
+	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<uint,object>
+	// System.Collections.Generic.Dictionary.ValueCollection<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.Dictionary.ValueCollection<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.Dictionary.ValueCollection<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.Dictionary.ValueCollection<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.Dictionary.ValueCollection<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.Dictionary.ValueCollection<int,object>
 	// System.Collections.Generic.Dictionary.ValueCollection<long,int>
 	// System.Collections.Generic.Dictionary.ValueCollection<long,object>
 	// System.Collections.Generic.Dictionary.ValueCollection<object,int>
 	// System.Collections.Generic.Dictionary.ValueCollection<object,object>
+	// System.Collections.Generic.Dictionary.ValueCollection<uint,object>
+	// System.Collections.Generic.Dictionary<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.Dictionary<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.Dictionary<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.Dictionary<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.Dictionary<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.Dictionary<int,object>
 	// System.Collections.Generic.Dictionary<long,int>
 	// System.Collections.Generic.Dictionary<long,object>
 	// System.Collections.Generic.Dictionary<object,int>
 	// System.Collections.Generic.Dictionary<object,object>
+	// System.Collections.Generic.Dictionary<uint,object>
+	// System.Collections.Generic.EqualityComparer<MiniCore.Core.GameObjectPoolKey>
 	// System.Collections.Generic.EqualityComparer<MiniCore.Service.UIService.UIWindowLogicalKey>
 	// System.Collections.Generic.EqualityComparer<MiniCore.UI.UIWindowId>
 	// System.Collections.Generic.EqualityComparer<MiniCore.UI.UIWindowInstanceId>
@@ -157,14 +180,17 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.HashSetEqualityComparer<object>
 	// System.Collections.Generic.ICollection<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Collections.Generic.ICollection<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
+	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<MiniCore.Core.GameObjectPoolKey,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<MiniCore.Service.UIService.UIWindowLogicalKey,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,uint>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowInstanceId,object>>
+	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<int,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<long,int>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<long,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<object,int>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<object,object>>
+	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<uint,object>>
 	// System.Collections.Generic.ICollection<long>
 	// System.Collections.Generic.ICollection<object>
 	// System.Collections.Generic.IComparer<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
@@ -173,33 +199,42 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.IComparer<object>
 	// System.Collections.Generic.IEnumerable<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Collections.Generic.IEnumerable<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
+	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<MiniCore.Core.GameObjectPoolKey,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<MiniCore.Service.UIService.UIWindowLogicalKey,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,uint>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowInstanceId,object>>
+	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<int,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<long,int>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<long,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<object,int>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<object,object>>
+	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<uint,object>>
 	// System.Collections.Generic.IEnumerable<long>
 	// System.Collections.Generic.IEnumerable<object>
 	// System.Collections.Generic.IEnumerator<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Collections.Generic.IEnumerator<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
+	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<MiniCore.Core.GameObjectPoolKey,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<MiniCore.Service.UIService.UIWindowLogicalKey,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,uint>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowInstanceId,object>>
+	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<int,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<long,int>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<long,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<object,int>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<object,object>>
+	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<uint,object>>
 	// System.Collections.Generic.IEnumerator<long>
 	// System.Collections.Generic.IEnumerator<object>
+	// System.Collections.Generic.IEqualityComparer<MiniCore.Core.GameObjectPoolKey>
 	// System.Collections.Generic.IEqualityComparer<MiniCore.Service.UIService.UIWindowLogicalKey>
 	// System.Collections.Generic.IEqualityComparer<MiniCore.UI.UIWindowId>
 	// System.Collections.Generic.IEqualityComparer<MiniCore.UI.UIWindowInstanceId>
+	// System.Collections.Generic.IEqualityComparer<int>
 	// System.Collections.Generic.IEqualityComparer<long>
 	// System.Collections.Generic.IEqualityComparer<object>
+	// System.Collections.Generic.IEqualityComparer<uint>
 	// System.Collections.Generic.IList<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Collections.Generic.IList<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Collections.Generic.IList<long>
@@ -212,14 +247,17 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.IReadOnlyList<MiniCore.Demo.MiniBomber.MiniBomberMatchResult>
 	// System.Collections.Generic.IReadOnlyList<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Collections.Generic.IReadOnlyList<object>
+	// System.Collections.Generic.KeyValuePair<MiniCore.Core.GameObjectPoolKey,object>
 	// System.Collections.Generic.KeyValuePair<MiniCore.Service.UIService.UIWindowLogicalKey,object>
 	// System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,object>
 	// System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowId,uint>
 	// System.Collections.Generic.KeyValuePair<MiniCore.UI.UIWindowInstanceId,object>
+	// System.Collections.Generic.KeyValuePair<int,object>
 	// System.Collections.Generic.KeyValuePair<long,int>
 	// System.Collections.Generic.KeyValuePair<long,object>
 	// System.Collections.Generic.KeyValuePair<object,int>
 	// System.Collections.Generic.KeyValuePair<object,object>
+	// System.Collections.Generic.KeyValuePair<uint,object>
 	// System.Collections.Generic.List.Enumerator<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Collections.Generic.List.Enumerator<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Collections.Generic.List.Enumerator<long>
@@ -232,6 +270,7 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.ObjectComparer<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Collections.Generic.ObjectComparer<long>
 	// System.Collections.Generic.ObjectComparer<object>
+	// System.Collections.Generic.ObjectEqualityComparer<MiniCore.Core.GameObjectPoolKey>
 	// System.Collections.Generic.ObjectEqualityComparer<MiniCore.Service.UIService.UIWindowLogicalKey>
 	// System.Collections.Generic.ObjectEqualityComparer<MiniCore.UI.UIWindowId>
 	// System.Collections.Generic.ObjectEqualityComparer<MiniCore.UI.UIWindowInstanceId>
@@ -256,16 +295,24 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Func<object,object,object>
 	// System.Func<object,object>
 	// System.Func<object>
+	// System.IEquatable<MiniCore.Core.GameObjectPoolKey>
 	// System.IEquatable<MiniCore.Service.UIService.UIWindowLogicalKey>
+	// System.IEquatable<object>
+	// System.Memory<byte>
 	// System.Predicate<MiniCore.Demo.MiniBomber.MiniBomberBattleParticipant>
 	// System.Predicate<MiniCore.Demo.MiniBomber.MiniBomberRoomWorkerCommand>
 	// System.Predicate<MiniCore.Demo.MiniBomber.MiniBomberSimulationEvent>
 	// System.Predicate<long>
 	// System.Predicate<object>
+	// System.ReadOnlyMemory<byte>
 	// System.ReadOnlySpan.Enumerator<byte>
 	// System.ReadOnlySpan<byte>
 	// System.Span.Enumerator<byte>
 	// System.Span<byte>
+	// UnityEngine.InputSystem.InputBindingComposite<UnityEngine.Vector2>
+	// UnityEngine.InputSystem.InputControl<UnityEngine.Vector2>
+	// UnityEngine.InputSystem.InputProcessor<UnityEngine.Vector2>
+	// UnityEngine.InputSystem.Utilities.InlinedArray<object>
 	// }}
 
 	public void RefMethods()
@@ -293,10 +340,11 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 		// System.Void MiniCore.Eventing.IEventBus.Publish<object>(object)
 		// MiniCore.Eventing.EventSubscription MiniCore.Eventing.IEventBus.Subscribe<object>(System.Action<object>)
 		// object MiniCore.Model.AComponent.AddComponent<object>()
+		// System.Void MiniCore.Model.NetworkProtocolBuilder.RegisterMessage<object>(uint,MiniCore.Model.NetworkMessageRole,MiniCore.Serialization.IMessageParser)
+		// MiniCore.Threading.MTask MiniCore.Serialization.ProtobufSaveServiceExtensions.SaveProtobufAsync<object>(MiniCore.Service.ISaveService,string,object)
 		// MiniCore.Threading.MTask<object> MiniCore.Service.INetworkService.CallAsync<object,object>(string,object)
 		// MiniCore.Threading.MTask MiniCore.Service.INetworkService.SendAsync<object>(string,object)
 		// MiniCore.Model.NetworkSendResult MiniCore.Service.INetworkService.TrySend<object>(string,object)
-		// MiniCore.Threading.MTask MiniCore.Service.ISaveService.SaveAsync<object>(string,object)
 		// MiniCore.Threading.MTask<object> MiniCore.Threading.MTask.FromResult<object>(object)
 		// System.Void MiniCore.Threading.MTaskMethodBuilder.AwaitUnsafeOnCompleted<MiniCore.Threading.MSharedTaskAwaiter<byte>,object>(MiniCore.Threading.MSharedTaskAwaiter<byte>&,object&)
 		// System.Void MiniCore.Threading.MTaskMethodBuilder.AwaitUnsafeOnCompleted<MiniCore.Threading.MSharedTaskAwaiter<object>,object>(MiniCore.Threading.MSharedTaskAwaiter<object>&,object&)
@@ -320,6 +368,7 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 		// object Newtonsoft.Json.JsonConvert.DeserializeObject<object>(string)
 		// object Newtonsoft.Json.JsonConvert.DeserializeObject<object>(string,Newtonsoft.Json.JsonSerializerSettings)
 		// object System.Activator.CreateInstance<object>()
+		// UnityEngine.Vector2Int[] System.Array.Empty<UnityEngine.Vector2Int>()
 		// object[] System.Array.Empty<object>()
 		// int System.Array.IndexOf<int>(int[],int)
 		// int System.Array.IndexOfImpl<int>(int[],int,int,int)
@@ -328,13 +377,19 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 		// object System.Reflection.CustomAttributeExtensions.GetCustomAttribute<object>(System.Reflection.MemberInfo)
 		// object& System.Runtime.CompilerServices.Unsafe.As<object,object>(object&)
 		// System.Void* System.Runtime.CompilerServices.Unsafe.AsPointer<object>(object&)
+		// System.Void* Unity.Collections.LowLevel.Unsafe.UnsafeUtility.AddressOf<UnityEngine.Vector2>(UnityEngine.Vector2&)
+		// int Unity.Collections.LowLevel.Unsafe.UnsafeUtility.SizeOf<UnityEngine.Vector2>()
 		// object UnityEngine.Component.GetComponentInChildren<object>()
 		// object[] UnityEngine.Component.GetComponentsInChildren<object>()
 		// object[] UnityEngine.Component.GetComponentsInChildren<object>(bool)
 		// object UnityEngine.GameObject.AddComponent<object>()
 		// object UnityEngine.GameObject.GetComponent<object>()
 		// object[] UnityEngine.GameObject.GetComponentsInChildren<object>(bool)
+		// UnityEngine.Vector2 UnityEngine.InputSystem.InputAction.ReadValue<UnityEngine.Vector2>()
+		// UnityEngine.Vector2 UnityEngine.InputSystem.InputActionState.ReadValue<UnityEngine.Vector2>(int,int,bool)
 		// object UnityEngine.Object.FindObjectOfType<object>()
+		// object UnityEngine.Object.Instantiate<object>(object,UnityEngine.Transform)
+		// object UnityEngine.Object.Instantiate<object>(object,UnityEngine.Transform,bool)
 		// object UnityEngine.Resources.Load<object>(string)
 		// YooAsset.AssetHandle YooAsset.ResourcePackage.LoadAssetAsync<object>(string,uint)
 	}

@@ -2,26 +2,45 @@
 <linker>
   <assembly fullname="Google.Protobuf">
     <type fullname="Google.Protobuf.ByteString" preserve="all" />
+    <type fullname="Google.Protobuf.CodedInputStream" preserve="all" />
+    <type fullname="Google.Protobuf.CodedOutputStream" preserve="all" />
     <type fullname="Google.Protobuf.Collections.RepeatedField`1" preserve="all" />
+    <type fullname="Google.Protobuf.Extension" preserve="all" />
+    <type fullname="Google.Protobuf.FieldCodec" preserve="all" />
+    <type fullname="Google.Protobuf.FieldCodec`1" preserve="all" />
+    <type fullname="Google.Protobuf.IBufferMessage" preserve="all" />
+    <type fullname="Google.Protobuf.IDeepCloneable`1" preserve="all" />
+    <type fullname="Google.Protobuf.IMessage" preserve="all" />
     <type fullname="Google.Protobuf.IMessage`1" preserve="all" />
+    <type fullname="Google.Protobuf.JsonFormatter" preserve="all" />
+    <type fullname="Google.Protobuf.MessageParser" preserve="all" />
     <type fullname="Google.Protobuf.MessageParser`1" preserve="all" />
+    <type fullname="Google.Protobuf.ParseContext" preserve="all" />
+    <type fullname="Google.Protobuf.ProtoPreconditions" preserve="all" />
+    <type fullname="Google.Protobuf.Reflection.FileDescriptor" preserve="all" />
+    <type fullname="Google.Protobuf.Reflection.GeneratedClrTypeInfo" preserve="all" />
+    <type fullname="Google.Protobuf.Reflection.MessageDescriptor" preserve="all" />
+    <type fullname="Google.Protobuf.Reflection.OriginalNameAttribute" preserve="all" />
+    <type fullname="Google.Protobuf.UnknownFieldSet" preserve="all" />
+    <type fullname="Google.Protobuf.WriteContext" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Network">
     <type fullname="MiniCore.Model.AMHandler`1" preserve="all" />
     <type fullname="MiniCore.Model.ARpcHandler`2" preserve="all" />
+    <type fullname="MiniCore.Model.INetworkMessage" preserve="all" />
     <type fullname="MiniCore.Model.INetworkMessageHandlerInvoker" preserve="all" />
     <type fullname="MiniCore.Model.INetworkRpcHandlerInvoker" preserve="all" />
-    <type fullname="MiniCore.Model.INetworkMessage" preserve="all" />
+    <type fullname="MiniCore.Model.INetworkTransport" preserve="all" />
     <type fullname="MiniCore.Model.INormalMessage" preserve="all" />
     <type fullname="MiniCore.Model.IRpcRequest" preserve="all" />
     <type fullname="MiniCore.Model.IRpcResponse" preserve="all" />
-    <type fullname="MiniCore.Model.NetworkProtocolBuilder" preserve="all" />
-    <type fullname="MiniCore.Model.NetworkProtocolRegistry" preserve="all" />
-    <type fullname="MiniCore.Model.INetworkTransport" preserve="all" />
     <type fullname="MiniCore.Model.KcpServerConfig" preserve="all" />
     <type fullname="MiniCore.Model.KcpTransportConfig" preserve="all" />
     <type fullname="MiniCore.Model.NetworkIncomingQueueSnapshot" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkMessageRole" preserve="all" />
     <type fullname="MiniCore.Model.NetworkOutboundQueueSnapshot" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkProtocolBuilder" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkProtocolRegistry" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSendResult" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSession" preserve="all" />
     <type fullname="MiniCore.Model.NetworkTransportReceiveSnapshot" preserve="all" />
@@ -29,63 +48,6 @@
     <type fullname="MiniCore.Model.UdpServerConfig" preserve="all" />
     <type fullname="MiniCore.Service.INetworkService" preserve="all" />
     <type fullname="MiniCore.Service.NetworkService" preserve="all" />
-  </assembly>
-  <assembly fullname="MiniCore.Protocol">
-    <type fullname="MiniCore.Protocol.Generated.DemoNormalMessage" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.DemoRpcRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.DemoRpcResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.DisconnectNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberAccountDatabaseData" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberAccountRecordData" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleBombDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleDelta" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleEventBatch" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleEventDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleEventType" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleInputBatch" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattlePlayerDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleResyncRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleResyncResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberBattleSnapshot" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberClientDestination" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberCreateRoomRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberCreateRoomResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberDisconnectNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberInputFrameDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberJoinRoomRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberJoinRoomResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLeaveRoomRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLeaveRoomResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLobbyChangedNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLobbySnapshotRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLobbySnapshotResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLoginRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberLoginResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberMatchCountdownNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberMatchPrepareNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberMatchResultEntryDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberMatchResultNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberPlayerProfileDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRegisterRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRegisterResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberResumeSessionRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberResumeSessionResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomMemberDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomSnapshotDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomSnapshotNotice" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomState" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberRoomSummaryDto" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberSavedSessionData" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberSceneReadyRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberSceneReadyResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberSetReadyRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberSetReadyResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberStartMatchRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberStartMatchResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberUpdateRoomRequest" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberUpdateRoomResponse" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.MiniBomberVersionInfo" preserve="all" />
-    <type fullname="MiniCore.Protocol.Generated.TestNetworkData" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Runtime">
     <type fullname="MiniCore.Core.Global" preserve="all" />
@@ -134,10 +96,11 @@
     <type fullname="MiniCore.Threading.MTask`1" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Serialization">
+    <type fullname="MiniCore.Serialization.IMessageParser" preserve="all" />
+    <type fullname="MiniCore.Serialization.ProtobufMessageParser`1" preserve="all" />
     <type fullname="MiniCore.Serialization.ProtobufSaveServiceExtensions" preserve="all" />
   </assembly>
   <assembly fullname="MiniCore.Unity">
-    <type fullname="MiniCore.Service.Persistence.Generated.ClientSettingsSaveData" preserve="all" />
     <type fullname="MiniCore.Model.IListener" preserve="all" />
     <type fullname="MiniCore.Model.MonoSingleton`1" preserve="all" />
     <type fullname="MiniCore.Model.UnreadPropertyAttribute" preserve="all" />
@@ -186,6 +149,7 @@
     <type fullname="Newtonsoft.Json.JsonConvert" preserve="all" />
   </assembly>
   <assembly fullname="System">
+    <type fullname="System.CodeDom.Compiler.GeneratedCodeAttribute" preserve="all" />
     <type fullname="System.Collections.Generic.Stack`1" preserve="all" />
     <type fullname="System.Diagnostics.Stopwatch" preserve="all" />
   </assembly>
@@ -316,7 +280,9 @@
     <type fullname="System.Diagnostics.DebuggableAttribute/DebuggingModes" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerBrowsableAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerBrowsableState" preserve="all" />
+    <type fullname="System.Diagnostics.DebuggerDisplayAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerHiddenAttribute" preserve="all" />
+    <type fullname="System.Diagnostics.DebuggerNonUserCodeAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerStepThroughAttribute" preserve="all" />
     <type fullname="System.Double" preserve="all" />
     <type fullname="System.Enum" preserve="all" />
