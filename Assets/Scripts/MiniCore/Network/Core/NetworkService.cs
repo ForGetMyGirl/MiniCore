@@ -1120,7 +1120,7 @@ namespace MiniCore.Service
             {
                 if (TryGetHeartbeatMode(session.SessionId, out var mode) && mode == NetworkHeartbeatMode.Client)
                 {
-                    TouchPong(session.SessionId);
+                    TouchPong(session.SessionId, rpcId);
                 }
                 return;
             }
@@ -1341,11 +1341,8 @@ namespace MiniCore.Service
         /// <returns>执行处理后的结果。</returns>
         private async MTask SendPingAsync(NetworkSession session)
         {
-            if (heartbeatStates.TryGetValue(session.SessionId, out var state))
-            {
-                state.LastPingSentTicks = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            }
-            byte[] body = BuildControlPacket(PingOpcode, 0);
+            long pingTimestamp = Stopwatch.GetTimestamp();
+            byte[] body = BuildControlPacket(PingOpcode, pingTimestamp);
             await session.SendOwnedAsync(body, 12);
         }
 
@@ -1365,30 +1362,35 @@ namespace MiniCore.Service
         /// 执行 TouchPong 相关处理。
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
-        private void TouchPong(string sessionId)
+        /// <param name="pingTimestamp">服务端原样返回的客户端 Ping 单调时钟时间戳。</param>
+        private void TouchPong(string sessionId, long pingTimestamp)
         {
             if (heartbeatStates.TryGetValue(sessionId, out var state))
             {
                 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 state.LastPongTicks = now;
-                if (state.LastPingSentTicks > 0)
+                long elapsedTicks = Stopwatch.GetTimestamp() - pingTimestamp;
+                if (pingTimestamp > 0 && elapsedTicks >= 0)
                 {
-                    int rtt = (int)Math.Max(0, now - state.LastPingSentTicks);
-                    state.LastRttMs = rtt;
+                    long elapsedMilliseconds = elapsedTicks * 1000L / Stopwatch.Frequency;
+                    int rtt = elapsedMilliseconds > int.MaxValue ? int.MaxValue : (int)elapsedMilliseconds;
+                    Volatile.Write(ref state.LastRttMs, rtt);
                     if (state.MinRttWindowStartTicks == 0)
                     {
                         state.MinRttWindowStartTicks = now;
-                        state.MinRttMs = rtt;
+                        Volatile.Write(ref state.MinRttMs, rtt);
                     }
                     else if (now - state.MinRttWindowStartTicks > 10000)
                     {
                         state.MinRttWindowStartTicks = now;
-                        state.MinRttMs = rtt;
+                        Volatile.Write(ref state.MinRttMs, rtt);
                     }
-                    else if (state.MinRttMs == 0 || rtt < state.MinRttMs)
+                    else if (rtt < Volatile.Read(ref state.MinRttMs))
                     {
-                        state.MinRttMs = rtt;
+                        Volatile.Write(ref state.MinRttMs, rtt);
                     }
+
+                    Volatile.Write(ref state.HasRtt, 1);
                 }
             }
         }
@@ -1410,7 +1412,7 @@ namespace MiniCore.Service
         #region Public 公共成员
 
         /// <summary>
-        /// 获取最近一次心跳往返耗时。
+        /// 获取适用于所有传输协议的最近一次应用层心跳往返耗时。
         /// </summary>
         /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
         /// <param name="pingMs">执行该方法所需的 pingMs 参数。</param>
@@ -1418,12 +1420,12 @@ namespace MiniCore.Service
         public bool TryGetLastPingMs(string sessionId, out int pingMs)
         {
             pingMs = 0;
-            if (!heartbeatStates.TryGetValue(sessionId, out var state))
+            if (!heartbeatStates.TryGetValue(sessionId, out var state) || Volatile.Read(ref state.HasRtt) == 0)
             {
                 return false;
             }
-            pingMs = state.LastRttMs;
-            return pingMs > 0;
+            pingMs = Volatile.Read(ref state.LastRttMs);
+            return true;
         }
 
         /// <summary>
@@ -1435,12 +1437,12 @@ namespace MiniCore.Service
         public bool TryGetMinPingMs(string sessionId, out int pingMs)
         {
             pingMs = 0;
-            if (!heartbeatStates.TryGetValue(sessionId, out var state))
+            if (!heartbeatStates.TryGetValue(sessionId, out var state) || Volatile.Read(ref state.HasRtt) == 0)
             {
                 return false;
             }
-            pingMs = state.MinRttMs;
-            return pingMs > 0;
+            pingMs = Volatile.Read(ref state.MinRttMs);
+            return true;
         }
 
         /// <summary>

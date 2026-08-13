@@ -10,13 +10,14 @@ namespace MiniCore.Bootstrap
         #region Public 公共成员
 
         /// <summary>
-        /// 通过启动流程可达的类型引用保留客户端动态角色、动画和粒子所需的 Unity 原生实现。
+        /// 通过启动流程可达的类型引用保留客户端动态角色、物理碰撞、动画和粒子所需的 Unity 原生实现。
         /// </summary>
         public static void ProtectDynamicContentTypes()
         {
 #if !UNITY_EDITOR && !UNITY_SERVER
             Debug.Log(typeof(AnimationClip));
             Debug.Log(typeof(Avatar));
+            Debug.Log(typeof(BoxCollider));
             Debug.Log(typeof(SkinnedMeshRenderer));
             Debug.Log(typeof(ParticleSystem));
             Debug.Log(typeof(ParticleSystemRenderer));
@@ -26,6 +27,7 @@ namespace MiniCore.Bootstrap
                 hideFlags = HideFlags.HideAndDontSave
             };
             nativeTypeAnchor.SetActive(false);
+            nativeTypeAnchor.AddComponent<BoxCollider>();
             nativeTypeAnchor.AddComponent<SkinnedMeshRenderer>();
             Object.Destroy(nativeTypeAnchor);
 #endif

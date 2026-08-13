@@ -27,7 +27,7 @@ namespace MiniCore.Demo.MiniBomber
         #region Protected 受保护成员
 
         /// <summary>
-        /// 重置缓存窗口状态，绑定登录和注册按钮并填充最近服务器地址。
+        /// 重置缓存窗口状态并绑定登录和注册按钮。
         /// </summary>
         protected override void OnBind()
         {
@@ -36,8 +36,6 @@ namespace MiniCore.Demo.MiniBomber
             commandRunning = false;
             View.PromptText.text = string.Empty;
             SetCommandInteractable(true);
-            View.HostInput.text = string.IsNullOrEmpty(account.Host) ? "127.0.0.1" : account.Host;
-            View.PortInput.text = account.Port.ToString();
             Bindings.Add(View.LoginButton, Login);
             Bindings.Add(View.RegisterButton, OpenRegister);
         }
@@ -76,22 +74,15 @@ namespace MiniCore.Demo.MiniBomber
         /// <returns>登录流程完成任务。</returns>
         private async MTask LoginAsync()
         {
-            if (!int.TryParse(View.PortInput.text, out int port))
-            {
-                View.PromptText.text = "端口格式不正确";
-                return;
-            }
-
             commandRunning = true;
             SetCommandInteractable(false);
-            string host = View.HostInput.text;
             string accountName = View.AccountInput.text;
             string password = View.PasswordInput.text;
             bool authenticated = false;
             try
             {
                 View.PromptText.text = "正在连接服务器...";
-                if (!await account.ConnectAsync(host, port))
+                if (!await account.ConnectAsync())
                 {
                     if (!released)
                     {
@@ -160,19 +151,12 @@ namespace MiniCore.Demo.MiniBomber
         /// <returns>连接检查和弹窗打开完成任务。</returns>
         private async MTask OpenRegisterAsync()
         {
-            if (!int.TryParse(View.PortInput.text, out int port))
-            {
-                View.PromptText.text = "端口格式不正确";
-                return;
-            }
-
             commandRunning = true;
             SetCommandInteractable(false);
-            string host = View.HostInput.text;
             try
             {
                 View.PromptText.text = "正在连接服务器...";
-                if (!await account.ConnectAsync(host, port))
+                if (!await account.ConnectAsync())
                 {
                     if (!released)
                     {

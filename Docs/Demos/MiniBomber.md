@@ -1,6 +1,6 @@
 # MiniBomber 全链路 Demo 制作与验证
 
-本文档对应 `Demos/MiniBomber` 的当前实现，用于同时验证 MiniCore 的账号、KCP 网络、服务器权威状态同步、UI Root、场景切换、Dedicated Server、YooAsset 和 HybridCLR 热更新链路。
+本文档对应 `Demos/MiniBomber` 的当前实现，用于同时验证 MiniCore 的账号、KCP/WebSocket 网络、服务器权威状态同步、UI Root、场景切换、Dedicated Server、YooAsset 和 HybridCLR 热更新链路。
 
 ## 1. 当前实现边界
 
@@ -12,6 +12,7 @@
 - 账号注册/登录、开发版随机盐 SHA-256 摘要、版本握手、会话令牌和 `15` 秒断线恢复。
 - 大厅创建/加入/刷新房间，房主设置、准备、开始、房主转移和战斗加载超时。
 - Windows 键盘和 Android 虚拟摇杆/炸弹按钮的统一输入；Android 支持持续移动时同时放置炸弹，并在 Demo 运行期间保持屏幕常亮。
+- 客户端固定连接 `MiniBomberConstants` 中的 Demo 服务地址；原生 PC/Android 使用 KCP，浏览器 WebGL 使用 WebSocket，登录界面不暴露地址和端口输入。
 - 登录、大厅、房间、战斗、成绩和重连的 Client Flow、View 与 Presenter。
 - 客户端展示插值、简单本地预测、小误差收敛和超过 `0.75` 格的直接校正。预测不参与权威判定。
 
@@ -50,7 +51,7 @@ Dedicated ServerBootstrapScene
   → MiniCoreStartup.StartAsync
   → GameStartup.StartAsync
   → MiniBomberServerStartupComponent
-  → MiniBomberServerRuntimeComponent 启动 KCP
+  → MiniBomberServerRuntimeComponent 同时启动 KCP 与 WebSocket
 ```
 
 Dedicated Server 必须以 `-batchmode` 运行。该分支不切换 Login/Lobby/BattleScene，`UIService` 也不创建 `ApplicationUIRoot`。
@@ -58,8 +59,8 @@ Dedicated Server 必须以 `-batchmode` 运行。该分支不切换 Login/Lobby/
 `GameStartup` 只负责运行形态分流：
 
 - 未带自动压测参数的普通客户端：创建 `MiniBomberClientStartupComponent`，由它加载共享配置、创建账号/大厅/房间/战斗组件并进入登录流程。
-- Batch/Dedicated Server：创建 `MiniBomberServerStartupComponent`，由它加载共享规则和地图，并在 `0.0.0.0:20000` 启动权威运行时与 KCP 监听。
-- `-serverPort <port>` 可覆盖默认端口。
+- Batch/Dedicated Server：创建 `MiniBomberServerStartupComponent`，由它加载共享规则和地图，并在 `0.0.0.0:20000` 同时启动 KCP（UDP）与 WebSocket（TCP）监听。
+- `-serverPort <port>` 同时覆盖 KCP 与 WebSocket 的数值端口；UDP 与 TCP 可以使用相同端口号。
 - 旧 KCP 测试代码仍保留，但不再启动时自动打开 `KcpTestWindow`。
 
 客户端流程窗口的完成边界不是“场景句柄加载结束”，而是“场景加载、目标数据刷新和目标窗口进入 Active 全部完成”。`SceneLoadingWindow` 在此边界之后才关闭，因此登录窗口不会在大厅尚未可用时重新露出。创建房间同样先完成 RoomWindow 导航，再关闭发起操作的 Popup。
@@ -297,16 +298,17 @@ MiniBomber 是服务器权威状态同步，不是帧同步：
 
 ```text
 Mac mini M4
-├── macOS Dedicated Server        UDP 20000
+├── macOS Dedicated Server        UDP 20000（KCP）+ TCP 20000（WebSocket）
 └── HTTP 静态资源服务          TCP 8080
 
 Windows 笔记本                     Windows x86_64 Client
 Android 手机                         Android ARM64 Client
+浏览器                                WebGL Client
 ```
 
 1. 为 Mac mini 设置固定 IP 或路由器 DHCP 保留。
-2. macOS 防火墙允许 Server 接收 UDP `20000`，HTTP 服务侦听 TCP `8080`。
-3. Windows 和 Android 必须填 Mac mini 的局域网 IP，不能填 `127.0.0.1`。
+2. 防火墙或云安全组同时放行 UDP `20000`（KCP）与 TCP `20000`（WebSocket）；静态资源服务使用独立 HTTP/HTTPS 端口。
+3. 客户端不再手工填写地址；发布前在 `MiniBomberConstants` 中设置部署端点并重新构建对应 HotUpdate 资源。
 4. 先启动 Server，再启动两个 Client。
 
 服务器启动参数示例：
@@ -317,7 +319,7 @@ MiniBomberServer -batchmode -nographics -serverPort 20000 -logFile MiniBomberSer
 
 首次调试先使用 OfflinePlayMode，排除 HTTP 配置干扰；再将 Client `HotUpdateScene/UpdateMainWindow` 切到 HostPlayMode，填写指向 Mac mini 的主/备 URL。Server 若也需要在启动时取得新 HotUpdate DLL，将 `ServerBootstrapScene/ServerBootstrap` 的包模式同样改为 HostPlayMode。
 
-## 9. 三端构建
+## 9. 多端构建
 
 首次构建、切换平台、改变 Development Build 或修改 AOT/Unity 层代码时，每个平台都执行：
 
@@ -345,13 +347,21 @@ MiniBomberServer -batchmode -nographics -serverPort 20000 -logFile MiniBomberSer
 - Build Settings 以 `Assets/Scenes/HotUpdateScene.unity` 为第一启动场景。
 - 完成 HybridCLR 和 DefaultPackage 后构建 APK/AAB，手机与 Mac mini 位于同一局域网。
 
+### WebGL Client
+
+- 切换 WebGL 目标，Build Settings 以 `Assets/Scenes/HotUpdateScene.unity` 为第一启动场景。
+- 浏览器不能创建原生 TCP/UDP Socket，因此运行时能力选择会自动改用 WebSocket，不会尝试 KCP。
+- 当前固定地址使用 `ws://`，WebGL 页面必须通过 HTTP 提供；若页面通过 HTTPS 发布，必须在公网域名上配置可信证书和 WSS 反向代理，再把固定地址改为 `wss://`。
+- Dedicated Server 的 WebSocket 路径固定为 `/minibomber`，与 KCP 复用业务协议、Session、RPC 和 Handler。
+
 资源发布根目录按平台隔离：
 
 ```text
 ReleaseRoot
 ├── MacServer/DefaultPackage
 ├── Windows64/DefaultPackage
-└── Android/DefaultPackage
+├── Android/DefaultPackage
+└── WebGL/DefaultPackage
 ```
 
 YooAsset 是平台相关产物，Windows 和 Android 不得指向同一个包目录。完整通用流程见 [打包与热更新流程](../BuildAndHotUpdateWorkflow.md)。
@@ -405,6 +415,14 @@ Editor 回归测试位于 `Assets/Tests/Editor/Demos/MiniBomber`，当前覆盖�
 运行入口：Unity Test Runner 的 EditMode，筛选 `MiniCore.Tests.Editor.Demos.MiniBomber`。
 
 ## 13. 验证记录
+
+### 2026-08-12（WebGL 与原生端共用 Dedicated Server 接入）
+
+- 设计调整：登录窗口隐藏并停止绑定服务器地址、端口输入，客户端连接端点固定由 `MiniBomberConstants` 提供；恢复存档不再保存连接端点，原字段号永久保留而不复用。
+- 传输选择：原生 PC/Android 按能力使用 KCP，浏览器 WebGL 按能力使用 WebSocket；业务层不引入 `UNITY_WEBGL` 条件编译。
+- 服务端接入：同一 Dedicated Server 同时监听 UDP/KCP 与 TCP/WebSocket 的同一数值端口，二者复用协议注册、Session、RPC、Handler 和权威房间状态。
+- 部署约束：当前 `ws://` 只适合 HTTP 测试页面；HTTPS 页面必须改用具有可信域名证书的 WSS 入口。
+- 构建结果：Unity `2021.3.45f2` 隔离工程的协议生成、WebGL C#/IL2CPP、HybridCLR Generate All、DefaultPackage 与最终 WebGL Player 构建通过；未运行测试套件。
 
 ### 2026-08-06（Android 角色原生注册、多点操作、即时木箱与 HUD 性能信息）
 

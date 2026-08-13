@@ -60,9 +60,9 @@ namespace MiniCore.Demo.MiniBomber
         public bool IsInitialized => initialized;
 
         /// <summary>
-        /// 使用项目配置初始化服务器运行时并启动 KCP 监听。
+        /// 使用项目配置初始化服务器运行时，并在同一数值端口启动 KCP 与 WebSocket 监听。
         /// </summary>
-        /// <param name="runtimeConfig">连接、频率和资源地址配置；为空时使用计划默认值。</param>
+        /// <param name="runtimeConfig">连接、频率和资源地址配置。</param>
         /// <param name="ruleConfig">玩法规则配置；为空时使用计划默认值。</param>
         /// <param name="mapDefinition">17×13 地图配置；为空时创建内置测试地图。</param>
         /// <param name="host">监听地址。</param>
@@ -75,6 +75,11 @@ namespace MiniCore.Demo.MiniBomber
                 return;
             }
 
+            if (runtimeConfig == null)
+            {
+                throw new ArgumentNullException(nameof(runtimeConfig));
+            }
+
             ApplyConfiguration(runtimeConfig, ruleConfig, mapDefinition);
             int deltaIntervalTicks = Math.Max(1, serverTickRate / Math.Max(1, snapshotRate));
             int keyframeIntervalTicks = Math.Max(1, (serverTickRate * fullKeyframeIntervalMilliseconds + 999) / 1000);
@@ -83,11 +88,26 @@ namespace MiniCore.Demo.MiniBomber
             network.OnServerSessionClosed += HandleServerSessionClosed;
             accountRepository = AddComponent<MiniBomberAccountRepositoryComponent>();
             await accountRepository.InitializeAsync();
-            int port = portOverride > 0 ? portOverride : runtimeConfig != null ? runtimeConfig.ServerPort : MiniBomberConstants.DefaultServerPort;
-            await network.StartKcpServerAsync(string.IsNullOrWhiteSpace(host) ? "0.0.0.0" : host, port);
+            int port = portOverride > 0 ? portOverride : runtimeConfig.ServerPort;
+            string listenHost = string.IsNullOrWhiteSpace(host) ? "0.0.0.0" : host;
+            try
+            {
+                await network.StartKcpServerAsync(listenHost, port);
+                await network.StartWebSocketServerAsync(listenHost, port, new WebSocketServerConfig
+                {
+                    Path = MiniBomberConstants.WebSocketPath
+                });
+            }
+            catch
+            {
+                network.StopWebSocketServer();
+                network.StopKcpServer();
+                throw;
+            }
+
             previousUpdateTime = Global.Time.UnscaledTime;
             initialized = true;
-            LogSwitch.Info($"MiniBomber Dedicated Server 已就绪，KCP:{port} Tick:{serverTickRate}Hz Delta:{snapshotRate}Hz Workers:{roomWorkers.WorkerCount}。");
+            LogSwitch.Info($"MiniBomber Dedicated Server 已就绪，KCP(UDP):{port} WS(TCP):{port}{MiniBomberConstants.WebSocketPath} Tick:{serverTickRate}Hz Delta:{snapshotRate}Hz Workers:{roomWorkers.WorkerCount}。");
         }
 
         /// <summary>
@@ -550,6 +570,8 @@ namespace MiniCore.Demo.MiniBomber
             if (network != null)
             {
                 network.OnServerSessionClosed -= HandleServerSessionClosed;
+                network.StopWebSocketServer();
+                network.StopKcpServer();
             }
 
             roomWorkers?.Dispose();

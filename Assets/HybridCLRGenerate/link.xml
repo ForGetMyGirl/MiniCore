@@ -36,6 +36,7 @@
     <type fullname="MiniCore.Model.IRpcResponse" preserve="all" />
     <type fullname="MiniCore.Model.KcpServerConfig" preserve="all" />
     <type fullname="MiniCore.Model.KcpTransportConfig" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkCapabilities" preserve="all" />
     <type fullname="MiniCore.Model.NetworkIncomingQueueSnapshot" preserve="all" />
     <type fullname="MiniCore.Model.NetworkMessageRole" preserve="all" />
     <type fullname="MiniCore.Model.NetworkOutboundQueueSnapshot" preserve="all" />
@@ -43,9 +44,11 @@
     <type fullname="MiniCore.Model.NetworkProtocolRegistry" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSendResult" preserve="all" />
     <type fullname="MiniCore.Model.NetworkSession" preserve="all" />
+    <type fullname="MiniCore.Model.NetworkTransportKind" preserve="all" />
     <type fullname="MiniCore.Model.NetworkTransportReceiveSnapshot" preserve="all" />
     <type fullname="MiniCore.Model.NetworkTransportSendSnapshot" preserve="all" />
     <type fullname="MiniCore.Model.UdpServerConfig" preserve="all" />
+    <type fullname="MiniCore.Model.WebSocketServerConfig" preserve="all" />
     <type fullname="MiniCore.Service.INetworkService" preserve="all" />
     <type fullname="MiniCore.Service.NetworkService" preserve="all" />
   </assembly>
@@ -278,12 +281,9 @@
     <type fullname="System.Delegate" preserve="all" />
     <type fullname="System.Diagnostics.DebuggableAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggableAttribute/DebuggingModes" preserve="all" />
-    <type fullname="System.Diagnostics.DebuggerBrowsableAttribute" preserve="all" />
-    <type fullname="System.Diagnostics.DebuggerBrowsableState" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerDisplayAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerHiddenAttribute" preserve="all" />
     <type fullname="System.Diagnostics.DebuggerNonUserCodeAttribute" preserve="all" />
-    <type fullname="System.Diagnostics.DebuggerStepThroughAttribute" preserve="all" />
     <type fullname="System.Double" preserve="all" />
     <type fullname="System.Enum" preserve="all" />
     <type fullname="System.Environment" preserve="all" />

@@ -11,14 +11,6 @@ namespace MiniCore.Demo.MiniBomber
         #region UnityProperty Unity 引用属性
 
         /// <summary>
-        /// 服务器地址输入。
-        /// </summary>
-        public TMP_InputField HostInput;
-        /// <summary>
-        /// 服务器端口输入。
-        /// </summary>
-        public TMP_InputField PortInput;
-        /// <summary>
         /// 账号输入。
         /// </summary>
         public TMP_InputField AccountInput;

@@ -8,14 +8,14 @@ using UnityEngine;
 namespace MiniCore.Demo.MiniBomber
 {
     /// <summary>
-    /// MiniBomber Dedicated Server 的权威运行时、KCP 监听与跨进程冒烟装配入口。
+    /// MiniBomber Dedicated Server 的权威运行时、KCP/WebSocket 监听与跨进程冒烟装配入口。
     /// </summary>
     public sealed class MiniBomberServerStartupComponent : MiniBomberStartupComponentBase
     {
         #region Public 公共成员
 
         /// <summary>
-        /// 加载 MiniBomber 共享配置并启动命令行指定端口上的 KCP 权威服务器。
+        /// 加载 MiniBomber 共享配置并在命令行指定端口上启动 KCP 与 WebSocket 权威服务器。
         /// </summary>
         /// <returns>服务器运行时和监听初始化完成任务。</returns>
         public async MTask InitializeAsync()
@@ -24,7 +24,7 @@ namespace MiniCore.Demo.MiniBomber
             Application.targetFrameRate = 60;
             await LoadConfigurationAsync();
             serverRuntime = Global.GetOrAdd<MiniBomberServerRuntimeComponent>(this);
-            int serverPort = ReadServerPort();
+            int serverPort = ReadServerPort(RuntimeConfig.ServerPort);
             await serverRuntime.InitializeAsync(RuntimeConfig, RuleConfig, MapDefinition, "0.0.0.0", serverPort);
             ConfigureSmokeTestIfRequested(serverPort);
         }
@@ -40,7 +40,7 @@ namespace MiniCore.Demo.MiniBomber
         /// <summary>
         /// 在 Dedicated Server 冒烟模式下订阅业务事件并输出服务端就绪日志。
         /// </summary>
-        /// <param name="serverPort">当前 KCP 监听端口。</param>
+        /// <param name="serverPort">当前 KCP 与 WebSocket 监听使用的数值端口。</param>
         private void ConfigureSmokeTestIfRequested(int serverPort)
         {
             if (!NetworkSmokeTestRunner.HasCommandLineArgument(DedicatedServerSmokeTestArgument))
@@ -65,8 +65,9 @@ namespace MiniCore.Demo.MiniBomber
         /// <summary>
         /// 从命令行读取服务端监听端口。
         /// </summary>
-        /// <returns>合法端口；未指定或无效时返回 Demo 默认端口。</returns>
-        private static int ReadServerPort()
+        /// <param name="defaultPort">运行时配置指定的默认监听端口。</param>
+        /// <returns>合法命令行端口；未指定或无效时返回配置端口。</returns>
+        private static int ReadServerPort(int defaultPort)
         {
             string[] arguments = Environment.GetCommandLineArgs();
             for (int index = 0; index < arguments.Length - 1; index++)
@@ -79,7 +80,7 @@ namespace MiniCore.Demo.MiniBomber
                 }
             }
 
-            return MiniBomberConstants.DefaultServerPort;
+            return defaultPort;
         }
 
         #endregion

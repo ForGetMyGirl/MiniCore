@@ -2050,7 +2050,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1511989692814633307
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2909,7 +2909,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &60161874600936372
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3149,8 +3149,6 @@ MonoBehaviour:
   closeOnMaskClick: 0
   maxCacheCount: 1
   navigationGroup: Main
-  HostInput: {fileID: 6932680646908542758}
-  PortInput: {fileID: 8606374769598158821}
   AccountInput: {fileID: 8022190369670439220}
   PasswordInput: {fileID: 4148015114058061015}
   LoginButton: {fileID: 7013192957071765649}

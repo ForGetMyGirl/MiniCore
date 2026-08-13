@@ -14,6 +14,7 @@
     "com.unity.test-framework": "1.4.5",
     "com.unity.test-framework.performance": "3.0.2",
     "com.unity.textmeshpro": "3.0.9",
+    "com.unity.toolchain.macos-arm64-linux-x86_64": "2.0.5",
     "com.unity.xr.legacyinputhelpers": "2.1.11",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",

@@ -5,8 +5,7 @@ option csharp_namespace = "MiniCore.Protocol.Generated";
 
 // MiniBomber 客户端断线恢复信息。
 message MiniBomberSavedSessionData {
-  string host = 1;
-  int32 port = 2;
+  reserved 1, 2;
   int64 player_id = 3;
   string player_name = 4;
   string session_token = 5;

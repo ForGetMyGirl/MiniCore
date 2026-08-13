@@ -61,11 +61,12 @@ namespace MiniCore.Demo.MiniBomber
         {
             NetworkIncomingQueueSnapshot queue = network.GetIncomingQueueSnapshot();
             int rtt = 0;
-            network.TryGetTransportRttMs(MiniBomberConstants.DefaultSessionId, out rtt);
+            bool hasRtt = network.TryGetLastPingMs(MiniBomberConstants.DefaultSessionId, out rtt);
             int snapshotAge = battle.LastSnapshotReceiveTime <= 0d
                 ? 0
                 : Mathf.Max(0, Mathf.RoundToInt((float)((Global.Time.UnscaledTime - battle.LastSnapshotReceiveTime) * 1000d)));
-            View.DiagnosticsText.text = $"ServerTick: {battle.Snapshot?.ServerTick ?? 0}\nRTT: {rtt} ms\nSnapshotAge: {snapshotAge} ms\nQueued: {queue.PendingPacketCount}\nPeak: {queue.PeakPendingPacketCount}";
+            string rttText = hasRtt ? $"{rtt} ms" : "--";
+            View.DiagnosticsText.text = $"ServerTick: {battle.Snapshot?.ServerTick ?? 0}\nRTT: {rttText}\nSnapshotAge: {snapshotAge} ms\nQueued: {queue.PendingPacketCount}\nPeak: {queue.PeakPendingPacketCount}";
         }
 
         /// <summary>

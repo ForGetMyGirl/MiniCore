@@ -18,6 +18,9 @@
     <type fullname="UnityEngine.ParticleSystem" preserve="all" />
     <type fullname="UnityEngine.ParticleSystemRenderer" preserve="all" />
   </assembly>
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.BoxCollider" preserve="all" />
+  </assembly>
   <assembly fullname="Unity.InputSystem">
     <type fullname="UnityEngine.InputSystem.OnScreen.OnScreenButton" preserve="all" />
     <type fullname="UnityEngine.InputSystem.OnScreen.OnScreenStick" preserve="all" />

@@ -18,9 +18,9 @@ namespace MiniCore.Demo.MiniBomber
         public const int RuleVersion = 1;
 
         /// <summary>
-        /// 默认 KCP 端口。
+        /// WebSocket 服务在 Dedicated Server 上使用的固定路径。
         /// </summary>
-        public const int DefaultServerPort = 20000;
+        public const string WebSocketPath = "/minibomber";
 
         /// <summary>
         /// MiniBomber KCP 会话固定 Conv。

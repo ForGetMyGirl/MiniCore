@@ -134,7 +134,7 @@ namespace MiniCore.Service
         /// </summary>
         void ResetIncomingQueueMetrics();
         /// <summary>
-        /// 获取最近一次心跳往返耗时。
+        /// 获取适用于所有传输协议的最近一次应用层心跳往返耗时。
         /// </summary>
         /// <param name="sessionId">目标会话标识。</param>
         /// <param name="pingMs">往返毫秒数。</param>

@@ -15,9 +15,9 @@ namespace MiniCore.Core
         /// </summary>
         public long LastPingTicks;
         /// <summary>
-        /// 最近一次发出 Ping 的 Unix 毫秒时间戳。
+        /// 是否已经收到至少一条带有效时间戳的 Pong，使用 Volatile 读写。
         /// </summary>
-        public long LastPingSentTicks;
+        internal int HasRtt;
         /// <summary>
         /// 最近一次计算出的心跳往返耗时（毫秒）。
         /// </summary>

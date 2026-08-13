@@ -126,7 +126,7 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 每半秒计算平均渲染帧率并刷新 KCP 平滑往返延迟。
+        /// 每半秒计算平均渲染帧率并刷新跨传输统一的应用层心跳往返延迟。
         /// </summary>
         /// <returns>窗口释放或任务域取消后结束的刷新任务。</returns>
         private async MTask RefreshPerformanceLoopAsync()
@@ -149,7 +149,7 @@ namespace MiniCore.Demo.MiniBomber
                 lastPerformanceSampleTime = now;
 
                 int rttMilliseconds = 0;
-                bool hasRtt = network != null && network.TryGetTransportRttMs(MiniBomberConstants.DefaultSessionId, out rttMilliseconds);
+                bool hasRtt = network != null && network.TryGetLastPingMs(MiniBomberConstants.DefaultSessionId, out rttMilliseconds);
                 View.PerformanceText.text = hasRtt
                     ? $"FPS: {framesPerSecond:F2}\nRTT: {rttMilliseconds} ms"
                     : $"FPS: {framesPerSecond:F2}\nRTT: --";

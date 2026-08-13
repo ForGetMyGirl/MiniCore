@@ -11,6 +11,9 @@ namespace MiniCore.Demo.MiniBomber
         #region Private 私有成员
 
         [SerializeField, Min(1)] private int serverPort = 20000; // 默认 KCP 服务端端口。
+        [SerializeField] private string kcpServerHost = "game.namo.wang"; // 原生客户端连接的 KCP 公网域名。
+        [SerializeField, Min(1)] private int kcpServerPort = 20000; // 原生客户端连接的 KCP 公网端口。
+        [SerializeField] private string webSocketUrl = "wss://ws.namo.wang/minibomber"; // WebGL 客户端连接的完整 WSS 地址。
         [SerializeField, Min(1)] private int serverTickRate = 30; // 权威服务器逻辑频率。
         [SerializeField, Min(1)] private int inputSendRate = 30; // 客户端输入发送频率。
         [SerializeField, Min(1)] private int snapshotRate = 15; // 服务器世界快照频率。
@@ -35,6 +38,18 @@ namespace MiniCore.Demo.MiniBomber
         /// 获取 Dedicated Server 默认监听端口。
         /// </summary>
         public int ServerPort => serverPort;
+        /// <summary>
+        /// 获取原生客户端连接的 KCP 公网域名。
+        /// </summary>
+        public string KcpServerHost => kcpServerHost;
+        /// <summary>
+        /// 获取原生客户端连接的 KCP 公网端口。
+        /// </summary>
+        public int KcpServerPort => kcpServerPort;
+        /// <summary>
+        /// 获取 WebGL 客户端连接的完整 WebSocket 地址。
+        /// </summary>
+        public string WebSocketUrl => webSocketUrl;
         /// <summary>
         /// 获取服务器权威逻辑频率。
         /// </summary>

@@ -25,20 +25,20 @@ namespace MiniCore.Protocol.Generated {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CixEZW1vcy9NaW5pQm9tYmVyL01pbmlCb21iZXJQZXJzaXN0ZW5jZS5wcm90",
-            "bxIUbWluaWNvcmUucGVyc2lzdGVuY2UidwoaTWluaUJvbWJlclNhdmVkU2Vz",
-            "c2lvbkRhdGESDAoEaG9zdBgBIAEoCRIMCgRwb3J0GAIgASgFEhEKCXBsYXll",
-            "cl9pZBgDIAEoAxITCgtwbGF5ZXJfbmFtZRgEIAEoCRIVCg1zZXNzaW9uX3Rv",
-            "a2VuGAUgASgJIoQBChtNaW5pQm9tYmVyQWNjb3VudFJlY29yZERhdGESEQoJ",
-            "cGxheWVyX2lkGAEgASgDEg8KB2FjY291bnQYAiABKAkSEwoLcGxheWVyX25h",
-            "bWUYAyABKAkSFQoNcGFzc3dvcmRfc2FsdBgEIAEoCRIVCg1wYXNzd29yZF9o",
-            "YXNoGAUgASgJInwKHU1pbmlCb21iZXJBY2NvdW50RGF0YWJhc2VEYXRhEhYK",
-            "Dm5leHRfcGxheWVyX2lkGAEgASgDEkMKCGFjY291bnRzGAIgAygLMjEubWlu",
-            "aWNvcmUucGVyc2lzdGVuY2UuTWluaUJvbWJlckFjY291bnRSZWNvcmREYXRh",
-            "Qh6qAhtNaW5pQ29yZS5Qcm90b2NvbC5HZW5lcmF0ZWRiBnByb3RvMw=="));
+            "bxIUbWluaWNvcmUucGVyc2lzdGVuY2UiZwoaTWluaUJvbWJlclNhdmVkU2Vz",
+            "c2lvbkRhdGESEQoJcGxheWVyX2lkGAMgASgDEhMKC3BsYXllcl9uYW1lGAQg",
+            "ASgJEhUKDXNlc3Npb25fdG9rZW4YBSABKAlKBAgBEAJKBAgCEAMihAEKG01p",
+            "bmlCb21iZXJBY2NvdW50UmVjb3JkRGF0YRIRCglwbGF5ZXJfaWQYASABKAMS",
+            "DwoHYWNjb3VudBgCIAEoCRITCgtwbGF5ZXJfbmFtZRgDIAEoCRIVCg1wYXNz",
+            "d29yZF9zYWx0GAQgASgJEhUKDXBhc3N3b3JkX2hhc2gYBSABKAkifAodTWlu",
+            "aUJvbWJlckFjY291bnREYXRhYmFzZURhdGESFgoObmV4dF9wbGF5ZXJfaWQY",
+            "ASABKAMSQwoIYWNjb3VudHMYAiADKAsyMS5taW5pY29yZS5wZXJzaXN0ZW5j",
+            "ZS5NaW5pQm9tYmVyQWNjb3VudFJlY29yZERhdGFCHqoCG01pbmlDb3JlLlBy",
+            "b3RvY29sLkdlbmVyYXRlZGIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::MiniCore.Protocol.Generated.MiniBomberSavedSessionData), global::MiniCore.Protocol.Generated.MiniBomberSavedSessionData.Parser, new[]{ "Host", "Port", "PlayerId", "PlayerName", "SessionToken" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::MiniCore.Protocol.Generated.MiniBomberSavedSessionData), global::MiniCore.Protocol.Generated.MiniBomberSavedSessionData.Parser, new[]{ "PlayerId", "PlayerName", "SessionToken" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::MiniCore.Protocol.Generated.MiniBomberAccountRecordData), global::MiniCore.Protocol.Generated.MiniBomberAccountRecordData.Parser, new[]{ "PlayerId", "Account", "PlayerName", "PasswordSalt", "PasswordHash" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::MiniCore.Protocol.Generated.MiniBomberAccountDatabaseData), global::MiniCore.Protocol.Generated.MiniBomberAccountDatabaseData.Parser, new[]{ "NextPlayerId", "Accounts" }, null, null, null, null)
           }));
@@ -85,8 +85,6 @@ namespace MiniCore.Protocol.Generated {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public MiniBomberSavedSessionData(MiniBomberSavedSessionData other) : this() {
-      host_ = other.host_;
-      port_ = other.port_;
       playerId_ = other.playerId_;
       playerName_ = other.playerName_;
       sessionToken_ = other.sessionToken_;
@@ -97,30 +95,6 @@ namespace MiniCore.Protocol.Generated {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public MiniBomberSavedSessionData Clone() {
       return new MiniBomberSavedSessionData(this);
-    }
-
-    /// <summary>Field number for the "host" field.</summary>
-    public const int HostFieldNumber = 1;
-    private string host_ = "";
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Host {
-      get { return host_; }
-      set {
-        host_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
-    /// <summary>Field number for the "port" field.</summary>
-    public const int PortFieldNumber = 2;
-    private int port_;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public int Port {
-      get { return port_; }
-      set {
-        port_ = value;
-      }
     }
 
     /// <summary>Field number for the "player_id" field.</summary>
@@ -174,8 +148,6 @@ namespace MiniCore.Protocol.Generated {
       if (ReferenceEquals(other, this)) {
         return true;
       }
-      if (Host != other.Host) return false;
-      if (Port != other.Port) return false;
       if (PlayerId != other.PlayerId) return false;
       if (PlayerName != other.PlayerName) return false;
       if (SessionToken != other.SessionToken) return false;
@@ -186,8 +158,6 @@ namespace MiniCore.Protocol.Generated {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Host.Length != 0) hash ^= Host.GetHashCode();
-      if (Port != 0) hash ^= Port.GetHashCode();
       if (PlayerId != 0L) hash ^= PlayerId.GetHashCode();
       if (PlayerName.Length != 0) hash ^= PlayerName.GetHashCode();
       if (SessionToken.Length != 0) hash ^= SessionToken.GetHashCode();
@@ -209,14 +179,6 @@ namespace MiniCore.Protocol.Generated {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Host.Length != 0) {
-        output.WriteRawTag(10);
-        output.WriteString(Host);
-      }
-      if (Port != 0) {
-        output.WriteRawTag(16);
-        output.WriteInt32(Port);
-      }
       if (PlayerId != 0L) {
         output.WriteRawTag(24);
         output.WriteInt64(PlayerId);
@@ -239,14 +201,6 @@ namespace MiniCore.Protocol.Generated {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Host.Length != 0) {
-        output.WriteRawTag(10);
-        output.WriteString(Host);
-      }
-      if (Port != 0) {
-        output.WriteRawTag(16);
-        output.WriteInt32(Port);
-      }
       if (PlayerId != 0L) {
         output.WriteRawTag(24);
         output.WriteInt64(PlayerId);
@@ -269,12 +223,6 @@ namespace MiniCore.Protocol.Generated {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Host.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Host);
-      }
-      if (Port != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeInt32Size(Port);
-      }
       if (PlayerId != 0L) {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(PlayerId);
       }
@@ -295,12 +243,6 @@ namespace MiniCore.Protocol.Generated {
     public void MergeFrom(MiniBomberSavedSessionData other) {
       if (other == null) {
         return;
-      }
-      if (other.Host.Length != 0) {
-        Host = other.Host;
-      }
-      if (other.Port != 0) {
-        Port = other.Port;
       }
       if (other.PlayerId != 0L) {
         PlayerId = other.PlayerId;
@@ -330,14 +272,6 @@ namespace MiniCore.Protocol.Generated {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
-          case 10: {
-            Host = input.ReadString();
-            break;
-          }
-          case 16: {
-            Port = input.ReadInt32();
-            break;
-          }
           case 24: {
             PlayerId = input.ReadInt64();
             break;
@@ -369,14 +303,6 @@ namespace MiniCore.Protocol.Generated {
           default:
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
-          case 10: {
-            Host = input.ReadString();
-            break;
-          }
-          case 16: {
-            Port = input.ReadInt32();
-            break;
-          }
           case 24: {
             PlayerId = input.ReadInt64();
             break;

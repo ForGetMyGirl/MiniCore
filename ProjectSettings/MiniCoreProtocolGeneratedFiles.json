@@ -2,7 +2,7 @@
     "Version": 2,
     "Generator": "MiniCore.Protocol.ProtoCodeGenerator",
     "OutputDirectory": "Assets/Scripts/MiniCore/Protocol/Generated",
-    "SourceDigest": "ce7f1220c2e586a57f65da5a496677a2a84dd09fa58e9a154e73d4f6a664a0cd",
+    "SourceDigest": "83595703a73c93c49537c571530a680e949f5d3b13997bcf2dd167aa87e97d76",
     "Files": [
         "Assets/Scripts/MiniCore/Protocol/Generated/MiniBomber.ProtocolRegistration.g.cs",
         "Assets/Scripts/MiniCore/Protocol/Generated/MiniBomber.ProtocolRole.g.cs",

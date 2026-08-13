@@ -36,7 +36,7 @@ namespace MiniCore.Demo.MiniBomber
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
             await LoadConfigurationAsync();
             accountSession = Global.GetOrAdd<AccountSessionComponent>(this);
-            await accountSession.InitializeAsync();
+            await accountSession.InitializeAsync(RuntimeConfig);
             lobby = Global.GetOrAdd<LobbyComponent>(this);
             room = Global.GetOrAdd<RoomComponent>(this);
             battle = Global.GetOrAdd<BattleClientComponent>(this);

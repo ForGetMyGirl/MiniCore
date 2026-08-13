@@ -13,6 +13,9 @@ MonoBehaviour:
   m_Name: MiniBomberRuntimeConfig
   m_EditorClassIdentifier:
   serverPort: 20000
+  kcpServerHost: game.namo.wang
+  kcpServerPort: 20000
+  webSocketUrl: wss://ws.namo.wang/minibomber
   serverTickRate: 30
   inputSendRate: 30
   snapshotRate: 15

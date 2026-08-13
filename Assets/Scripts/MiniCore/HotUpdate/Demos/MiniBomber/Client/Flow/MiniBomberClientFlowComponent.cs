@@ -295,7 +295,7 @@ namespace MiniCore.Demo.MiniBomber
                     Message = $"连接中断，{ReconnectDelayMilliseconds[index] / 1000} 秒后进行第 {ReconnectAttempt} 次恢复";
                     Changed?.Invoke();
                     await MTask.Delay(ReconnectDelayMilliseconds[index]);
-                    bool connected = await account.ConnectAsync(account.Host, account.Port);
+                    bool connected = await account.ConnectAsync();
                     if (!connected)
                     {
                         continue;

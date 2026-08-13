@@ -20,6 +20,7 @@ namespace MiniCore.Demo.MiniBomber
 
         private INetworkService network; // 项目网络服务。
         private ISaveService saveService; // 客户端加密存档服务。
+        private MiniBomberRuntimeConfig runtimeConfig; // 当前客户端使用的服务器端点配置。
         private MiniBomberSavedSessionData savedSession; // 当前恢复会话的 Protobuf 持久化数据。
         private Action transportDisconnectedHandler; // 当前客户端传输断开回调。
 
@@ -58,63 +59,56 @@ namespace MiniCore.Demo.MiniBomber
         public string PlayerName => savedSession?.PlayerName ?? string.Empty;
 
         /// <summary>
-        /// 当前连接服务器地址。
+        /// 应用服务器端点配置、加载本地加密恢复会话并取得网络服务。
         /// </summary>
-        public string Host => savedSession?.Host ?? string.Empty;
-
-        /// <summary>
-        /// 当前连接服务器端口。
-        /// </summary>
-        public int Port => savedSession?.Port ?? MiniBomberConstants.DefaultServerPort;
-
-        /// <summary>
-        /// 加载本地加密恢复会话并取得网络服务。
-        /// </summary>
+        /// <param name="config">客户端连接使用的运行时配置。</param>
         /// <returns>初始化完成任务。</returns>
-        public async MTask InitializeAsync()
+        public async MTask InitializeAsync(MiniBomberRuntimeConfig config)
         {
+            ValidateRuntimeConfig(config);
+            runtimeConfig = config;
             network = Global.GetService<INetworkService>(this);
             saveService = Global.GetService<ISaveService>(this);
-            savedSession = await saveService.LoadProtobufAsync<MiniBomberSavedSessionData>(MiniBomberConstants.ClientSessionSlot) ?? new MiniBomberSavedSessionData
-            {
-                Host = "127.0.0.1",
-                Port = MiniBomberConstants.DefaultServerPort
-            };
+            savedSession = await saveService.LoadProtobufAsync<MiniBomberSavedSessionData>(MiniBomberConstants.ClientSessionSlot) ?? new MiniBomberSavedSessionData();
             network.DefaultSessionId = MiniBomberConstants.DefaultSessionId;
             Changed?.Invoke();
         }
 
         /// <summary>
-        /// 连接指定 MiniBomber KCP 服务器。
+        /// 按当前平台能力连接固定 MiniBomber 服务器；原生端使用 KCP，浏览器使用 WebSocket。
         /// </summary>
-        /// <param name="host">服务器地址。</param>
-        /// <param name="port">服务器端口。</param>
         /// <returns>握手和探测成功时返回 true。</returns>
-        public async MTask<bool> ConnectAsync(string host, int port)
+        public async MTask<bool> ConnectAsync()
         {
-            if (string.IsNullOrWhiteSpace(host) || port <= 0 || port > 65535)
-            {
-                return false;
-            }
-
-            string normalizedHost = host.Trim();
-            if (IsConnected && string.Equals(Host, normalizedHost, StringComparison.OrdinalIgnoreCase) && Port == port)
+            if (IsConnected)
             {
                 return true;
             }
 
-            if (IsConnected)
+            if (NetworkCapabilities.SupportsConnect(NetworkTransportKind.Kcp))
             {
-                UnbindTransport();
-                network.DisconnectSession(MiniBomberConstants.DefaultSessionId);
+                IsConnected = await network.ConnectKcpSessionAsync(
+                    MiniBomberConstants.DefaultSessionId,
+                    runtimeConfig.KcpServerHost,
+                    runtimeConfig.KcpServerPort,
+                    MiniBomberConstants.KcpConversation,
+                    TimeSpan.FromSeconds(5));
+            }
+            else if (NetworkCapabilities.SupportsConnect(NetworkTransportKind.WebSocket))
+            {
+                IsConnected = await network.ConnectWebSocketSessionAsync(
+                    MiniBomberConstants.DefaultSessionId,
+                    runtimeConfig.WebSocketUrl,
+                    TimeSpan.FromSeconds(5));
+            }
+            else
+            {
+                IsConnected = false;
             }
 
-            IsConnected = await network.ConnectKcpSessionAsync(MiniBomberConstants.DefaultSessionId, normalizedHost, port, MiniBomberConstants.KcpConversation, TimeSpan.FromSeconds(5));
             if (IsConnected)
             {
                 savedSession ??= new MiniBomberSavedSessionData();
-                savedSession.Host = normalizedHost;
-                savedSession.Port = port;
                 NetworkSession session = network.GetSession(MiniBomberConstants.DefaultSessionId);
                 if (session?.Transport != null)
                 {
@@ -211,14 +205,8 @@ namespace MiniCore.Demo.MiniBomber
         /// <returns>清理存档完成任务。</returns>
         public async MTask LogoutAsync()
         {
-            string previousHost = Host;
-            int previousPort = Port;
             UnbindTransport();
-            savedSession = new MiniBomberSavedSessionData
-            {
-                Host = previousHost,
-                Port = previousPort
-            };
+            savedSession = new MiniBomberSavedSessionData();
             if (network != null)
             {
                 network.DisconnectSession(MiniBomberConstants.DefaultSessionId);
@@ -252,6 +240,7 @@ namespace MiniCore.Demo.MiniBomber
             UnbindTransport();
             network = null;
             saveService = null;
+            runtimeConfig = null;
             savedSession = null;
             Global.ReleaseAll(this);
             base.OnDispose();
@@ -269,6 +258,35 @@ namespace MiniCore.Demo.MiniBomber
             if (!IsConnected || network == null)
             {
                 throw new InvalidOperationException("MiniBomber 客户端尚未连接服务器。");
+            }
+        }
+
+        /// <summary>
+        /// 验证客户端连接所需的 KCP 与 WebSocket 端点配置。
+        /// </summary>
+        /// <param name="config">待验证的运行时配置。</param>
+        private static void ValidateRuntimeConfig(MiniBomberRuntimeConfig config)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            if (string.IsNullOrWhiteSpace(config.KcpServerHost))
+            {
+                throw new ArgumentException("MiniBomber KCP 服务器域名不能为空。", nameof(config));
+            }
+
+            if (config.KcpServerPort <= 0 || config.KcpServerPort > 65535)
+            {
+                throw new ArgumentOutOfRangeException(nameof(config), "MiniBomber KCP 服务器端口必须位于 1 到 65535 之间。");
+            }
+
+            if (!Uri.TryCreate(config.WebSocketUrl, UriKind.Absolute, out Uri webSocketUri) ||
+                (!string.Equals(webSocketUri.Scheme, "ws", StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(webSocketUri.Scheme, "wss", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new ArgumentException("MiniBomber WebSocket 地址必须是有效的 ws:// 或 wss:// 绝对地址。", nameof(config));
             }
         }
 
