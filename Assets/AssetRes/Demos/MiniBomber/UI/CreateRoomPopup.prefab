@@ -341,7 +341,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 0}
   windowId: c5afe26cd0fc4a5aaf3f5849f6bdb35b
   routeName: CreateRoomPopup
-  logicTypeName: MiniCore.Demo.MiniBomber.CreateRoomPopupPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.CreateRoomPopupPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: CreateRoomPopup
   template: 2

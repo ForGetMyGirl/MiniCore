@@ -415,7 +415,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 0}
   windowId: 7787305bb60c41f3a281556bb473c1f7
   routeName: ReconnectOverlay
-  logicTypeName: MiniCore.Demo.MiniBomber.ReconnectOverlayPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.ReconnectOverlayPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: ReconnectOverlay
   template: 6

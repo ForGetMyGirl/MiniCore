@@ -103,7 +103,7 @@ namespace MiniCore.EditorTools.UI
             if (!File.Exists(Path.GetFullPath(UIAuthoringUtility.RegistryPath)) ||
                 !string.Equals(File.ReadAllText(Path.GetFullPath(UIAuthoringUtility.RegistryPath)), expectedRegistry, StringComparison.Ordinal))
             {
-                error = "UIWindowRegistry.Generated.cs 已过期，请执行 MiniCore/UI/Generate Window Registry。";
+                error = "ProjectUIWindowRegistration.Generated.cs 已过期，请执行 MiniCore/UI/Generate Window Registry。";
                 return false;
             }
 
@@ -428,24 +428,32 @@ namespace MiniCore.EditorTools.UI
         {
             StringBuilder builder = new StringBuilder(4096);
             builder.Append(GeneratedHeader);
-            builder.AppendLine("namespace MiniCore.UI");
+            builder.AppendLine("using MiniCore.UI;");
+            builder.AppendLine();
+            builder.AppendLine("namespace MiniCore.HotUpdate");
             builder.AppendLine("{");
             builder.AppendLine("    /// <summary>");
-            builder.AppendLine("    /// 当前项目窗口 View Authoring 自动生成的注册表部分。");
+            builder.AppendLine("    /// 将当前项目窗口定义显式注入 AOT UI Runtime。");
             builder.AppendLine("    /// </summary>");
-            builder.AppendLine("    public static partial class UIWindowRegistry");
+            builder.AppendLine("    public static class ProjectUIWindowRegistration");
             builder.AppendLine("    {");
-            builder.AppendLine("        #region Private 私有成员");
+            builder.AppendLine("        #region Public 公共成员");
             builder.AppendLine();
             builder.AppendLine("        /// <summary>");
             builder.AppendLine("        /// 登记当前项目中全部有效窗口。");
             builder.AppendLine("        /// </summary>");
-            builder.AppendLine("        static partial void RegisterGenerated()");
+            builder.AppendLine("        /// <param name=\"registry\">AOT UI Runtime 持有的项目注册表。</param>");
+            builder.AppendLine("        public static void Register(UIWindowRegistry registry)");
             builder.AppendLine("        {");
+            builder.AppendLine("            if (registry == null)");
+            builder.AppendLine("            {");
+            builder.AppendLine("                throw new global::System.ArgumentNullException(nameof(registry));");
+            builder.AppendLine("            }");
+            builder.AppendLine();
             for (int i = 0; i < windows.Count; i++)
             {
                 UIWindowGenerationInfo window = windows[i];
-                builder.AppendLine("            Register(new UIWindowDefinition(");
+                builder.AppendLine("            registry.Register(new UIWindowDefinition(");
                 builder.AppendLine($"                new UIWindowId({window.Id.High}UL, {window.Id.Low}UL),");
                 builder.AppendLine($"                typeof(global::MiniCore.HotUpdate.{window.RouteName}),");
                 builder.AppendLine($"                \"{Escape(window.RouteName)}\",");
@@ -466,6 +474,9 @@ namespace MiniCore.EditorTools.UI
 
             builder.AppendLine("        }");
             builder.AppendLine();
+            builder.AppendLine("        #endregion");
+            builder.AppendLine();
+            builder.AppendLine("        #region Private 私有成员");
             for (int i = 0; i < windows.Count; i++)
             {
                 UIWindowGenerationInfo window = windows[i];

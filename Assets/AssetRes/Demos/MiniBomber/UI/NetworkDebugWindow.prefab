@@ -239,7 +239,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 9079644312431210061}
   windowId: 8e19e3ccebaa485c9bd58b763edb7f8d
   routeName: NetworkDebugWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.NetworkDebugWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.NetworkDebugWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: NetworkDebugWindow
   template: 7

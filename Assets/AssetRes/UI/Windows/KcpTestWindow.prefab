@@ -2810,7 +2810,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 391303199964576546}
   windowId: de825d1d848b45f193a2fbb15432c4e9
   routeName: KcpTestWindow
-  logicTypeName: MiniCore.HotUpdate.KcpTestWindowPresenter, MiniCore.HotUpdate, Version=0.0.0.0,
+  logicTypeName: MiniCore.HotUpdate.KcpTestWindowPresenter, MiniCore.HotUpdate.Client, Version=0.0.0.0,
     Culture=neutral, PublicKeyToken=null
   assetAddress: KcpTestWindow
   template: 0

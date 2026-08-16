@@ -18,6 +18,15 @@ namespace MiniCore.EditorTools
         #region Internal 内部成员
 
         /// <summary>
+        /// 在命令行中只同步当前目标的 HybridCLR 程序集清单。
+        /// </summary>
+        public static void SynchronizeFromCommandLine()
+        {
+            EnsureConfigured();
+            UnityEngine.Debug.Log($"HybridCLR 当前目标清单已同步：{MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget}。");
+        }
+
+        /// <summary>
         /// 获取当前是否正在执行 HybridCLR 产物生成流程。
         /// </summary>
         internal static bool IsGeneratingArtifacts => artifactGenerationDepth > 0;
@@ -55,7 +64,7 @@ namespace MiniCore.EditorTools
                 throw new InvalidOperationException(error);
             }
 
-            MiniCoreHotUpdateAssemblyEntry[] entries = projectSettings.GetEntriesInLoadOrder();
+            MiniCoreHotUpdateAssemblyEntry[] entries = projectSettings.GetEntriesInLoadOrder(MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget);
             string[] assemblyNames = new string[entries.Length];
             for (int index = 0; index < entries.Length; index++)
             {

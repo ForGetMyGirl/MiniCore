@@ -6,7 +6,9 @@
     "MiniCore.HotUpdateAssembly.Editor",
     "MiniCore.Runtime",
     "MiniCore.Network",
-    "MiniCore.HotUpdate"
+    "MiniCore.HotUpdate.Shared",
+    "MiniCore.HotUpdate.Client",
+    "MiniCore.HotUpdate.Server"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

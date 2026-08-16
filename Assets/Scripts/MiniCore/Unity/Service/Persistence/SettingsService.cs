@@ -11,7 +11,7 @@ namespace MiniCore.Service
     /// <summary>
     /// 将客户端偏好设置保存到独立加密槽位的应用服务。
     /// </summary>
-    [AppService("客户端设置", typeof(ISettingsService), Description = "加载、保存并通知客户端偏好设置的变化。", RequiresServices = new[] { typeof(ISaveService) })]
+    [AppService("客户端设置", typeof(ISettingsService), Description = "加载、保存并通知客户端偏好设置的变化。", RequiresServices = new[] { typeof(ISaveService) }, RuntimeTargets = AppServiceRuntimeTargets.Client)]
     public sealed class SettingsService : AAppService, ISettingsService, IAsyncAppService
     {
         #region Private 私有成员

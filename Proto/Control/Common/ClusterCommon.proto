@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package minicore.cluster.common;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+enum ClusterServiceKind {
+  CLUSTER_SERVICE_UNSPECIFIED = 0;
+  CLUSTER_SERVICE_COORDINATOR = 1;
+  CLUSTER_SERVICE_LOBBY = 2;
+  CLUSTER_SERVICE_MATCH = 3;
+  CLUSTER_SERVICE_GAME = 4;
+  CLUSTER_SERVICE_DATABASE = 5;
+}
+
+enum ClusterServiceState {
+  CLUSTER_SERVICE_STATE_UNSPECIFIED = 0;
+  CLUSTER_SERVICE_STARTING = 1;
+  CLUSTER_SERVICE_READY = 2;
+  CLUSTER_SERVICE_DRAINING = 3;
+}
+
+message ClusterServiceEndpoint {
+  string instance_id = 1;
+  ClusterServiceKind service_kind = 2;
+  string inner_host = 3;
+  int32 inner_port = 4;
+  string outer_web_socket_url = 5;
+  ClusterServiceState state = 6;
+  int64 directory_revision = 7;
+}

@@ -16,7 +16,7 @@ namespace MiniCore.Service
     /// <summary>
     /// 使用 UnityWebRequest 实现的 HTTP 应用服务。
     /// </summary>
-    [AppService("HTTP", typeof(IHttpService), Description = "基于 UnityWebRequest 发送 HTTP 请求，并支持超时和重试。", InitArgsType = typeof(HttpServiceInitArgs))]
+    [AppService("HTTP", typeof(IHttpService), Description = "基于 UnityWebRequest 发送 HTTP 请求，并支持超时和重试。", InitArgsType = typeof(HttpServiceInitArgs), RuntimeTargets = AppServiceRuntimeTargets.Client)]
     public sealed class UnityWebRequestHttpService : AAppService, IHttpService
     {
         #region Private 私有成员

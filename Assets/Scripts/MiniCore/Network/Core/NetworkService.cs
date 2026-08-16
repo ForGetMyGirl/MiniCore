@@ -13,7 +13,12 @@ namespace MiniCore.Service
     /// <summary>
     /// 网络消息中枢，负责多会话的发包、收包、RPC、心跳和处理器派发。
     /// </summary>
-    [AppService("网络", typeof(INetworkService), Description = "管理多会话的收发包、RPC、心跳和消息处理器派发。")]
+    [AppService(
+        "网络",
+        typeof(INetworkService),
+        Description = "管理多会话的收发包、RPC、心跳和消息处理器派发。",
+        RuntimeTargets = AppServiceRuntimeTargets.All,
+        RequiredInDedicatedServer = true)]
     public class NetworkService : AAppService, INetworkService
     {
         #region Private 私有成员
@@ -31,14 +36,14 @@ namespace MiniCore.Service
         private readonly Dictionary<string, NetworkHeartbeatState> heartbeatStates = new Dictionary<string, NetworkHeartbeatState>(); // 各会话心跳状态。
         private const int IncomingDataMaximumPacketCount = 4096; // 全局普通收包队列固定槽位数量。
         private const int IncomingDataMaximumByteCount = 4 * 1024 * 1024; // 全局普通收包队列有效字节上限。
-        private const int IncomingControlMaximumPacketCount = 256; // Ping/Pong 与 RPC 收包的保留槽位数量；本机回环的 64 并发 RPC 请求与响应可同时短暂积压。
-        private const int IncomingControlMaximumByteCount = 64 * 1024; // Ping/Pong 与 RPC 收包的保留字节上限。
+        private const int IncomingControlMaximumPacketCount = 256; // Ping/Pong 与已匹配 RPC 响应的保留槽位数量。
+        private const int IncomingControlMaximumByteCount = 64 * 1024; // Ping/Pong 与已匹配 RPC 响应的保留字节上限。
         private const int IncomingSessionMaximumPacketCount = 1024; // 单会话全部收包最大数量。
         private const int IncomingSessionMaximumByteCount = 1024 * 1024; // 单会话全部收包最大有效字节数。
         private static readonly long IncomingCongestionDisconnectTicks = Stopwatch.Frequency * 3L; // 单会话持续三秒满载后断开的阈值。
         private readonly object incomingQueueLock = new object(); // 同步全局预算、会话预算和两条固定队列。
         private readonly FixedCapacityPacketQueue<NetworkIncomingPacket> incomingDataPackets = new FixedCapacityPacketQueue<NetworkIncomingPacket>(IncomingDataMaximumPacketCount, IncomingDataMaximumByteCount); // 普通业务收包环形队列。
-        private readonly FixedCapacityPacketQueue<NetworkIncomingPacket> incomingControlPackets = new FixedCapacityPacketQueue<NetworkIncomingPacket>(IncomingControlMaximumPacketCount, IncomingControlMaximumByteCount); // 心跳与 RPC 收包保留队列。
+        private readonly FixedCapacityPacketQueue<NetworkIncomingPacket> incomingControlPackets = new FixedCapacityPacketQueue<NetworkIncomingPacket>(IncomingControlMaximumPacketCount, IncomingControlMaximumByteCount); // 心跳与已匹配 RPC 响应的独立处理队列。
         private readonly Dictionary<string, IncomingSessionBudget> incomingSessionBudgets = new Dictionary<string, IncomingSessionBudget>(); // 各会话当前占用与持续满载时刻。
         private long incomingPacketCount; // 当前等待主线程处理的数据包数量。
         private long incomingPacketBytes; // 当前等待主线程处理的数据总字节数。
@@ -54,7 +59,8 @@ namespace MiniCore.Service
         private readonly NetworkTimingHistogram incomingPacketProcessHistogram = new NetworkTimingHistogram(); // 仅压测启用的主线程单包处理百分位时间桶。
         private long incomingControlRejectedPacketCount; // 统计周期内控制保留入站队列或单会话预算拒绝的包数量。
         private long incomingDataRejectedPacketCount; // 统计周期内普通数据入站队列或单会话预算拒绝的包数量。
-        private int processingQueue; // 收包队列处理任务的互斥标志。
+        private int processingControlQueue; // 心跳与已匹配 RPC 响应处理任务的互斥标志。
+        private int processingDataQueue; // 普通消息与 RPC 请求处理任务的互斥标志。
         private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2); // 连接探测的默认超时。
 
         private class PendingRpc
@@ -114,15 +120,11 @@ namespace MiniCore.Service
         /// <summary>
         /// 客户端发送心跳或服务端检查心跳的间隔。
         /// </summary>
-        public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);
+        public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(2);
         /// <summary>
         /// 判定连接心跳超时的时长。
         /// </summary>
-        public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(15);
-        /// <summary>
-        /// 未指定取消令牌时使用的 RPC 超时时长。
-        /// </summary>
-        public TimeSpan RpcTimeout { get; set; } = TimeSpan.FromSeconds(10);
+        public TimeSpan HeartbeatTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// 服务端创建逻辑会话后触发。
@@ -708,17 +710,17 @@ namespace MiniCore.Service
         /// </summary>
         protected override void Update()
         {
-            if (!HasIncomingPackets())
+            if (HasIncomingPackets(incomingControlPackets)
+                && Interlocked.CompareExchange(ref processingControlQueue, 1, 0) == 0)
             {
-                return;
+                ProcessControlQueueAsync().Forget();
             }
 
-            if (Interlocked.CompareExchange(ref processingQueue, 1, 0) != 0)
+            if (HasIncomingPackets(incomingDataPackets)
+                && Interlocked.CompareExchange(ref processingDataQueue, 1, 0) == 0)
             {
-                return;
+                ProcessDataQueueAsync().Forget();
             }
-
-            ProcessQueueAsync().Forget();
         }
 
         #endregion
@@ -777,25 +779,36 @@ namespace MiniCore.Service
         /// <summary>
         /// 通过默认会话发送 RPC 请求并等待对应响应。
         /// </summary>
-        /// <param name="request">执行该方法所需的 request 参数。</param>
+        /// <typeparam name="TRequest">RPC 请求类型。</typeparam>
+        /// <typeparam name="TResponse">RPC 响应类型。</typeparam>
+        /// <param name="request">需要发送的 RPC 请求。</param>
+        /// <param name="timeoutSeconds">当前调用等待响应的秒数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public MTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request)
+        public MTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request, int timeoutSeconds = 10)
             where TRequest : IRpcRequest
             where TResponse : IRpcResponse
         {
-            return CallAsync<TRequest, TResponse>(DefaultSessionId, request);
+            return CallAsync<TRequest, TResponse>(DefaultSessionId, request, timeoutSeconds);
         }
 
         /// <summary>
         /// 通过指定会话发送 RPC 请求并等待对应响应。
         /// </summary>
-        /// <param name="sessionId">执行该方法所需的 sessionId 参数。</param>
-        /// <param name="request">执行该方法所需的 request 参数。</param>
+        /// <typeparam name="TRequest">RPC 请求类型。</typeparam>
+        /// <typeparam name="TResponse">RPC 响应类型。</typeparam>
+        /// <param name="sessionId">目标逻辑会话标识。</param>
+        /// <param name="request">需要发送的 RPC 请求。</param>
+        /// <param name="timeoutSeconds">当前调用等待响应的秒数。</param>
         /// <returns>执行处理后的结果。</returns>
-        public async MTask<TResponse> CallAsync<TRequest, TResponse>(string sessionId, TRequest request)
+        public async MTask<TResponse> CallAsync<TRequest, TResponse>(string sessionId, TRequest request, int timeoutSeconds = 10)
             where TRequest : IRpcRequest
             where TResponse : IRpcResponse
         {
+            if (timeoutSeconds <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), timeoutSeconds, "RPC 超时秒数必须大于零。");
+            }
+
             if (!TryGetSession(sessionId, out var session))
             {
                 return CreateLocalErrorResponse<TResponse>($"Session {sessionId} not found.");
@@ -823,10 +836,7 @@ namespace MiniCore.Service
             }
 
             using var linkedCts = new CancellationTokenSource();
-            if (RpcTimeout > TimeSpan.Zero)
-            {
-                linkedCts.CancelAfter(RpcTimeout);
-            }
+            linkedCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
             using var registration = linkedCts.Token.Register(() =>
             {
                 if (TryRemovePendingRpc(rpcId, out var pending))
@@ -1788,7 +1798,7 @@ namespace MiniCore.Service
 
             int length = data.Length;
             bool disconnectForCongestion = false;
-            bool isControlPacket = IsIncomingControlPacket(data);
+            bool isControlPacket = IsIncomingControlPacket(session, data);
             lock (incomingQueueLock)
             {
                 IncomingSessionBudget budget = GetOrCreateIncomingBudget(session.SessionId);
@@ -1850,45 +1860,71 @@ namespace MiniCore.Service
         }
 
         /// <summary>
-        /// 执行 ProcessQueueAsync 相关处理。
+        /// 处理心跳与已匹配 RPC 响应；该通道不等待普通业务处理器结束。
         /// </summary>
-        /// <returns>执行处理后的结果。</returns>
-        private async MTask ProcessQueueAsync()
+        /// <returns>当前控制响应批次处理任务。</returns>
+        private async MTask ProcessControlQueueAsync()
         {
-            long updateStartedTicks = Stopwatch.GetTimestamp();
-            int processedThisUpdate = 0;
             try
             {
-                while (TryDequeueIncomingPacket(out NetworkIncomingPacket packet))
-                {
-                    RecordIncomingQueueWait(packet.EnqueuedTicks);
-                    long startedTicks = Stopwatch.GetTimestamp();
-                    try
-                    {
-                        await HandleIncoming(packet.Session, new ReadOnlyMemory<byte>(packet.Buffer, 0, packet.Length));
-                    }
-                    finally
-                    {
-                        long elapsedTicks = Stopwatch.GetTimestamp() - startedTicks;
-                        Interlocked.Increment(ref processedIncomingPacketCount);
-                        UpdateMaximum(ref maxIncomingPacketProcessTicks, elapsedTicks);
-                        if (Volatile.Read(ref incomingTimingMetricsEnabled) != 0)
-                        {
-                            incomingPacketProcessHistogram.Record(elapsedTicks);
-                        }
-                        ByteBufferPool.Shared.Return(packet.Buffer);
-                    }
-
-                    processedThisUpdate++;
-                    if (ShouldYieldIncomingProcessing(processedThisUpdate, updateStartedTicks))
-                    {
-                        break;
-                    }
-                }
+                await ProcessQueueAsync(incomingControlPackets);
             }
             finally
             {
-                Interlocked.Exchange(ref processingQueue, 0);
+                Interlocked.Exchange(ref processingControlQueue, 0);
+            }
+        }
+
+        /// <summary>
+        /// 串行处理普通消息与 RPC 请求，保持现有业务状态修改顺序。
+        /// </summary>
+        /// <returns>当前普通业务批次处理任务。</returns>
+        private async MTask ProcessDataQueueAsync()
+        {
+            try
+            {
+                await ProcessQueueAsync(incomingDataPackets);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref processingDataQueue, 0);
+            }
+        }
+
+        /// <summary>
+        /// 在单次主循环预算内处理指定入站队列。
+        /// </summary>
+        /// <param name="queue">当前独占消费的入站队列。</param>
+        /// <returns>当前队列批次处理任务。</returns>
+        private async MTask ProcessQueueAsync(FixedCapacityPacketQueue<NetworkIncomingPacket> queue)
+        {
+            long updateStartedTicks = Stopwatch.GetTimestamp();
+            int processedThisUpdate = 0;
+            while (TryDequeueIncomingPacket(queue, out NetworkIncomingPacket packet))
+            {
+                RecordIncomingQueueWait(packet.EnqueuedTicks);
+                long startedTicks = Stopwatch.GetTimestamp();
+                try
+                {
+                    await HandleIncoming(packet.Session, new ReadOnlyMemory<byte>(packet.Buffer, 0, packet.Length));
+                }
+                finally
+                {
+                    long elapsedTicks = Stopwatch.GetTimestamp() - startedTicks;
+                    Interlocked.Increment(ref processedIncomingPacketCount);
+                    UpdateMaximum(ref maxIncomingPacketProcessTicks, elapsedTicks);
+                    if (Volatile.Read(ref incomingTimingMetricsEnabled) != 0)
+                    {
+                        incomingPacketProcessHistogram.Record(elapsedTicks);
+                    }
+                    ByteBufferPool.Shared.Return(packet.Buffer);
+                }
+
+                processedThisUpdate++;
+                if (ShouldYieldIncomingProcessing(processedThisUpdate, updateStartedTicks))
+                {
+                    break;
+                }
             }
         }
 
@@ -1986,27 +2022,31 @@ namespace MiniCore.Service
         }
 
         /// <summary>
-        /// 判断两条入站固定队列中是否仍有待主线程处理的数据包。
+        /// 判断指定入站固定队列中是否仍有待主线程处理的数据包。
         /// </summary>
+        /// <param name="queue">需要检查的入站队列。</param>
         /// <returns>存在待处理数据包时返回 true。</returns>
-        private bool HasIncomingPackets()
+        private bool HasIncomingPackets(FixedCapacityPacketQueue<NetworkIncomingPacket> queue)
         {
             lock (incomingQueueLock)
             {
-                return Interlocked.Read(ref incomingPacketCount) > 0;
+                return queue.TryPeek(out _, out _);
             }
         }
 
         /// <summary>
-        /// 优先从控制队列取包，再从普通业务队列取包，并同步回收全局与会话预算。
+        /// 从指定入站队列取包，并同步回收全局与会话预算。
         /// </summary>
+        /// <param name="queue">当前独占消费的入站队列。</param>
         /// <param name="packet">成功时返回需要在主线程处理的数据包。</param>
         /// <returns>存在可处理数据包时返回 true。</returns>
-        private bool TryDequeueIncomingPacket(out NetworkIncomingPacket packet)
+        private bool TryDequeueIncomingPacket(
+            FixedCapacityPacketQueue<NetworkIncomingPacket> queue,
+            out NetworkIncomingPacket packet)
         {
             lock (incomingQueueLock)
             {
-                if (!incomingControlPackets.TryDequeue(out packet, out _) && !incomingDataPackets.TryDequeue(out packet, out _))
+                if (!queue.TryDequeue(out packet, out _))
                 {
                     packet = default;
                     return false;
@@ -2030,11 +2070,12 @@ namespace MiniCore.Service
         }
 
         /// <summary>
-        /// 判断当前入站包是否应进入心跳与 RPC 的保留控制队列。
+        /// 判断当前入站包是否应进入不会被业务处理器阻塞的控制响应队列。
         /// </summary>
+        /// <param name="session">收到当前包的逻辑会话。</param>
         /// <param name="data">完整业务包数据。</param>
-        /// <returns>Ping、Pong 或带 RPC 标识的数据包时返回 true。</returns>
-        private bool IsIncomingControlPacket(ReadOnlyMemory<byte> data)
+        /// <returns>Ping、Pong 或已登记待完成 RPC 的匹配响应时返回 true。</returns>
+        private bool IsIncomingControlPacket(NetworkSession session, ReadOnlyMemory<byte> data)
         {
             if (data.Length < 12)
             {
@@ -2047,7 +2088,18 @@ namespace MiniCore.Service
                 return true;
             }
 
-            return NetBinaryCodec.ReadInt64BE(data.Span, 4) != 0;
+            long rpcId = NetBinaryCodec.ReadInt64BE(data.Span, 4);
+            if (rpcId == 0 || session == null)
+            {
+                return false;
+            }
+
+            lock (pendingRpcLock)
+            {
+                return pendingRpcs.TryGetValue(rpcId, out PendingRpc pending)
+                    && string.Equals(pending.SessionId, session.SessionId, StringComparison.Ordinal)
+                    && pending.ResponseOpcode == opcode;
+            }
         }
 
         /// <summary>

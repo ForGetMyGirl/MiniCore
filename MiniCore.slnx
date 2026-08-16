@@ -1,13 +1,22 @@
 ﻿<Solution>
   <Project Path="MiniCore.Network.csproj" />
   <Project Path="MiniCore.Runtime.csproj" />
-  <Project Path="MiniCore.HotUpdate.csproj" />
-  <Project Path="MiniCore.Protocol.csproj" />
+  <Project Path="MiniCore.HotUpdate.Client.csproj" />
   <Project Path="MiniCore.Unity.csproj" />
   <Project Path="MiniCore.Serialization.csproj" />
+  <Project Path="MiniCore.Protocol.Control.csproj" />
+  <Project Path="MiniCore.Server.csproj" />
+  <Project Path="MiniCore.Unity.YooAsset.csproj" />
+  <Project Path="MiniCore.Protocol.Outer.csproj" />
+  <Project Path="MiniCore.HotUpdate.Server.csproj" />
+  <Project Path="MiniCore.HotUpdate.Shared.csproj" />
   <Project Path="Project.Bootstrap.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="MiniCore.Protocol.Inner.csproj" />
   <Project Path="MiniCore.UI.PlayModeTests.csproj" />
+  <Project Path="MiniCore.Development.Network.csproj" />
+  <Project Path="MiniCore.Protocol.Common.csproj" />
+  <Project Path="MiniCore.Protocol.Control.Inner.csproj" />
   <Project Path="MiniCore.Protocol.Editor.csproj" />
   <Project Path="MiniCore.EditorTests.csproj" />
   <Project Path="MiniCore.Editor.csproj" />

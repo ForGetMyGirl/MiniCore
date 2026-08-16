@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package minicore.database.inner;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+message PlayerDataDto {
+  int64 player_id = 1;
+  string player_name = 2;
+  int64 revision = 3;
+  bytes payload = 4;
+}
+
+//[IRpcRequest]
+message LoadPlayerDataRequest {
+  int64 player_id = 1;
+}
+
+//[IRpcResponse]
+message LoadPlayerDataResponse {
+  int32 code = 1;
+  string msg = 2;
+  PlayerDataDto player = 3;
+}
+
+//[IRpcRequest]
+message SavePlayerDataRequest {
+  PlayerDataDto player = 1;
+  int64 expected_revision = 2;
+}
+
+//[IRpcResponse]
+message SavePlayerDataResponse {
+  int32 code = 1;
+  string msg = 2;
+  int64 revision = 3;
+}

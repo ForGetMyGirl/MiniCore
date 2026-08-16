@@ -1,28 +1,29 @@
 using System;
-using System.Collections.Generic;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
 using MiniCore.Serialization;
 using MiniCore.Threading;
-using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
-
     /// <summary>
-    /// MiniBomber 客户端连接、登录与断线恢复状态组件。
+    /// MiniBomber 客户端认证、Coordinator 发现、Lobby 直连与断线恢复组件。
     /// </summary>
     public sealed class AccountSessionComponent : AComponent
     {
         #region Private 私有成员
 
-        private INetworkService network; // 项目网络服务。
+        private const string CoordinatorSessionId = "MiniBomber.Coordinator"; // 临时 Coordinator 会话。
+        private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5); // 服务连接探测超时。
+        private INetworkService network; // 可选网络服务。
+        private IHttpService http; // 可选 HTTP 认证服务。
         private ISaveService saveService; // 客户端加密存档服务。
-        private MiniBomberRuntimeConfig runtimeConfig; // 当前客户端使用的服务器端点配置。
-        private MiniBomberSavedSessionData savedSession; // 当前恢复会话的 Protobuf 持久化数据。
-        private Action transportDisconnectedHandler; // 当前客户端传输断开回调。
+        private MiniBomberClientNetworkProfile profile; // MiniBomber 客户端独有网络配置。
+        private MiniBomberSavedSessionData savedSession; // 当前认证会话。
+        private string lobbyWebSocketUrl; // 本次认证流程动态发现的 Lobby 地址。
+        private Action transportDisconnectedHandler; // 当前 Lobby 传输断开回调。
 
         #endregion
 
@@ -34,81 +35,264 @@ namespace MiniCore.Demo.MiniBomber
         public event Action Changed;
 
         /// <summary>
-        /// 底层客户端传输断开事件。
+        /// 底层 Lobby 传输断开事件。
         /// </summary>
         public event Action Disconnected;
 
         /// <summary>
-        /// 当前网络是否已经建立连接。
+        /// 获取当前是否已经直连 Lobby。
         /// </summary>
         public bool IsConnected { get; private set; }
 
         /// <summary>
-        /// 当前是否已经通过服务器认证。
+        /// 获取当前是否持有认证服务器签发的会话。
         /// </summary>
         public bool IsAuthenticated => savedSession != null && savedSession.PlayerId > 0 && !string.IsNullOrEmpty(savedSession.SessionToken);
 
         /// <summary>
-        /// 当前玩家身份。
+        /// 获取当前玩家标识。
         /// </summary>
         public long PlayerId => savedSession?.PlayerId ?? 0;
 
         /// <summary>
-        /// 当前玩家显示名。
+        /// 获取当前玩家显示名。
         /// </summary>
         public string PlayerName => savedSession?.PlayerName ?? string.Empty;
 
         /// <summary>
-        /// 应用服务器端点配置、加载本地加密恢复会话并取得网络服务。
+        /// 应用 MiniBomber 客户端业务配置并取得所需可选服务。
         /// </summary>
-        /// <param name="config">客户端连接使用的运行时配置。</param>
-        /// <returns>初始化完成任务。</returns>
-        public async MTask InitializeAsync(MiniBomberRuntimeConfig config)
+        /// <param name="networkProfile">只包含认证入口的客户端业务配置。</param>
+        /// <returns>本地会话加载完成任务。</returns>
+        public async MTask InitializeAsync(MiniBomberClientNetworkProfile networkProfile)
         {
-            ValidateRuntimeConfig(config);
-            runtimeConfig = config;
+            profile = networkProfile ?? throw new ArgumentNullException(nameof(networkProfile));
+            if (!profile.EnableNetwork)
+            {
+                return;
+            }
+
             network = Global.GetService<INetworkService>(this);
             saveService = Global.GetService<ISaveService>(this);
+            if (profile.EnableAuthentication)
+            {
+                http = Global.GetService<IHttpService>(this);
+                ValidateAuthenticationBaseUrl(profile.AuthenticationBaseUrl);
+            }
+
             savedSession = await saveService.LoadProtobufAsync<MiniBomberSavedSessionData>(MiniBomberConstants.ClientSessionSlot) ?? new MiniBomberSavedSessionData();
             network.DefaultSessionId = MiniBomberConstants.DefaultSessionId;
             Changed?.Invoke();
         }
 
         /// <summary>
-        /// 按当前平台能力连接固定 MiniBomber 服务器；原生端使用 KCP，浏览器使用 WebSocket。
+        /// 为登录前 UI 检查 MiniBomber 是否允许联网；已发现 Lobby 时执行真正重连。
         /// </summary>
-        /// <returns>握手和探测成功时返回 true。</returns>
+        /// <returns>允许继续认证或 Lobby 重连成功时返回 true。</returns>
         public async MTask<bool> ConnectAsync()
         {
-            if (IsConnected)
+            if (profile == null || !profile.EnableNetwork || network == null)
             {
-                return true;
+                return false;
             }
 
-            if (NetworkCapabilities.SupportsConnect(NetworkTransportKind.Kcp))
+            if (string.IsNullOrWhiteSpace(lobbyWebSocketUrl))
             {
-                IsConnected = await network.ConnectKcpSessionAsync(
-                    MiniBomberConstants.DefaultSessionId,
-                    runtimeConfig.KcpServerHost,
-                    runtimeConfig.KcpServerPort,
-                    MiniBomberConstants.KcpConversation,
-                    TimeSpan.FromSeconds(5));
-            }
-            else if (NetworkCapabilities.SupportsConnect(NetworkTransportKind.WebSocket))
-            {
-                IsConnected = await network.ConnectWebSocketSessionAsync(
-                    MiniBomberConstants.DefaultSessionId,
-                    runtimeConfig.WebSocketUrl,
-                    TimeSpan.FromSeconds(5));
-            }
-            else
-            {
-                IsConnected = false;
+                return profile.EnableAuthentication && http != null;
             }
 
+            return await ConnectLobbyAsync(lobbyWebSocketUrl);
+        }
+
+        /// <summary>
+        /// 通过独立认证服务器注册新账号。
+        /// </summary>
+        public async MTask<AuthenticationRegisterResponse> RegisterAsync(string account, string password, string playerName)
+        {
+            EnsureAuthenticationEnabled();
+            AuthenticationRegisterResponse result = await http.SendJsonAsync<AuthenticationRegisterRequest, AuthenticationRegisterResponse>(
+                BuildAuthenticationUrl("/api/auth/register"),
+                new AuthenticationRegisterRequest
+                {
+                    Account = account ?? string.Empty,
+                    Password = password ?? string.Empty,
+                    PlayerName = playerName ?? string.Empty
+                });
+            return new AuthenticationRegisterResponse
+            {
+                Code = result?.Code ?? 500,
+                Msg = result?.Msg ?? "认证服务器没有返回注册结果"
+            };
+        }
+
+        /// <summary>
+        /// 通过认证服务器登录，再通过 Coordinator 发现并直连 Lobby。
+        /// </summary>
+        public async MTask<MiniBomberResumeSessionResponse> LoginAsync(string account, string password)
+        {
+            EnsureAuthenticationEnabled();
+            AuthenticationLoginResponse result = await http.SendJsonAsync<AuthenticationLoginRequest, AuthenticationLoginResponse>(
+                BuildAuthenticationUrl("/api/auth/login"),
+                new AuthenticationLoginRequest
+                {
+                    Account = account ?? string.Empty,
+                    Password = password ?? string.Empty
+                });
+            if (result == null || result.Code != 0)
+            {
+                return new MiniBomberResumeSessionResponse
+                {
+                    Code = result?.Code ?? 500,
+                    Msg = result?.Msg ?? "认证服务器没有返回登录结果"
+                };
+            }
+
+            string lobbyUrl = await ResolveLobbyAsync(result.CoordinatorWebSocketUrl);
+            if (!await ConnectLobbyAsync(lobbyUrl))
+            {
+                return new MiniBomberResumeSessionResponse { Code = 503, Msg = "认证成功，但无法连接 Lobby" };
+            }
+
+            savedSession = new MiniBomberSavedSessionData
+            {
+                PlayerId = result.AccountId,
+                PlayerName = result.PlayerName ?? string.Empty,
+                SessionToken = result.SessionToken ?? string.Empty
+            };
+            lobbyWebSocketUrl = lobbyUrl;
+            await saveService.SaveProtobufAsync(MiniBomberConstants.ClientSessionSlot, savedSession);
+
+            MiniBomberResumeSessionResponse lobbyResponse = await ResumeAsync();
+            Changed?.Invoke();
+            return lobbyResponse;
+        }
+
+        /// <summary>
+        /// 使用认证令牌恢复当前 Lobby 业务会话。
+        /// </summary>
+        public async MTask<MiniBomberResumeSessionResponse> ResumeAsync()
+        {
+            if (!IsAuthenticated || !IsConnected)
+            {
+                return new MiniBomberResumeSessionResponse
+                {
+                    Code = MiniBomberErrorCode.SessionExpired,
+                    Msg = "没有可恢复的 Lobby 会话"
+                };
+            }
+
+            MiniBomberResumeSessionResponse response = await network.CallAsync<MiniBomberResumeSessionRequest, MiniBomberResumeSessionResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberResumeSessionRequest
+            {
+                PlayerId = savedSession.PlayerId,
+                SessionToken = savedSession.SessionToken,
+                Version = CreateVersionInfo(),
+                PlayerName = savedSession.PlayerName
+            });
+            if (response.Code == MiniBomberErrorCode.Success && response.Player != null)
+            {
+                savedSession.PlayerName = response.Player.PlayerName;
+                await saveService.SaveProtobufAsync(MiniBomberConstants.ClientSessionSlot, savedSession);
+            }
+
+            Changed?.Invoke();
+            return response;
+        }
+
+        /// <summary>
+        /// 清除本地认证信息并断开当前 Lobby。
+        /// </summary>
+        public async MTask LogoutAsync()
+        {
+            UnbindTransport();
+            savedSession = new MiniBomberSavedSessionData();
+            lobbyWebSocketUrl = null;
+            network?.DisconnectSession(MiniBomberConstants.DefaultSessionId);
+            IsConnected = false;
+            if (saveService != null)
+            {
+                await saveService.SaveProtobufAsync(MiniBomberConstants.ClientSessionSlot, savedSession);
+            }
+
+            Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// 标记底层 Lobby 连接已经断开。
+        /// </summary>
+        public void MarkDisconnected()
+        {
+            IsConnected = false;
+            Changed?.Invoke();
+        }
+
+        #endregion
+
+        #region Override 重写实现
+
+        /// <summary>
+        /// 释放服务引用和事件订阅。
+        /// </summary>
+        protected override void OnDispose()
+        {
+            Changed = null;
+            Disconnected = null;
+            UnbindTransport();
+            network = null;
+            http = null;
+            saveService = null;
+            profile = null;
+            savedSession = null;
+            lobbyWebSocketUrl = null;
+            Global.ReleaseAll(this);
+            base.OnDispose();
+        }
+
+        #endregion
+
+        #region Private 私有成员
+
+        /// <summary>
+        /// 连接认证响应下发的 Coordinator 并解析一个 Ready Lobby。
+        /// </summary>
+        private async MTask<string> ResolveLobbyAsync(string coordinatorWebSocketUrl)
+        {
+            ValidateWebSocketUrl(coordinatorWebSocketUrl, "CoordinatorWebSocketUrl");
+            bool connected = await network.ConnectWebSocketSessionAsync(CoordinatorSessionId, coordinatorWebSocketUrl, ConnectTimeout);
+            if (!connected)
+            {
+                throw new InvalidOperationException("无法连接认证服务器下发的 Coordinator。");
+            }
+
+            try
+            {
+                ResolveServiceResponse response = await network.CallAsync<ResolveServiceRequest, ResolveServiceResponse>(CoordinatorSessionId, new ResolveServiceRequest
+                {
+                    ServiceKind = (ClusterServiceKind)(int)ServiceKind.Lobby
+                }, timeoutSeconds: 8);
+                if (response.Code != 0 || response.Endpoint == null)
+                {
+                    throw new InvalidOperationException($"Coordinator 没有返回可用 Lobby：{response.Msg}");
+                }
+
+                ValidateWebSocketUrl(response.Endpoint.OuterWebSocketUrl, "LobbyWebSocketUrl");
+                return response.Endpoint.OuterWebSocketUrl;
+            }
+            finally
+            {
+                network.DisconnectSession(CoordinatorSessionId);
+            }
+        }
+
+        /// <summary>
+        /// 建立 Lobby WebSocket 会话并绑定断开通知。
+        /// </summary>
+        private async MTask<bool> ConnectLobbyAsync(string url)
+        {
+            UnbindTransport();
+            network.DisconnectSession(MiniBomberConstants.DefaultSessionId);
+            IsConnected = await network.ConnectWebSocketSessionAsync(MiniBomberConstants.DefaultSessionId, url, ConnectTimeout);
             if (IsConnected)
             {
-                savedSession ??= new MiniBomberSavedSessionData();
                 NetworkSession session = network.GetSession(MiniBomberConstants.DefaultSessionId);
                 if (session?.Transport != null)
                 {
@@ -122,191 +306,66 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 请求服务器注册新账号。
+        /// 确认当前业务选择了 HTTP 认证实现。
         /// </summary>
-        /// <param name="account">登录账号。</param>
-        /// <param name="password">密码。</param>
-        /// <param name="playerName">唯一玩家名。</param>
-        /// <returns>服务器注册响应。</returns>
-        public MTask<MiniBomberRegisterResponse> RegisterAsync(string account, string password, string playerName)
+        private void EnsureAuthenticationEnabled()
         {
-            EnsureConnected();
-            return network.CallAsync<MiniBomberRegisterRequest, MiniBomberRegisterResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberRegisterRequest
+            if (profile == null || !profile.EnableNetwork || !profile.EnableAuthentication || http == null)
             {
-                Account = account ?? string.Empty,
-                Password = password ?? string.Empty,
-                PlayerName = playerName ?? string.Empty,
-                Version = CreateVersionInfo()
-            });
-        }
-
-        /// <summary>
-        /// 登录服务器并加密保存恢复令牌。
-        /// </summary>
-        /// <param name="account">登录账号。</param>
-        /// <param name="password">密码。</param>
-        /// <returns>服务器登录响应。</returns>
-        public async MTask<MiniBomberLoginResponse> LoginAsync(string account, string password)
-        {
-            EnsureConnected();
-            MiniBomberLoginResponse response = await network.CallAsync<MiniBomberLoginRequest, MiniBomberLoginResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberLoginRequest
-            {
-                Account = account ?? string.Empty,
-                Password = password ?? string.Empty,
-                Version = CreateVersionInfo()
-            });
-            if (response.Code == MiniBomberErrorCode.Success && response.Player != null)
-            {
-                savedSession.PlayerId = response.Player.PlayerId;
-                savedSession.PlayerName = response.Player.PlayerName;
-                savedSession.SessionToken = response.SessionToken;
-                await saveService.SaveProtobufAsync(MiniBomberConstants.ClientSessionSlot, savedSession);
-                Changed?.Invoke();
-            }
-
-            return response;
-        }
-
-        /// <summary>
-        /// 使用本地令牌恢复服务器会话。
-        /// </summary>
-        /// <returns>服务器恢复响应；无令牌时返回会话过期响应。</returns>
-        public async MTask<MiniBomberResumeSessionResponse> ResumeAsync()
-        {
-            if (!IsAuthenticated)
-            {
-                return new MiniBomberResumeSessionResponse
-                {
-                    Code = MiniBomberErrorCode.SessionExpired,
-                    Msg = "没有可恢复的登录会话"
-                };
-            }
-
-            EnsureConnected();
-            MiniBomberResumeSessionResponse response = await network.CallAsync<MiniBomberResumeSessionRequest, MiniBomberResumeSessionResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberResumeSessionRequest
-            {
-                PlayerId = savedSession.PlayerId,
-                SessionToken = savedSession.SessionToken,
-                Version = CreateVersionInfo()
-            });
-            if (response.Code == MiniBomberErrorCode.Success && response.Player != null)
-            {
-                savedSession.PlayerName = response.Player.PlayerName;
-                await saveService.SaveProtobufAsync(MiniBomberConstants.ClientSessionSlot, savedSession);
-            }
-
-            Changed?.Invoke();
-            return response;
-        }
-
-        /// <summary>
-        /// 清除本地认证信息并断开当前连接。
-        /// </summary>
-        /// <returns>清理存档完成任务。</returns>
-        public async MTask LogoutAsync()
-        {
-            UnbindTransport();
-            savedSession = new MiniBomberSavedSessionData();
-            if (network != null)
-            {
-                network.DisconnectSession(MiniBomberConstants.DefaultSessionId);
-            }
-
-            IsConnected = false;
-            await saveService.SaveProtobufAsync(MiniBomberConstants.ClientSessionSlot, savedSession);
-            Changed?.Invoke();
-        }
-
-        /// <summary>
-        /// 标记底层连接已经断开，供重连流程调用。
-        /// </summary>
-        public void MarkDisconnected()
-        {
-            IsConnected = false;
-            Changed?.Invoke();
-        }
-
-        #endregion
-
-        #region Override 重写实现
-
-        /// <summary>
-        /// 释放服务引用和事件订阅者。
-        /// </summary>
-        protected override void OnDispose()
-        {
-            Changed = null;
-            Disconnected = null;
-            UnbindTransport();
-            network = null;
-            saveService = null;
-            runtimeConfig = null;
-            savedSession = null;
-            Global.ReleaseAll(this);
-            base.OnDispose();
-        }
-
-        #endregion
-
-        #region Private 私有成员
-
-        /// <summary>
-        /// 确认客户端已经连接服务器。
-        /// </summary>
-        private void EnsureConnected()
-        {
-            if (!IsConnected || network == null)
-            {
-                throw new InvalidOperationException("MiniBomber 客户端尚未连接服务器。");
+                throw new InvalidOperationException("MiniBomber 当前没有启用 HTTP 认证业务。");
             }
         }
 
         /// <summary>
-        /// 验证客户端连接所需的 KCP 与 WebSocket 端点配置。
+        /// 拼接认证服务器 API 绝对地址。
         /// </summary>
-        /// <param name="config">待验证的运行时配置。</param>
-        private static void ValidateRuntimeConfig(MiniBomberRuntimeConfig config)
+        private string BuildAuthenticationUrl(string path)
         {
-            if (config == null)
-            {
-                throw new ArgumentNullException(nameof(config));
-            }
+            return profile.AuthenticationBaseUrl.TrimEnd('/') + path;
+        }
 
-            if (string.IsNullOrWhiteSpace(config.KcpServerHost))
+        /// <summary>
+        /// 验证认证地址使用 HTTP 或 HTTPS 绝对地址。
+        /// </summary>
+        private static void ValidateAuthenticationBaseUrl(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ||
+                (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)))
             {
-                throw new ArgumentException("MiniBomber KCP 服务器域名不能为空。", nameof(config));
-            }
-
-            if (config.KcpServerPort <= 0 || config.KcpServerPort > 65535)
-            {
-                throw new ArgumentOutOfRangeException(nameof(config), "MiniBomber KCP 服务器端口必须位于 1 到 65535 之间。");
-            }
-
-            if (!Uri.TryCreate(config.WebSocketUrl, UriKind.Absolute, out Uri webSocketUri) ||
-                (!string.Equals(webSocketUri.Scheme, "ws", StringComparison.OrdinalIgnoreCase) &&
-                 !string.Equals(webSocketUri.Scheme, "wss", StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new ArgumentException("MiniBomber WebSocket 地址必须是有效的 ws:// 或 wss:// 绝对地址。", nameof(config));
+                throw new ArgumentException("MiniBomber AuthenticationBaseUrl 必须是 HTTP 或 HTTPS 绝对地址。", nameof(url));
             }
         }
 
         /// <summary>
-        /// 创建登录和恢复共用的版本握手。
+        /// 验证动态发现地址使用 WebSocket 协议。
         /// </summary>
-        /// <returns>当前客户端版本信息。</returns>
+        private static void ValidateWebSocketUrl(string url, string field)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ||
+                (!string.Equals(uri.Scheme, "ws", StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(uri.Scheme, "wss", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException($"{field} 不是有效的 ws:// 或 wss:// 地址。");
+            }
+        }
+
+        /// <summary>
+        /// 创建 Lobby 会话恢复使用的客户端版本信息。
+        /// </summary>
         private static MiniBomberVersionInfo CreateVersionInfo()
         {
             return new MiniBomberVersionInfo
             {
-                BuildVersion = Application.version,
+                BuildVersion = UnityEngine.Application.version,
                 ProtocolVersion = MiniBomberConstants.ProtocolVersion,
                 RuleVersion = MiniBomberConstants.RuleVersion,
-                ContentVersion = Application.version
+                ContentVersion = UnityEngine.Application.version
             };
         }
 
         /// <summary>
-        /// 将底层传输断开转为客户端流程事件。
+        /// 将 Lobby 传输断开转为业务事件。
         /// </summary>
         private void NotifyTransportDisconnected()
         {
@@ -315,7 +374,7 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 解除当前客户端传输断开监听。
+        /// 解除当前 Lobby 传输断开监听。
         /// </summary>
         private void UnbindTransport()
         {

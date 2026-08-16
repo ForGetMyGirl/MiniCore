@@ -55,7 +55,7 @@ namespace MiniCore.EditorTools.UI
         /// <summary>
         /// 自动生成注册表文件路径。
         /// </summary>
-        public const string RegistryPath = "Assets/Scripts/MiniCore/HotUpdate/UI/Generated/UIWindowRegistry.Generated.cs";
+        public const string RegistryPath = "Assets/Scripts/MiniCore/HotUpdate/UI/Generated/ProjectUIWindowRegistration.Generated.cs";
 
         /// <summary>
         /// 自动生成路由文件路径。

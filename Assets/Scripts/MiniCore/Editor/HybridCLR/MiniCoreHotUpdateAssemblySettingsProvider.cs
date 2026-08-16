@@ -40,11 +40,13 @@ namespace MiniCore.EditorTools
             MiniCoreHotUpdateAssemblySettings settings = MiniCoreHotUpdateAssemblySettings.Current;
             var serializedSettings = new SerializedObject(settings);
             SerializedProperty entries = serializedSettings.FindProperty("entries");
+            SerializedProperty includeClient = serializedSettings.FindProperty("includeClientAssembliesInDedicatedServer");
 
             EditorGUILayout.LabelField("热更新程序集", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "清单是 HybridCLR 编译、YooAsset DLL 地址和 Bootstrap 加载顺序的唯一来源。LoadOrder 必须保证依赖程序集先加载，并且只能有一个启动程序集。",
+                "清单是 HybridCLR 编译、YooAsset DLL 地址和 Bootstrap 加载顺序的唯一来源。客户端与 Dedicated Server 各有自己的启动入口和程序集过滤结果。",
                 MessageType.Info);
+            EditorGUILayout.PropertyField(includeClient, new GUIContent("DS 额外包含 Client", "仅在确实需要客户端 UI 或工具代码时启用；默认关闭。"));
             EditorGUILayout.PropertyField(entries, true);
             if (serializedSettings.ApplyModifiedProperties())
             {

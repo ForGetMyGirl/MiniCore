@@ -154,7 +154,7 @@ namespace MiniCore.Demo.MiniBomber
             {
                 PlayerId = account.PlayerId,
                 RoomId = Current?.RoomId ?? 0
-            });
+            }, timeoutSeconds: 15);
         }
 
         /// <summary>

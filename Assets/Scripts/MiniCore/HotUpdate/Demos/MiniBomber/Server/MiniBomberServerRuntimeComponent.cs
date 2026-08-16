@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
+using MiniCore.Server;
 using MiniCore.Threading;
 using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
     /// <summary>
-    /// MiniBomber Dedicated Server 的账号、房间和权威战斗运行时。
+    /// MiniBomber Dedicated Server 的大厅、房间和权威战斗运行时。
     /// </summary>
     public sealed class MiniBomberServerRuntimeComponent : AComponent
     {
@@ -27,7 +27,7 @@ namespace MiniCore.Demo.MiniBomber
         private readonly List<long> cleanupPlayerIds = new List<long>(8); // 断线宽限清理复用列表。
         private readonly List<long> cleanupMatchIds = new List<long>(8); // 已结束比赛清理复用列表。
         private INetworkService network; // 项目网络服务。
-        private MiniBomberAccountRepositoryComponent accountRepository; // 账号持久化组件。
+        private MiniBomberDatabaseComponent database; // 可选 DatabaseServer 业务直连组件。
         private MiniBomberBattleMap battleMap; // 当前服务器使用的只读地图。
         private MiniBomberBattleRules battleRules; // 当前服务器使用的权威规则。
         private MiniBomberRoomWorkerPool roomWorkers; // 固定数量且由 Demo 自行持有的房间工作池。
@@ -60,15 +60,18 @@ namespace MiniCore.Demo.MiniBomber
         public bool IsInitialized => initialized;
 
         /// <summary>
-        /// 使用项目配置初始化服务器运行时，并在同一数值端口启动 KCP 与 WebSocket 监听。
+        /// 使用项目配置初始化服务器业务运行时；框架服务发现已在此前启动内外网监听。
         /// </summary>
-        /// <param name="runtimeConfig">连接、频率和资源地址配置。</param>
+        /// <param name="runtimeConfig">频率和资源地址配置。</param>
         /// <param name="ruleConfig">玩法规则配置；为空时使用计划默认值。</param>
         /// <param name="mapDefinition">17×13 地图配置；为空时创建内置测试地图。</param>
-        /// <param name="host">监听地址。</param>
-        /// <param name="portOverride">大于零时覆盖配置端口。</param>
-        /// <returns>账号仓储和网络监听完成初始化的任务。</returns>
-        public async MTask InitializeAsync(MiniBomberRuntimeConfig runtimeConfig, MiniBomberRuleConfig ruleConfig, BomberMapDefinition mapDefinition, string host, int portOverride = 0)
+        /// <param name="persistenceMode">当前部署副本选择的持久化模式。</param>
+        /// <returns>业务内存状态初始化完成任务。</returns>
+        public async MTask InitializeAsync(
+            MiniBomberRuntimeConfig runtimeConfig,
+            MiniBomberRuleConfig ruleConfig,
+            BomberMapDefinition mapDefinition,
+            ServerPersistenceMode persistenceMode)
         {
             if (initialized)
             {
@@ -86,78 +89,15 @@ namespace MiniCore.Demo.MiniBomber
             roomWorkers = new MiniBomberRoomWorkerPool(roomWorkerCount, roomWorkerInputQueueCapacity, roomWorkerOutputQueueCapacity, deltaIntervalTicks, keyframeIntervalTicks);
             network = Global.GetService<INetworkService>(this);
             network.OnServerSessionClosed += HandleServerSessionClosed;
-            accountRepository = AddComponent<MiniBomberAccountRepositoryComponent>();
-            await accountRepository.InitializeAsync();
-            int port = portOverride > 0 ? portOverride : runtimeConfig.ServerPort;
-            string listenHost = string.IsNullOrWhiteSpace(host) ? "0.0.0.0" : host;
-            try
+            if (persistenceMode == ServerPersistenceMode.Database)
             {
-                await network.StartKcpServerAsync(listenHost, port);
-                await network.StartWebSocketServerAsync(listenHost, port, new WebSocketServerConfig
-                {
-                    Path = MiniBomberConstants.WebSocketPath
-                });
-            }
-            catch
-            {
-                network.StopWebSocketServer();
-                network.StopKcpServer();
-                throw;
+                database = AddComponent<MiniBomberDatabaseComponent>();
+                await database.InitializeAsync();
             }
 
             previousUpdateTime = Global.Time.UnscaledTime;
             initialized = true;
-            LogSwitch.Info($"MiniBomber Dedicated Server 已就绪，KCP(UDP):{port} WS(TCP):{port}{MiniBomberConstants.WebSocketPath} Tick:{serverTickRate}Hz Delta:{snapshotRate}Hz Workers:{roomWorkers.WorkerCount}。");
-        }
-
-        /// <summary>
-        /// 注册新账号；注册成功后仍停留在登录界面。
-        /// </summary>
-        /// <param name="session">请求网络会话。</param>
-        /// <param name="request">注册请求。</param>
-        /// <param name="response">待填写响应。</param>
-        /// <returns>持久化完成任务。</returns>
-        public async MTask RegisterAsync(NetworkSession session, MiniBomberRegisterRequest request, MiniBomberRegisterResponse response)
-        {
-            if (!ValidateVersion(request?.Version, out string versionMessage))
-            {
-                SetError(response, MiniBomberErrorCode.VersionMismatch, versionMessage);
-                return;
-            }
-
-            MiniBomberRegisterResult result = await accountRepository.RegisterAsync(request.Account, request.Password, request.PlayerName);
-            response.Code = result.Code;
-            response.Msg = result.Message;
-        }
-
-        /// <summary>
-        /// 验证账号密码并建立可恢复服务器会话。
-        /// </summary>
-        /// <param name="session">请求网络会话。</param>
-        /// <param name="request">登录请求。</param>
-        /// <param name="response">待填写响应。</param>
-        public void Login(NetworkSession session, MiniBomberLoginRequest request, MiniBomberLoginResponse response)
-        {
-            if (!ValidateVersion(request?.Version, out string versionMessage))
-            {
-                SetError(response, MiniBomberErrorCode.VersionMismatch, versionMessage);
-                return;
-            }
-
-            if (!accountRepository.TryAuthenticate(request.Account, request.Password, out MiniBomberAccountRecord account))
-            {
-                SetError(response, MiniBomberErrorCode.InvalidCredentials, "账号或密码错误");
-                return;
-            }
-
-            MiniBomberServerPlayerSession player = BindAuthenticatedSession(session.SessionId, account, CreateSessionToken());
-            response.Code = MiniBomberErrorCode.Success;
-            response.Msg = "登录成功";
-            response.Player = CreateProfile(player);
-            response.SessionToken = player.SessionToken;
-            response.RoomId = player.RoomId;
-            response.MatchId = player.MatchId;
-            response.Destination = ResolveDestination(player);
+            LogSwitch.Info($"MiniBomber 业务运行时已初始化，Roles:{DedicatedServerRuntimeContext.ActiveRoles} Tick:{serverTickRate}Hz Delta:{snapshotRate}Hz Workers:{roomWorkers.WorkerCount}。");
         }
 
         /// <summary>
@@ -166,7 +106,7 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="session">新网络会话。</param>
         /// <param name="request">恢复请求。</param>
         /// <param name="response">待填写响应。</param>
-        public void ResumeSession(NetworkSession session, MiniBomberResumeSessionRequest request, MiniBomberResumeSessionResponse response)
+        public async MTask ResumeSessionAsync(NetworkSession session, MiniBomberResumeSessionRequest request, MiniBomberResumeSessionResponse response)
         {
             if (!ValidateVersion(request?.Version, out string versionMessage))
             {
@@ -174,15 +114,43 @@ namespace MiniCore.Demo.MiniBomber
                 return;
             }
 
-            if (!playerById.TryGetValue(request.PlayerId, out MiniBomberServerPlayerSession player) ||
-                !FixedTimeTokenEquals(player.SessionToken, request.SessionToken) ||
-                (!player.IsOnline && Global.Time.UnscaledTime > player.ReconnectDeadline))
+            if (request.PlayerId <= 0 || string.IsNullOrWhiteSpace(request.SessionToken))
             {
                 SetError(response, MiniBomberErrorCode.SessionExpired, "登录会话已过期，请重新登录");
                 return;
             }
 
-            RebindNetworkSession(player, session.SessionId);
+            if (database != null)
+            {
+                LoadPlayerDataResponse databaseResponse = await database.LoadOrCreateAsync(request.PlayerId, request.PlayerName);
+                if (databaseResponse.Code != 0)
+                {
+                    SetError(response, databaseResponse.Code, databaseResponse.Msg);
+                    return;
+                }
+
+                if (databaseResponse.Player != null && !string.IsNullOrWhiteSpace(databaseResponse.Player.PlayerName))
+                {
+                    request.PlayerName = databaseResponse.Player.PlayerName;
+                }
+            }
+
+            if (!playerById.TryGetValue(request.PlayerId, out MiniBomberServerPlayerSession player))
+            {
+                player = BindAuthenticatedSession(session.SessionId, request.PlayerId, request.PlayerName, request.SessionToken);
+            }
+            else
+            {
+                if (!FixedTimeTokenEquals(player.SessionToken, request.SessionToken) ||
+                    (!player.IsOnline && Global.Time.UnscaledTime > player.ReconnectDeadline))
+                {
+                    SetError(response, MiniBomberErrorCode.SessionExpired, "登录会话已过期，请重新登录");
+                    return;
+                }
+
+                RebindNetworkSession(player, session.SessionId);
+            }
+
             response.Code = MiniBomberErrorCode.Success;
             response.Msg = "已恢复连接";
             response.Player = CreateProfile(player);
@@ -570,8 +538,6 @@ namespace MiniCore.Demo.MiniBomber
             if (network != null)
             {
                 network.OnServerSessionClosed -= HandleServerSessionClosed;
-                network.StopWebSocketServer();
-                network.StopKcpServer();
             }
 
             roomWorkers?.Dispose();
@@ -583,7 +549,7 @@ namespace MiniCore.Demo.MiniBomber
             cleanupPlayerIds.Clear();
             cleanupMatchIds.Clear();
             network = null;
-            accountRepository = null;
+            database = null;
             battleMap = null;
             battleRules = null;
             roomWorkers = null;
@@ -698,20 +664,21 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 将账号绑定到当前网络连接，并替换同账号旧连接。
+        /// 将认证服务器签发的玩家身份绑定到当前网络连接，并替换旧连接。
         /// </summary>
         /// <param name="networkSessionId">新网络会话标识。</param>
-        /// <param name="account">账号记录。</param>
+        /// <param name="playerId">认证服务器签发的玩家标识。</param>
+        /// <param name="playerName">认证服务器返回的玩家显示名。</param>
         /// <param name="sessionToken">新恢复令牌。</param>
         /// <returns>绑定后的玩家会话。</returns>
-        private MiniBomberServerPlayerSession BindAuthenticatedSession(string networkSessionId, MiniBomberAccountRecord account, string sessionToken)
+        private MiniBomberServerPlayerSession BindAuthenticatedSession(string networkSessionId, long playerId, string playerName, string sessionToken)
         {
-            if (!playerById.TryGetValue(account.PlayerId, out MiniBomberServerPlayerSession player))
+            if (!playerById.TryGetValue(playerId, out MiniBomberServerPlayerSession player))
             {
                 player = new MiniBomberServerPlayerSession
                 {
-                    PlayerId = account.PlayerId,
-                    PlayerName = account.PlayerName
+                    PlayerId = playerId,
+                    PlayerName = string.IsNullOrWhiteSpace(playerName) ? $"Player{playerId}" : playerName
                 };
                 playerById.Add(player.PlayerId, player);
             }
@@ -1401,21 +1368,6 @@ namespace MiniCore.Demo.MiniBomber
         private static bool IsDurationAllowed(int seconds)
         {
             return seconds == 120 || seconds == 300 || seconds == 600;
-        }
-
-        /// <summary>
-        /// 为断线恢复生成加密随机令牌。
-        /// </summary>
-        /// <returns>Base64 会话令牌。</returns>
-        private static string CreateSessionToken()
-        {
-            var bytes = new byte[32];
-            using (RandomNumberGenerator random = RandomNumberGenerator.Create())
-            {
-                random.GetBytes(bytes);
-            }
-
-            return Convert.ToBase64String(bytes);
         }
 
         /// <summary>

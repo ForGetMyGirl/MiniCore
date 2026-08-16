@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "KvBBszFgbms=",
+  "success": true,
+  "projectFilePath": "/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/MiniCore.Server.Protocol.csproj",
+  "expectedPackageFiles": [
+    "/Users/ws97_mini/.nuget/packages/google.protobuf/3.29.3/google.protobuf.3.29.3.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/grpc.tools/2.69.0/grpc.tools.2.69.0.nupkg.sha512"
+  ],
+  "logs": []
+}

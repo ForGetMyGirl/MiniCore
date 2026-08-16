@@ -16,8 +16,8 @@ namespace MiniCore.EditorTools
     {
         #region Private 私有成员
 
-        private const string HandlerOutputPath = "Assets/Scripts/MiniCore/HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs";
-        private const string HybridClrSettingsPath = "ProjectSettings/HybridCLRSettings.asset";
+        private const string ClientHandlerOutputPath = "Assets/Scripts/MiniCore/HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs";
+        private const string ServerHandlerOutputPath = "Assets/Scripts/MiniCore/HotUpdate/Server/Generated/Network/ServerHotUpdateHandlerRegistration.Generated.cs";
         private static readonly UTF8Encoding Utf8WithoutBom = new UTF8Encoding(false); // 生成文件固定编码。
 
         #endregion
@@ -42,7 +42,8 @@ namespace MiniCore.EditorTools
         /// </summary>
         internal static void InvalidateGeneratedHandlerRegistry()
         {
-            WriteFileIfChanged(HandlerOutputPath, BuildHandlerRegistrationContent(Array.Empty<HandlerBinding>()));
+            WriteFileIfChanged(ClientHandlerOutputPath, BuildClientHandlerRegistrationContent(Array.Empty<HandlerBinding>()));
+            WriteFileIfChanged(ServerHandlerOutputPath, BuildServerHandlerRegistrationContent(Array.Empty<HandlerBinding>()));
         }
 
         /// <summary>
@@ -64,15 +65,18 @@ namespace MiniCore.EditorTools
 
                 List<HandlerBinding> bindings = DiscoverBindings(assemblies);
                 ValidateBindings(bindings);
-                bool changed = WriteFileIfChanged(HandlerOutputPath, BuildHandlerRegistrationContent(bindings));
+                HandlerBinding[] clientBindings = bindings.Where(binding => binding.ServerHandler == null).ToArray();
+                HandlerBinding[] serverBindings = bindings.Where(binding => binding.ServerHandler != null).ToArray();
+                bool changed = WriteFileIfChanged(ClientHandlerOutputPath, BuildClientHandlerRegistrationContent(clientBindings));
+                changed |= WriteFileIfChanged(ServerHandlerOutputPath, BuildServerHandlerRegistrationContent(serverBindings));
                 if (changed && refreshAssets)
                 {
                     AssetDatabase.Refresh();
                 }
 
                 log = changed
-                    ? $"已同步 {bindings.Count} 个 Handler 直接注册项。"
-                    : $"Handler 注册代码无需更新，共 {bindings.Count} 项。";
+                    ? $"已同步客户端 {clientBindings.Length} 项、服务端 {serverBindings.Length} 项 Handler 注册代码。"
+                    : $"Handler 注册代码无需更新：客户端 {clientBindings.Length} 项、服务端 {serverBindings.Length} 项。";
                 return true;
             }
             catch (Exception exception)
@@ -93,9 +97,10 @@ namespace MiniCore.EditorTools
             {
                 List<HandlerBinding> bindings = DiscoverBindings(FindRegisteredAssemblies());
                 ValidateBindings(bindings);
-                string fullPath = GetFullPath(HandlerOutputPath);
-                string expected = BuildHandlerRegistrationContent(bindings);
-                if (!File.Exists(fullPath) || !string.Equals(File.ReadAllText(fullPath), expected, StringComparison.Ordinal))
+                HandlerBinding[] clientBindings = bindings.Where(binding => binding.ServerHandler == null).ToArray();
+                HandlerBinding[] serverBindings = bindings.Where(binding => binding.ServerHandler != null).ToArray();
+                if (!HasExpectedContent(ClientHandlerOutputPath, BuildClientHandlerRegistrationContent(clientBindings))
+                    || !HasExpectedContent(ServerHandlerOutputPath, BuildServerHandlerRegistrationContent(serverBindings)))
                 {
                     error = "Handler 注册代码与当前热更新程序集不一致，请等待 Unity 编译后的自动同步。";
                     return false;
@@ -116,39 +121,16 @@ namespace MiniCore.EditorTools
         #region Private 私有成员
 
         /// <summary>
-        /// 从 HybridCLR 项目设置读取并定位当前域中已登记的程序集。
+        /// 从 MiniCore 项目设置定位当前域中已登记的程序集。
         /// </summary>
         /// <returns>已加载程序集集合。</returns>
         private static List<Assembly> FindRegisteredAssemblies()
         {
-            string settingsPath = GetFullPath(HybridClrSettingsPath);
-            if (!File.Exists(settingsPath))
-            {
-                throw new FileNotFoundException("缺少 HybridCLR 项目设置。", settingsPath);
-            }
-
-            var registeredNames = new HashSet<string>(StringComparer.Ordinal);
-            string[] lines = File.ReadAllLines(settingsPath);
-            bool inAssemblyList = false;
-            for (int index = 0; index < lines.Length; index++)
-            {
-                string line = lines[index];
-                if (line.StartsWith("  hotUpdateAssemblies:", StringComparison.Ordinal))
-                {
-                    inAssemblyList = true;
-                    continue;
-                }
-
-                if (inAssemblyList && line.StartsWith("  ", StringComparison.Ordinal) && !line.StartsWith("  - ", StringComparison.Ordinal))
-                {
-                    break;
-                }
-
-                if (inAssemblyList && line.StartsWith("  - ", StringComparison.Ordinal))
-                {
-                    registeredNames.Add(line.Substring(4).Trim());
-                }
-            }
+            var registeredNames = new HashSet<string>(
+                MiniCoreHotUpdateAssemblySettings.Current.Entries
+                    .Where(entry => entry != null)
+                    .Select(entry => entry.AssemblyName),
+                StringComparer.Ordinal);
 
             return AppDomain.CurrentDomain.GetAssemblies()
                 .Where(assembly => registeredNames.Contains(assembly.GetName().Name))
@@ -176,7 +158,7 @@ namespace MiniCore.EditorTools
                     Type normalBase = FindGenericBase(type, typeof(AMHandler<>));
                     if (normalBase != null)
                     {
-                        result.Add(new HandlerBinding(type, normalBase.GetGenericArguments()[0], null));
+                        result.Add(new HandlerBinding(type, normalBase.GetGenericArguments()[0], null, type.GetCustomAttribute<ServerHandlerAttribute>()));
                         continue;
                     }
 
@@ -184,7 +166,7 @@ namespace MiniCore.EditorTools
                     if (rpcBase != null)
                     {
                         Type[] arguments = rpcBase.GetGenericArguments();
-                        result.Add(new HandlerBinding(type, arguments[0], arguments[1]));
+                        result.Add(new HandlerBinding(type, arguments[0], arguments[1], type.GetCustomAttribute<ServerHandlerAttribute>()));
                     }
                 }
             }
@@ -240,9 +222,9 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 生成直接实例化 Handler 的注册入口。
+        /// 生成客户端直接实例化 Handler 的注册入口。
         /// </summary>
-        private static string BuildHandlerRegistrationContent(IReadOnlyList<HandlerBinding> bindings)
+        private static string BuildClientHandlerRegistrationContent(IReadOnlyList<HandlerBinding> bindings)
         {
             var builder = new StringBuilder();
             builder.AppendLine("// Auto-generated by OpcodeRegistryGenerator. Do not modify by hand.");
@@ -256,7 +238,7 @@ namespace MiniCore.EditorTools
             builder.AppendLine("    public static class HotUpdateHandlerRegistration");
             builder.AppendLine("    {");
             builder.AppendLine("        /// <summary>");
-            builder.AppendLine("        /// 注册全部普通消息与 RPC Handler。");
+            builder.AppendLine("        /// 注册客户端可见的 Outer Handler。");
             builder.AppendLine("        /// </summary>");
             builder.AppendLine("        /// <param name=\"builder\">目标协议构建器。</param>");
             builder.AppendLine("        public static void Register(NetworkProtocolBuilder builder)");
@@ -273,6 +255,59 @@ namespace MiniCore.EditorTools
             builder.AppendLine("    }");
             builder.AppendLine("}");
             return builder.ToString();
+        }
+
+        /// <summary>
+        /// 生成服务端按 Role 直接实例化 Handler 的注册入口。
+        /// </summary>
+        /// <param name="bindings">全部服务端 Handler 绑定。</param>
+        /// <returns>可直接写入服务端热更新程序集的源码。</returns>
+        private static string BuildServerHandlerRegistrationContent(IReadOnlyList<HandlerBinding> bindings)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("// Auto-generated by OpcodeRegistryGenerator. Do not modify by hand.");
+            builder.AppendLine("using MiniCore.Model;");
+            builder.AppendLine();
+            builder.AppendLine("namespace MiniCore.HotUpdate.Server");
+            builder.AppendLine("{");
+            builder.AppendLine("    /// <summary>");
+            builder.AppendLine("    /// 按 Dedicated Server 当前 Role 注册服务端 Handler。");
+            builder.AppendLine("    /// </summary>");
+            builder.AppendLine("    public static class ServerHotUpdateHandlerRegistration");
+            builder.AppendLine("    {");
+            builder.AppendLine("        /// <summary>");
+            builder.AppendLine("        /// 注册与当前 Role 有交集的服务端 Handler。");
+            builder.AppendLine("        /// </summary>");
+            builder.AppendLine("        /// <param name=\"builder\">目标协议构建器。</param>");
+            builder.AppendLine("        /// <param name=\"activeRoles\">当前进程启用的 Role。</param>");
+            builder.AppendLine("        public static void Register(NetworkProtocolBuilder builder, DedicatedServerRole activeRoles)");
+            builder.AppendLine("        {");
+            builder.AppendLine("            if (builder == null)");
+            builder.AppendLine("            {");
+            builder.AppendLine("                throw new global::System.ArgumentNullException(nameof(builder));");
+            builder.AppendLine("            }");
+            for (int index = 0; index < bindings.Count; index++)
+            {
+                HandlerBinding binding = bindings[index];
+                builder.AppendLine($"            if ((activeRoles & (DedicatedServerRole){(int)binding.ServerHandler.Roles}) != 0)");
+                builder.AppendLine("            {");
+                builder.AppendLine($"                builder.RegisterHandler(new global::{binding.HandlerType.FullName}());");
+                builder.AppendLine("            }");
+            }
+            builder.AppendLine("        }");
+            builder.AppendLine("    }");
+            builder.AppendLine("}");
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// 判断生成文件是否与期望内容完全一致。
+        /// </summary>
+        private static bool HasExpectedContent(string path, string expected)
+        {
+            string fullPath = GetFullPath(path);
+            return File.Exists(fullPath)
+                && string.Equals(File.ReadAllText(fullPath), expected, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -305,12 +340,14 @@ namespace MiniCore.EditorTools
             public Type RequestType { get; }
             public Type ResponseType { get; }
             public bool IsRpc => ResponseType != null;
+            public ServerHandlerAttribute ServerHandler { get; }
 
-            public HandlerBinding(Type handlerType, Type requestType, Type responseType)
+            public HandlerBinding(Type handlerType, Type requestType, Type responseType, ServerHandlerAttribute serverHandler)
             {
                 HandlerType = handlerType;
                 RequestType = requestType;
                 ResponseType = responseType;
+                ServerHandler = serverHandler;
             }
         }
 

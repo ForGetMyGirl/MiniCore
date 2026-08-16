@@ -1875,7 +1875,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 4276607329921585684}
   windowId: 4a39d8db63fb4a0589659f9933adc857
   routeName: RoomWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.RoomWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.RoomWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: RoomWindow
   template: 0

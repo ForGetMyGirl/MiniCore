@@ -1,0 +1,14 @@
+{
+  "name": "MiniCore.Protocol.Control.Inner",
+  "rootNamespace": "",
+  "references": ["MiniCore.Protocol.Control", "MiniCore.Runtime", "MiniCore.Serialization", "MiniCore.Network"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_EDITOR || UNITY_SERVER"],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

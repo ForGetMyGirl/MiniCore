@@ -108,3 +108,7 @@ InitTestScene*.unity*
 /[Aa]ssets/StreamingAssets/yoo
 /[Bb]undles
 /BenchmarkPerformance/History/
+
+# 根目录独立 .NET 服务的项目文件属于正式源码，不使用 Unity 自动生成忽略规则。
+!/Server/**/*.csproj
+!/Server/**/*.sln

@@ -1,0 +1,41 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "MiniCore.Server.Protocol/1.0.0": {
+        "dependencies": {
+          "Google.Protobuf": "3.29.3"
+        },
+        "runtime": {
+          "MiniCore.Server.Protocol.dll": {}
+        }
+      },
+      "Google.Protobuf/3.29.3": {
+        "runtime": {
+          "lib/net5.0/Google.Protobuf.dll": {
+            "assemblyVersion": "3.29.3.0",
+            "fileVersion": "3.29.3.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MiniCore.Server.Protocol/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Google.Protobuf/3.29.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-t7nZFFUFwigCwZ+nIXHDLweXvwIpsOXi+P7J7smPT/QjI3EKxnCzTQOhBqyEh6XEzc/pNH+bCFOOSjatrPt6Tw==",
+      "path": "google.protobuf/3.29.3",
+      "hashPath": "google.protobuf.3.29.3.nupkg.sha512"
+    }
+  }
+}

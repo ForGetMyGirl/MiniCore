@@ -1,0 +1,24 @@
+{
+  "name": "MiniCore.Development.Network",
+  "rootNamespace": "",
+  "references": [
+    "MiniCore.Runtime",
+    "MiniCore.Protocol.Common",
+    "MiniCore.Protocol.Outer",
+    "MiniCore.Serialization",
+    "MiniCore.Network",
+    "MiniCore.Unity",
+    "MiniCore.HotUpdate.Shared"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_EDITOR || DEVELOPMENT_BUILD"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

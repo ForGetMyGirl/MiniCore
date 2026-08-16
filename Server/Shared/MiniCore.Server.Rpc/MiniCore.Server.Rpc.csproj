@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../MiniCore.Server.Protocol/MiniCore.Server.Protocol.csproj" />
+    <PackageReference Include="Google.Protobuf" Version="3.29.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../../Proto/Manifest/OpcodeManifest.json" Link="OpcodeManifest.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+{
+  "name": "MiniCore.Protocol.Outer",
+  "rootNamespace": "",
+  "references": ["MiniCore.Protocol.Common", "MiniCore.Runtime", "MiniCore.Serialization", "MiniCore.Network"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

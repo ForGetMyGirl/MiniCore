@@ -1436,7 +1436,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 8614405162196641578}
   windowId: 11fa3813bb4045e995cc934ea90cde0f
   routeName: BattleHudWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.BattleHudWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.BattleHudWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: BattleHudWindow
   template: 4

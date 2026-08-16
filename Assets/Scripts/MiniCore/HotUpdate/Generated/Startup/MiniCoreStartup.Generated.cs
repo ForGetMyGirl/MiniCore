@@ -18,6 +18,9 @@ namespace MiniCore.HotUpdate
         public static async MTask StartAsync()
         {
             Global.RegisterAppModule<global::MiniCore.Eventing.IApplicationEventBus, global::MiniCore.Eventing.ApplicationEventBusModule>("");
+            Global.RegisterAppModule<global::MiniCore.Pooling.IGameObjectPool, global::MiniCore.Pooling.GameObjectPoolModule>("");
+            global::MiniCore.UI.UIWindowRegistry.ResetProject();
+            ProjectUIWindowRegistration.Register(global::MiniCore.UI.UIWindowRegistry.Project);
             await StartConfiguredAsync();
 
             GameStartup gameStartup = Global.Pin<GameStartup>();
@@ -34,27 +37,25 @@ namespace MiniCore.HotUpdate
         /// <returns>项目启动完成任务。</returns>
         private static async MTask StartConfiguredAsync()
         {
-            global::MiniCore.Service.YooAssetResourceService service0 = Global.RegisterAppService<global::MiniCore.Service.IResourceService, global::MiniCore.Service.YooAssetResourceService>(new global::MiniCore.Service.YooAssetResourceServiceInitArgs());
-            global::MiniCore.Service.AssetService service1 = Global.RegisterAppService<global::MiniCore.Service.IAssetService, global::MiniCore.Service.AssetService>(null);
-            global::MiniCore.Service.AudioService service2 = Global.RegisterAppService<global::MiniCore.Service.IAudioService, global::MiniCore.Service.AudioService>(new global::MiniCore.Service.AudioServiceInitArgs());
-            global::MiniCore.Service.ConfigurationService service3 = Global.RegisterAppService<global::MiniCore.Service.IConfigurationService, global::MiniCore.Service.ConfigurationService>(null);
-            global::MiniCore.Service.DeviceSettingsService service4 = Global.RegisterAppService<global::MiniCore.Service.IDeviceSettingsService, global::MiniCore.Service.DeviceSettingsService>(null);
-            global::MiniCore.Service.StoragePathService service5 = Global.RegisterAppService<global::MiniCore.Service.IStoragePathService, global::MiniCore.Service.StoragePathService>(new global::MiniCore.Service.StoragePathServiceInitArgs { RelativePath = "MiniCoreDefaultTest" });
-            global::MiniCore.Service.EncryptedSaveService service6 = Global.RegisterAppService<global::MiniCore.Service.ISaveService, global::MiniCore.Service.EncryptedSaveService>(new global::MiniCore.Service.EncryptedSaveServiceInitArgs { EncryptionKey = "wnm9527" });
-            global::MiniCore.Service.LocalTelemetryFileService service7 = Global.RegisterAppService<global::MiniCore.Service.ITelemetryService, global::MiniCore.Service.LocalTelemetryFileService>(null);
-            global::MiniCore.Service.NetworkService service8 = Global.RegisterAppService<global::MiniCore.Service.INetworkService, global::MiniCore.Service.NetworkService>(null);
-            var protocolBuilder8 = new global::MiniCore.Model.NetworkProtocolBuilder();
-            global::MiniCore.Protocol.Generated.ProjectProtocolRegistration.Register(protocolBuilder8);
-            HotUpdateHandlerRegistration.Register(protocolBuilder8);
-            service8.ConfigureProtocol(protocolBuilder8.Build());
-            global::MiniCore.Service.SettingsService service9 = Global.RegisterAppService<global::MiniCore.Service.ISettingsService, global::MiniCore.Service.SettingsService>(null);
-            await ((global::MiniCore.Service.IAsyncAppService)service9).InitializeAsync();
-            global::MiniCore.Service.TimerService service10 = Global.RegisterAppService<global::MiniCore.Service.ITimerService, global::MiniCore.Service.TimerService>(null);
-            if (!UnityEngine.Application.isBatchMode)
-            {
-                global::MiniCore.Service.UIService service11 = Global.RegisterAppService<global::MiniCore.UI.IUIService, global::MiniCore.Service.UIService>(new global::MiniCore.Service.UIServiceInitArgs { ProfileAddress = "UIProjectProfile" });
-                await ((global::MiniCore.Service.IAsyncAppService)service11).InitializeAsync();
-            }
+            global::MiniCore.Service.AudioService service0 = Global.RegisterAppService<global::MiniCore.Service.IAudioService, global::MiniCore.Service.AudioService>(new global::MiniCore.Service.AudioServiceInitArgs());
+            global::MiniCore.Service.YooAssetResourceService service1 = Global.RegisterAppService<global::MiniCore.Service.IResourceService, global::MiniCore.Service.YooAssetResourceService>(new global::MiniCore.Service.YooAssetResourceServiceInitArgs());
+            global::MiniCore.Service.ConfigurationService service2 = Global.RegisterAppService<global::MiniCore.Service.IConfigurationService, global::MiniCore.Service.ConfigurationService>(null);
+            global::MiniCore.Service.DeviceSettingsService service3 = Global.RegisterAppService<global::MiniCore.Service.IDeviceSettingsService, global::MiniCore.Service.DeviceSettingsService>(null);
+            global::MiniCore.Service.StoragePathService service4 = Global.RegisterAppService<global::MiniCore.Service.IStoragePathService, global::MiniCore.Service.StoragePathService>(new global::MiniCore.Service.StoragePathServiceInitArgs { RelativePath = "MiniCoreDefaultTest" });
+            global::MiniCore.Service.EncryptedSaveService service5 = Global.RegisterAppService<global::MiniCore.Service.ISaveService, global::MiniCore.Service.EncryptedSaveService>(new global::MiniCore.Service.EncryptedSaveServiceInitArgs { EncryptionKey = "wnm9527" });
+            global::MiniCore.Service.LocalTelemetryFileService service6 = Global.RegisterAppService<global::MiniCore.Service.ITelemetryService, global::MiniCore.Service.LocalTelemetryFileService>(null);
+            global::MiniCore.Service.NetworkService service7 = Global.RegisterAppService<global::MiniCore.Service.INetworkService, global::MiniCore.Service.NetworkService>(null);
+            var protocolBuilder7 = new global::MiniCore.Model.NetworkProtocolBuilder();
+            global::MiniCore.Protocol.Generated.CoordinatorOuterProtocolRegistration.Register(protocolBuilder7);
+            global::MiniCore.Protocol.Generated.BusinessClientProtocolRegistration.Register(protocolBuilder7);
+            HotUpdateHandlerRegistration.Register(protocolBuilder7);
+            service7.ConfigureProtocol(protocolBuilder7.Build());
+            global::MiniCore.Service.SettingsService service8 = Global.RegisterAppService<global::MiniCore.Service.ISettingsService, global::MiniCore.Service.SettingsService>(null);
+            await ((global::MiniCore.Service.IAsyncAppService)service8).InitializeAsync();
+            global::MiniCore.Service.TimerService service9 = Global.RegisterAppService<global::MiniCore.Service.ITimerService, global::MiniCore.Service.TimerService>(null);
+            global::MiniCore.Service.UIService service10 = Global.RegisterAppService<global::MiniCore.UI.IUIService, global::MiniCore.Service.UIService>(new global::MiniCore.Service.UIServiceInitArgs { ProfileAddress = "UIProjectProfile" });
+            await ((global::MiniCore.Service.IAsyncAppService)service10).InitializeAsync();
+            global::MiniCore.Service.UnityWebRequestHttpService service11 = Global.RegisterAppService<global::MiniCore.Service.IHttpService, global::MiniCore.Service.UnityWebRequestHttpService>(new global::MiniCore.Service.HttpServiceInitArgs());
             global::MiniCore.Service.YooAssetSceneService service12 = Global.RegisterAppService<global::MiniCore.Service.ISceneService, global::MiniCore.Service.YooAssetSceneService>(new global::MiniCore.Service.YooAssetSceneServiceInitArgs());
         }
 

@@ -6,7 +6,7 @@ namespace MiniCore.Service
     /// <summary>
     /// 将客户端设置映射到 Unity 的画质、帧率、分辨率和垂直同步 API。
     /// </summary>
-    [AppService("设备设置", typeof(IDeviceSettingsService), Description = "将客户端画质、分辨率、帧率和垂直同步设置应用到当前设备。")]
+    [AppService("设备设置", typeof(IDeviceSettingsService), Description = "将客户端画质、分辨率、帧率和垂直同步设置应用到当前设备。", RuntimeTargets = AppServiceRuntimeTargets.Client)]
     public sealed class DeviceSettingsService : AAppService, IDeviceSettingsService
     {
         #region Interface 接口实现

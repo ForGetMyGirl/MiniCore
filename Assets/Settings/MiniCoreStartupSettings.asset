@@ -16,7 +16,7 @@ MonoBehaviour:
   Services:
   - AssemblyQualifiedTypeName: MiniCore.Service.UnityWebRequestHttpService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    Enabled: 0
+    Enabled: 1
     Arguments:
     - MemberName: DefaultTimeoutSeconds
       UseCodeDefault: 1
@@ -27,21 +27,21 @@ MonoBehaviour:
     - MemberName: RetryBackoffMilliseconds
       UseCodeDefault: 1
       Value: 
-  - AssemblyQualifiedTypeName: MiniCore.Service.UIService, MiniCore.HotUpdate, Version=0.0.0.0,
+  - AssemblyQualifiedTypeName: MiniCore.Service.UIService, MiniCore.Unity, Version=0.0.0.0,
       Culture=neutral, PublicKeyToken=null
     Enabled: 1
     Arguments:
     - MemberName: ProfileAddress
       UseCodeDefault: 0
       Value: UIProjectProfile
-  - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetSceneService, MiniCore.HotUpdate,
+  - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetSceneService, MiniCore.Unity.YooAsset,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1
     Arguments:
     - MemberName: PackageName
       UseCodeDefault: 1
       Value: 
-  - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetResourceService, MiniCore.HotUpdate,
+  - AssemblyQualifiedTypeName: MiniCore.Service.YooAssetResourceService, MiniCore.Unity.YooAsset,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1
     Arguments:
@@ -82,11 +82,7 @@ MonoBehaviour:
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1
     Arguments: []
-  - AssemblyQualifiedTypeName: MiniCore.Service.AssetService, MiniCore.HotUpdate,
-      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-    Enabled: 1
-    Arguments: []
-  - AssemblyQualifiedTypeName: MiniCore.Service.ConfigurationService, MiniCore.HotUpdate,
+  - AssemblyQualifiedTypeName: MiniCore.Service.ConfigurationService, MiniCore.Unity,
       Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     Enabled: 1
     Arguments: []

@@ -13,15 +13,52 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   entries:
-  - assemblyName: MiniCore.Protocol
-    assemblyDefinitionPath: Assets/Scripts/MiniCore/Protocol/MiniCore.Protocol.asmdef
+  - assemblyName: MiniCore.Protocol.Common
+    assemblyDefinitionPath: Assets/Scripts/MiniCore/Protocol/Generated/Common/MiniCore.Protocol.Common.asmdef
     loadOrder: 100
     isStartup: 0
     startupTypeName: 
     startupMethodName: 
-  - assemblyName: MiniCore.HotUpdate
+    runtimeTargets: 3
+    startupRuntimeTargets: 0
+  - assemblyName: MiniCore.Protocol.Outer
+    assemblyDefinitionPath: Assets/Scripts/MiniCore/Protocol/Generated/Outer/MiniCore.Protocol.Outer.asmdef
+    loadOrder: 200
+    isStartup: 0
+    startupTypeName: 
+    startupMethodName: 
+    runtimeTargets: 3
+    startupRuntimeTargets: 0
+  - assemblyName: MiniCore.Protocol.Inner
+    assemblyDefinitionPath: Assets/Scripts/MiniCore/Protocol/Generated/Inner/MiniCore.Protocol.Inner.asmdef
+    loadOrder: 300
+    isStartup: 0
+    startupTypeName: 
+    startupMethodName: 
+    runtimeTargets: 2
+    startupRuntimeTargets: 0
+  - assemblyName: MiniCore.HotUpdate.Shared
     assemblyDefinitionPath: Assets/Scripts/MiniCore/HotUpdate/MiniCore.HotUpdate.asmdef
+    loadOrder: 500
+    isStartup: 0
+    startupTypeName: 
+    startupMethodName: 
+    runtimeTargets: 3
+    startupRuntimeTargets: 0
+  - assemblyName: MiniCore.HotUpdate.Client
+    assemblyDefinitionPath: Assets/Scripts/MiniCore/HotUpdate/Client/MiniCore.HotUpdate.Client.asmdef
     loadOrder: 1000
     isStartup: 1
     startupTypeName: MiniCore.HotUpdate.MiniCoreStartup
     startupMethodName: StartAsync
+    runtimeTargets: 1
+    startupRuntimeTargets: 1
+  - assemblyName: MiniCore.HotUpdate.Server
+    assemblyDefinitionPath: Assets/Scripts/MiniCore/HotUpdate/Server/MiniCore.HotUpdate.Server.asmdef
+    loadOrder: 1100
+    isStartup: 1
+    startupTypeName: MiniCore.HotUpdate.Server.MiniCoreServerStartup
+    startupMethodName: StartAsync
+    runtimeTargets: 2
+    startupRuntimeTargets: 2
+  includeClientAssembliesInDedicatedServer: 0

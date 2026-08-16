@@ -42,10 +42,15 @@ namespace MiniCore.Service
         public Type InitArgsType { get; set; }
 
         /// <summary>
-        /// 获取或设置服务是否在 BatchMode 中参与启动装配。
-        /// 默认为 true；依赖图形设备或交互界面的客户端服务可显式关闭。
+        /// 获取或设置服务允许参与装配的运行目标。
         /// </summary>
-        public bool RunInBatchMode { get; set; } = true;
+        public AppServiceRuntimeTargets RuntimeTargets { get; set; } = AppServiceRuntimeTargets.All;
+
+        /// <summary>
+        /// 获取或设置当前服务是否为 Dedicated Server 的强制基础能力。
+        /// 强制服务无需开发者在客户端启动配置中启用，Dedicated Server 会自动装配。
+        /// </summary>
+        public bool RequiredInDedicatedServer { get; set; }
 
         /// <summary>
         /// 创建应用服务标记。

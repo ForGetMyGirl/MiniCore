@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "LkWFiH3ALu8=",
+  "success": true,
+  "projectFilePath": "/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/MiniCore.Server.Rpc.csproj",
+  "expectedPackageFiles": [
+    "/Users/ws97_mini/.nuget/packages/google.protobuf/3.29.3/google.protobuf.3.29.3.nupkg.sha512"
+  ],
+  "logs": []
+}

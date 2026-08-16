@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace MiniCore.EditorTests
 {
     /// <summary>
-    /// 验证资源、通用资产与 UI 服务化迁移后的公开契约和依赖关系。
+    /// 验证资源、配置与 UI 服务化迁移后的公开契约和依赖关系。
     /// </summary>
     public sealed class ServiceMigrationTests
     {
@@ -34,13 +34,13 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
-        /// 验证四项迁移后的实现均为 AppService，且公开服务接口与依赖声明正确。
+        /// 验证迁移后的实现均为 AppService，且公开服务接口与依赖声明正确。
         /// </summary>
         [Test]
         public void MigratedServices_ExposeExpectedContractsAndDependencies()
         {
             AssertServiceContract<YooAssetResourceService, IResourceService>();
-            AssertServiceContract<AssetService, IAssetService>(typeof(IResourceService));
+            AssertServiceContract<ConfigurationService, IConfigurationService>(typeof(IResourceService));
             AssertServiceContract<UIService, MiniCore.UI.IUIService>(typeof(IResourceService));
             AssertServiceContract<StoragePathService, IStoragePathService>();
             AssertServiceContract<EncryptedSaveService, ISaveService>(typeof(IStoragePathService));
@@ -55,20 +55,20 @@ namespace MiniCore.EditorTests
         {
             object owner = new object();
             TestResourceService resource = Global.RegisterAppService<ITestResourceService, TestResourceService>();
-            TestAssetService asset = Global.RegisterAppService<ITestAssetService, TestAssetService>();
+            TestConfigurationService configuration = Global.RegisterAppService<ITestConfigurationService, TestConfigurationService>();
             TestUIService ui = Global.RegisterAppService<ITestUIService, TestUIService>();
 
             Assert.AreSame(resource, Global.GetService<ITestResourceService>(owner));
-            Assert.AreSame(asset, Global.GetService<ITestAssetService>(owner));
+            Assert.AreSame(configuration, Global.GetService<ITestConfigurationService>(owner));
             Assert.AreSame(ui, Global.GetService<ITestUIService>(owner));
 
             Global.ReleaseAll(owner);
             Global.Unpin<TestUIService>();
-            Global.Unpin<TestAssetService>();
+            Global.Unpin<TestConfigurationService>();
             Global.Unpin<TestResourceService>();
 
             Assert.IsTrue(resource.IsDisposed);
-            Assert.IsTrue(asset.IsDisposed);
+            Assert.IsTrue(configuration.IsDisposed);
             Assert.IsTrue(ui.IsDisposed);
         }
 
@@ -100,9 +100,9 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
-        /// 用于验证资产服务注册生命周期的测试接口。
+        /// 用于验证配置服务注册生命周期的测试接口。
         /// </summary>
-        private interface ITestAssetService : IAppService
+        private interface ITestConfigurationService : IAppService
         {
         }
 
@@ -121,9 +121,9 @@ namespace MiniCore.EditorTests
         }
 
         /// <summary>
-        /// 资产服务的最小测试实现。
+        /// 配置服务的最小测试实现。
         /// </summary>
-        private sealed class TestAssetService : AAppService, ITestAssetService
+        private sealed class TestConfigurationService : AAppService, ITestConfigurationService
         {
         }
 

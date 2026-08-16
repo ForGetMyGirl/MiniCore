@@ -1,0 +1,2 @@
+obj/Release/net10.0/Control/Inner/CoordinatorInner.cs: ../../../Proto/Control/Common/ClusterCommon.proto\
+ ../../../Proto/Control/Inner/CoordinatorInner.proto

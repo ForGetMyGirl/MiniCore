@@ -695,7 +695,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 0}
   windowId: 499f84e478ae485b9096cb3411021b80
   routeName: SceneLoadingWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.SceneLoadingWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.SceneLoadingWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: SceneLoadingWindow
   template: 7

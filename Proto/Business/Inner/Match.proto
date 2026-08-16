@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package minicore.match.inner;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+//[IRpcRequest]
+message EnqueueMatchRequest {
+  int64 player_id = 1;
+  int32 rating = 2;
+}
+
+//[IRpcResponse]
+message EnqueueMatchResponse {
+  int32 code = 1;
+  string msg = 2;
+  int64 ticket_id = 3;
+}
+
+//[IRpcRequest]
+message CancelMatchRequest {
+  int64 player_id = 1;
+  int64 ticket_id = 2;
+}
+
+//[IRpcResponse]
+message CancelMatchResponse {
+  int32 code = 1;
+  string msg = 2;
+}
+
+//[IRpcRequest]
+message TakeMatchRequest {
+  int32 player_count = 1;
+}
+
+//[IRpcResponse]
+message TakeMatchResponse {
+  int32 code = 1;
+  string msg = 2;
+  repeated int64 player_ids = 3;
+}

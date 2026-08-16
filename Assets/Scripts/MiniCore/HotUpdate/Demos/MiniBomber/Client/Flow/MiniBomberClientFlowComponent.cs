@@ -186,7 +186,7 @@ namespace MiniCore.Demo.MiniBomber
                     PlayerId = account.PlayerId,
                     RoomId = notice.RoomId,
                     MatchId = notice.MatchId
-                });
+                }, timeoutSeconds: 15);
                 if (response.Code != MiniBomberErrorCode.Success)
                 {
                     Message = response.Msg;

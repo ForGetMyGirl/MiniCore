@@ -17,7 +17,9 @@ namespace MiniCore.Service
         "保护存档",
         typeof(ISaveService),
         Description = "加密、校验并通过当前平台后端保存 Protobuf 等二进制数据。",
-        InitArgsType = typeof(EncryptedSaveServiceInitArgs))]
+        InitArgsType = typeof(EncryptedSaveServiceInitArgs),
+        RequiresServices = new[] { typeof(IStoragePathService) },
+        RuntimeTargets = AppServiceRuntimeTargets.Client)]
     public sealed class EncryptedSaveService : AAppService, ISaveService
     {
         #region Private 私有成员

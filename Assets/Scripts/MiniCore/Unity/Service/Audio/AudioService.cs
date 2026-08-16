@@ -11,7 +11,7 @@ namespace MiniCore.Service
     /// <summary>
     /// 基于持久化 AudioSource 池的 BGM、SFX 和 UI 音频应用服务。
     /// </summary>
-    [AppService("音频", typeof(IAudioService), Description = "播放并管理 BGM、音效和 UI 音频。", InitArgsType = typeof(AudioServiceInitArgs))]
+    [AppService("音频", typeof(IAudioService), Description = "播放并管理 BGM、音效和 UI 音频。", InitArgsType = typeof(AudioServiceInitArgs), RuntimeTargets = AppServiceRuntimeTargets.Client)]
     public sealed class AudioService : AAppService, IAudioService
     {
         #region Private 私有成员

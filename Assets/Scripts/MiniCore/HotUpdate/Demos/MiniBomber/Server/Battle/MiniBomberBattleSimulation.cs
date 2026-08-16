@@ -246,7 +246,15 @@ namespace MiniCore.Demo.MiniBomber
             var result = new MiniBomberMatchResult[resultSortBuffer.Count];
             for (int index = 0; index < resultSortBuffer.Count; index++)
             {
-                result[index] = new MiniBomberMatchResult(index + 1, resultSortBuffer[index]);
+                MiniBomberPlayerState player = resultSortBuffer[index];
+                result[index] = new MiniBomberMatchResult(
+                    index + 1,
+                    player.PlayerId,
+                    player.PlayerName,
+                    player.Score,
+                    player.Kills,
+                    player.Deaths,
+                    player.IsOnline);
             }
 
             return result;

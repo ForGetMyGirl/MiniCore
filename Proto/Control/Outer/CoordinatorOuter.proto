@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package minicore.cluster.outer;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+import "Control/Common/ClusterCommon.proto";
+
+//[IRpcRequest]
+message ResolveServiceRequest {
+  minicore.cluster.common.ClusterServiceKind service_kind = 1;
+}
+
+//[IRpcResponse]
+message ResolveServiceResponse {
+  int32 code = 1;
+  string msg = 2;
+  minicore.cluster.common.ClusterServiceEndpoint endpoint = 3;
+}

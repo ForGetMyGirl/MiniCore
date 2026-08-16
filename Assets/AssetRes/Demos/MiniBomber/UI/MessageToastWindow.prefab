@@ -104,7 +104,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 285621669837711575}
   windowId: 8d4b3b94f6964620a1a15f467095c2b7
   routeName: MessageToastWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.MessageToastWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.MessageToastWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: MessageToastWindow
   template: 3

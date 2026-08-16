@@ -40,7 +40,7 @@ namespace MiniCore.EditorTools
         {
             MiniCoreProtocolSettings settings = MiniCoreProtocolSettings.instance;
             EditorGUILayout.LabelField("项目业务 Proto", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("一个项目只使用一个输出目录。目录必须位于 Assets 下，并归属于已登记的热更新程序集。框架内部 ClientSettings.proto 始终输出到 MiniCore.Unity，不受此设置影响。", MessageType.Info);
+            EditorGUILayout.HelpBox("一个项目只使用一个业务输出根目录。其 Common、Outer、Inner 子目录必须分别归属于三个业务热更新协议程序集；固定 Control 与框架 ClientSettings 使用框架预设 AOT 目录，不受此设置影响。", MessageType.Info);
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.TextField("C# 输出目录", settings.ProjectOutputDirectory);

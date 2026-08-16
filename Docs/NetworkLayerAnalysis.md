@@ -8,17 +8,18 @@
 | --- | --- | --- |
 | 网络协议抽象 | `MiniCore.Network` | 消息角色接口、实例级 `NetworkProtocolBuilder` / `NetworkProtocolRegistry`、Handler 基类 |
 | 序列化 | `MiniCore.Serialization` | `INetworkSerializer`、`ProtobufSerializer`、JSON 迁移/性能实现 |
-| 项目协议热更新程序集 | `MiniCore.Protocol` | 项目 PB、角色 partial、每 Proto 注册代码和项目统一注册入口 |
+| 固定控制面协议 | `MiniCore.Protocol.Control/Control.Inner` | Coordinator 查询、注册、心跳、状态与目录同步；AOT 固定携带 |
+| 业务协议 | `MiniCore.Protocol.Common/Outer/Inner` | MiniBomber/NetworkLab 共享 DTO、客户端消息与服务间 RPC；HybridCLR 热更新 |
 | 网络运行时 | `MiniCore.Network` | `NetworkService`、Session、RPC、心跳、TCP/UDP/KCP/WebSocket |
 | 浏览器适配层 | `MiniCore.Platform.Browser` | WebGL JavaScript WebSocket 客户端适配器与 IndexedDB 存储注册；不改变网络业务 API |
-| 业务层 | `MiniCore.HotUpdate` | 业务 Proto 对应的 Handler 与自动生成的直接注册表 |
+| 业务层 | `MiniCore.HotUpdate.Client/Server` | 客户端 Handler、按 Role 注册的服务端 Handler及两个直接注册表 |
 | 编辑器生成 | `MiniCore.Editor` | Proto 生成、Handler 扫描、Opcode Manifest、构建校验 |
 
 ```mermaid
 flowchart LR
-    Proto["Proto/*.proto"] --> PGen["Generate All"]
+    Proto["Proto/Control + Proto/Business"] --> PGen["Generate All"]
     PGen --> Manifest["OpcodeManifest.json"]
-    PGen --> Protocol["MiniCore.Protocol\nPB / Role / Registration"]
+    PGen --> Protocol["AOT Control + HotUpdate Business\nPB / Role / Registration"]
     Handler["HotUpdate\nAMHandler / ARpcHandler"] --> Scan["脚本编译后自动扫描"]
     Scan --> HReg["HotUpdateHandlerRegistration"]
     Protocol --> Builder["NetworkProtocolBuilder"]
@@ -33,7 +34,13 @@ flowchart LR
 
 ### 2.1 文件位置与标记
 
-业务 `.proto` 放在仓库根目录 `Proto/`，可按登录、背包、战斗、配置或持久化等领域创建子目录。不要按消息方向拆目录；同一个 RPC 的 Request/Response 应放在同一业务 Proto 文件中。仅用于配置/存档的 Protobuf 消息可以不写网络角色注解：生成器仍生成消息类，但不会为其生成网络角色、Parser 或 Opcode 注册项。
+协议源码放在仓库根目录 `Proto/`。第一层用 `Control` 与 `Business` 区分固定控制面和可热更新业务协议，第二层使用 `Common`、`Outer`、`Inner` 表达通信与发布边界。同一个 RPC 的 Request/Response 必须放在同一文件。仅用于共享 DTO、配置或存档的消息可以不写网络角色注解：生成器仍生成消息类，但不会为其生成网络角色、Parser 或 Opcode 注册项。
+
+- `Control/Common|Outer`：服务类型、服务地址和 Client ↔ Coordinator 查询，进入 AOT Control；
+- `Control/Inner`：注册、心跳、状态和目录同步，只进入 DS 的 AOT Control.Inner；
+- `Business/Common`：业务两侧共同引用的 DTO/存档；
+- `Business/Outer`：客户端可见的 MiniBomber/NetworkLab 消息；
+- `Business/Inner`：Match、Database 等服务间 RPC，客户端程序集不可见。
 
 ```proto
 syntax = "proto3";
@@ -74,11 +81,20 @@ MiniCore > Protocol > Generate All
 
 | 输出 | 路径 | 用途 |
 | --- | --- | --- |
-| 项目业务 PB、角色与注册代码 | Project Settings 中配置的单一目录；默认 `Assets/Scripts/MiniCore/Protocol/Generated` | 归属于一个已登记的热更新程序集，不再拆 Message/Role/Registry 子目录 |
+| 固定控制面 PB、角色与注册代码 | `Protocol/Control/Generated/Common|Outer|Inner` | Common/Outer 归属 AOT Control，Inner 归属 AOT Control.Inner |
+| 项目业务 PB、角色与注册代码 | `Protocol/Generated/Common|Outer|Inner` | 分别归属于三个按运行侧裁剪的 HybridCLR 业务协议程序集 |
 | 框架客户端设置 PB | `Assets/Scripts/MiniCore/Unity/Service/Persistence/Generated` | 固定归属 `MiniCore.Unity`，不受项目输出目录影响 |
 | 稳定 Opcode 清单 | `Proto/Manifest/OpcodeManifest.json` | 网络角色消息的稳定类型到编号映射；删除项保留 |
 
-项目业务只配置一个输出目录；在 `Project/MiniCore/Protocol` 中手动选择。生成器按最近的 asmdef 校验真实程序集归属，只允许输出到已登记的热更新程序集。`Proto/Internal` 是框架固定协议，`Proto/Tools` 是 import/protoc 工具，两者都不进入项目业务扫描。统一目录要求业务 Proto 文件名全局唯一；工具用归属清单清理旧生成文件，不会递归清空开发者目录。
+项目只配置 Business 生成根目录；Control 固定输出到 AOT 目录。生成器校验五个目标程序集边界，Control 与 Business 共用 `OpcodeManifest.json`。`Proto/Internal` 是框架本地数据，`Proto/Tools` 是 import/protoc 工具，两者不进入网络协议扫描。所有 Control/Business Proto 文件名必须全局唯一；工具用归属清单清理旧生成文件，不递归清空开发者目录。
+
+### 2.3 协议演进规则
+
+- Control 协议变化必须重新构建并发布客户端或 DS Player，不作为日常热更新入口。
+- Business 协议只允许追加字段、消息和枚举值；删除字段必须在 Proto 中声明 `reserved`。
+- 禁止修改已有字段编号、复用历史 Opcode，或把已有消息从普通消息改成 RPC（反之亦然）。
+- 破坏性语义变化创建新消息和新 Opcode，并用独立业务协议版本拒绝不兼容客户端；不长期保留旧实现。
+- Database RPC 先以兼容字段发布并重启 DBServer，再发布 DS 的 Business Inner/HotUpdate Server；稳定后才能移除临时兼容处理。
 
 ## 3. Proto 驱动 Opcode，Handler 第二阶段绑定
 
@@ -109,7 +125,7 @@ public sealed class EnterBattleHandler
 
 ### 3.2 自动同步时机
 
-无需 Opcode 菜单。HotUpdate C# 源码变更并完成脚本编译后：
+无需 Opcode 菜单。HotUpdate C# 源码变更并完成脚本编译后，生成器扫描已登记的 Shared、Client、Server 程序集：
 
 1. `OpcodeHandlerRegistryInvalidator` 先将旧的直接 Handler 注册表变为安全空表，避免删除/改名 Handler 时旧 `new Handler()` 引用阻断首轮编译。
 2. 独立 Proto Editor 程序集先生成 PB、角色、Opcode 和空 Handler stub；即使 HotUpdate 暂时编译失败，生成入口仍可使用。
@@ -122,8 +138,10 @@ public sealed class EnterBattleHandler
 | --- | --- |
 | `Proto/Manifest/OpcodeManifest.json` | 稳定号码唯一事实来源；删除项永久保留，禁止手改/复用 |
 | 项目输出目录中的 `*.ProtocolRegistration.g.cs` | 每个 Proto 的消息、Opcode、角色和 Parser 无状态注册入口 |
-| 项目输出目录中的 `ProjectProtocolRegistration.g.cs` | 按稳定顺序汇总全部项目协议 |
-| `HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs` | 直接 `new` 每个 Handler；运行时不扫描 AppDomain |
+| `Outer/BusinessClientProtocolRegistration.g.cs` | 业务 Common + Outer 统一入口，客户端和 DS 均可调用 |
+| `Inner/BusinessServerProtocolRegistration.g.cs` | 业务 Inner 统一入口，仅 DS 调用 |
+| `HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs` | 只直接 `new` 客户端 Handler |
+| `HotUpdate/Server/Generated/Network/ServerHotUpdateHandlerRegistration.Generated.cs` | 按 `DedicatedServerRole` 直接 `new` 服务端 Handler |
 
 普通消息从 `100001` 起，RPC 从 `200001` 起。编号稳定性来自 Manifest，而不是类型排序。
 
@@ -155,6 +173,17 @@ public sealed class EnterBattleHandler
 | WebSocket | 二进制消息承载 `length int32 big-endian + packet`；接收端按字节流累计拆帧，不依赖一次回调恰好对应一个业务包 |
 
 `NetworkService` 使用当前实例持有的不可变 Registry 查询 Type、Opcode、Parser 和 Handler，使用预分配固定容量入站环形队列接收数据，并在主线程 Tick 中完成反序列化和业务 Handler 派发。原生环境的网络执行器不调用 Unity API，也不直接执行业务 Handler；浏览器 WebGL 的 JavaScript 回调和 Handler 都运行在主循环，但仍经过同一固定容量队列与帧预算。
+
+每条长连接只有一个接收循环，Ping、Pong、RPC 和普通可靠消息共用该 Session 的串行发送入口。Unity `NetworkService` 与独立 .NET `MiniCoreRpcClient` 默认每 `2` 秒发送一次 Ping，连续 `10` 秒没有 Pong 才判定连接失效；断线时一次性失败该 Session 的全部 Pending RPC，已经超时后才到达的响应按 RpcId 直接忽略。
+
+单次 RPC 使用简单的末尾可选秒数，不要求业务构造 Options：
+
+```csharp
+await network.CallAsync<Request, Response>(sessionId, request); // 默认 10 秒
+await network.CallAsync<Request, Response>(sessionId, request, timeoutSeconds: 3);
+```
+
+`timeoutSeconds` 必须大于零。RPC 超时只结束该请求，不主动断开仍健康的 Session；写请求超时表示结果未知，业务不得无条件重发。Ping 间隔、Pong 失效时间、Coordinator 五秒租约心跳和断线重连退避是四个独立概念，不作为 `CallAsync` 参数混在一起。
 
 TCP 不按“每包读一次包头、再读一次正文”发起两次异步接收。传输保持一个初始 `64 KiB` 的连续接收缓冲，每次 `Socket.ReceiveAsync` 后从头解析所有可用完整帧；只有一个大帧跨越当前容量时才扩容到该帧所需容量。每个完整业务正文仍复制进独立租用数组，直到 `OnDataReceived` 全部回调完成后归还，因此不会把可重用的连续缓冲暴露给异步订阅者。该设计既保留 TCP 半包/粘包语义，又避免小包高频场景的每包双 I/O 等待。
 
@@ -216,7 +245,8 @@ if (NetworkCapabilities.SupportsConnect(NetworkTransportKind.WebSocket))
 
 ```text
 Global.RegisterAppService<INetworkService, NetworkService>()
-    -> ProjectProtocolRegistration.Register(builder)
+    -> CoordinatorOuterProtocolRegistration.Register(builder)
+    -> BusinessClientProtocolRegistration.Register(builder)
     -> HotUpdateHandlerRegistration.Register(builder)
     -> network.ConfigureProtocol(builder.Build())
     -> Global.Pin<TimerService>()

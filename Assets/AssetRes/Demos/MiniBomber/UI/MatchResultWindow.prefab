@@ -67,7 +67,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 0}
   windowId: 80a5cb0c6e144d8a97e8df100451e55b
   routeName: MatchResultWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.MatchResultWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.MatchResultWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: MatchResultWindow
   template: 2

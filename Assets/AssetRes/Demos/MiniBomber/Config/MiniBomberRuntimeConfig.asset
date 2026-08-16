@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4b1b95ad2cc40b4882e6cd3fcd047a1, type: 3}
   m_Name: MiniBomberRuntimeConfig
   m_EditorClassIdentifier:
-  serverPort: 20000
-  kcpServerHost: game.namo.wang
-  kcpServerPort: 20000
-  webSocketUrl: wss://ws.namo.wang/minibomber
   serverTickRate: 30
   inputSendRate: 30
   snapshotRate: 15
+  roomWorkerCount: 2
+  roomWorkerInputQueueCapacity: 1024
+  roomWorkerOutputQueueCapacity: 256
+  fullKeyframeIntervalMilliseconds: 2000
   inputHoldMilliseconds: 100
   reconnectGraceMilliseconds: 15000
   sceneLoadingTimeoutMilliseconds: 30000

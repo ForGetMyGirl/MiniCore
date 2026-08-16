@@ -1,7 +1,7 @@
 {
   "name": "Project.Bootstrap",
   "rootNamespace": "",
-  "references": ["MiniCore.Runtime", "MiniCore.Unity", "HybridCLR.Runtime", "GUID:e34a5702dd353724aa315fb8011f08c3"],
+  "references": ["MiniCore.Runtime", "MiniCore.Unity", "MiniCore.Unity.YooAsset", "HybridCLR.Runtime", "GUID:e34a5702dd353724aa315fb8011f08c3"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

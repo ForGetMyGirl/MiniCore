@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniCore.Server.Protocol", "Shared/MiniCore.Server.Protocol/MiniCore.Server.Protocol.csproj", "{A101EC7E-25B7-4DD4-914F-A52C2F3BA001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniCore.Server.Rpc", "Shared/MiniCore.Server.Rpc/MiniCore.Server.Rpc.csproj", "{A101EC7E-25B7-4DD4-914F-A52C2F3BA002}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuthenticationServer", "AuthenticationServer/AuthenticationServer.csproj", "{A101EC7E-25B7-4DD4-914F-A52C2F3BA003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatabaseServer", "DatabaseServer/DatabaseServer.csproj", "{A101EC7E-25B7-4DD4-914F-A52C2F3BA004}"
+EndProject
+Global
+  GlobalSection(SolutionConfigurationPlatforms) = preSolution
+    Debug|Any CPU = Debug|Any CPU
+    Release|Any CPU = Release|Any CPU
+  EndGlobalSection
+  GlobalSection(ProjectConfigurationPlatforms) = postSolution
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA001}.Release|Any CPU.Build.0 = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA002}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA002}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA002}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA002}.Release|Any CPU.Build.0 = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA003}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA003}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA003}.Release|Any CPU.Build.0 = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA004}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA004}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {A101EC7E-25B7-4DD4-914F-A52C2F3BA004}.Release|Any CPU.Build.0 = Release|Any CPU
+  EndGlobalSection
+EndGlobal

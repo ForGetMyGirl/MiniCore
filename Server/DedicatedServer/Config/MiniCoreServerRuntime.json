@@ -1,0 +1,23 @@
+{
+  "instanceId": "Lobby-01",
+  "roles": [
+    "Lobby"
+  ],
+  "coordinator": {
+    "innerHost": "127.0.0.1",
+    "innerPort": 7000
+  },
+  "listeners": {
+    "innerHost": "0.0.0.0",
+    "innerPort": 7100,
+    "outerHost": "0.0.0.0",
+    "outerPort": 7101,
+    "outerPath": "/minicore"
+  },
+  "advertised": {
+    "innerHost": "127.0.0.1",
+    "innerPort": 7100,
+    "outerWebSocketUrl": "ws://127.0.0.1:7101/minicore"
+  },
+  "persistenceMode": "None"
+}

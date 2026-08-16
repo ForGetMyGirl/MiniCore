@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package minicore.persistence;
+option csharp_namespace = "MiniCore.Protocol.Generated";
+
+// MiniBomber 客户端断线恢复信息。
+message MiniBomberSavedSessionData {
+  reserved 1, 2;
+  int64 player_id = 3;
+  string player_name = 4;
+  string session_token = 5;
+}

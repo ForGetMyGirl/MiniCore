@@ -120,7 +120,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 0}
   windowId: 6f775df54fda4049ba39471b88d3ef8c
   routeName: RegisterWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.RegisterWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.RegisterWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: RegisterWindow
   template: 2

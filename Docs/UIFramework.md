@@ -17,7 +17,9 @@
 | 窗口 Prefab | `Assets/AssetRes/UI/Windows` |
 | CanvasScaler 与 Transition Preset | `Assets/Settings/MiniCore/UI/Presets` |
 | View、Root、布局、动画和输入组件 | `Assets/Scripts/MiniCore/Unity/UI` |
-| UIService、Session、Presenter、路由和注册表 | `Assets/Scripts/MiniCore/HotUpdate/UI` |
+| UIService、Session、窗口定义和运行时注册表 | `Assets/Scripts/MiniCore/Unity/UI` |
+| 业务 View/Presenter | `Assets/Scripts/MiniCore/HotUpdate/Demos/*/Client/UI` |
+| 业务路由与构造注册代码 | `Assets/Scripts/MiniCore/HotUpdate/UI/Generated` |
 | Inspector、创建向导和生成器 | `Assets/Scripts/MiniCore/Editor/UI` |
 
 ## 2. ApplicationUIRoot 的职责
@@ -173,7 +175,7 @@ public sealed class InventoryWindowView : AUIWindowView
 4. 在派生 View 中声明控件字段，并在 Prefab 中绑定引用。
 5. 保存 Prefab，然后执行 `MiniCore/UI/Generate Window Registry`；脚本重载也会自动同步。
 
-生成文件为 `UIWindowRoutes.Generated.cs` 和 `UIWindowRegistry.Generated.cs`。Player 运行时直接构造 Presenter 并获取强类型 View，不扫描程序集、不使用字符串反射或 `Activator`。
+生成文件为 `UIWindowRoutes.Generated.cs` 和 `ProjectUIWindowRegistration.Generated.cs`。后者由客户端启动代码先注入 AOT `UIWindowRegistry.Project`，再初始化 `UIService`。Player 运行时通过构造委托直接创建 Presenter 并获取强类型 View，不扫描程序集、不使用字符串反射或 `Activator`。
 
 ## 7. 安全区域
 
@@ -259,10 +261,11 @@ await ui.CloseAsync(detail);
 
 | 内容 | 路径 |
 | --- | --- |
-| View | `Assets/Scripts/MiniCore/HotUpdate/UI/Test/View/KcpTestWindowView.cs` |
-| Presenter | `Assets/Scripts/MiniCore/HotUpdate/UI/Test/Presenter/KcpTestWindowPresenter.cs` |
+| View | `Assets/Scripts/MiniCore/HotUpdate/Demos/NetworkLab/Client/UI/View/KcpTestWindowView.cs` |
+| Presenter | `Assets/Scripts/MiniCore/HotUpdate/Demos/NetworkLab/Client/UI/Presenter/KcpTestWindowPresenter.cs` |
 | Prefab | `Assets/AssetRes/UI/Windows/KcpTestWindow.prefab` |
 | 生成路由 | `Assets/Scripts/MiniCore/HotUpdate/UI/Generated/UIWindowRoutes.Generated.cs` |
+| 生成注册 | `Assets/Scripts/MiniCore/HotUpdate/UI/Generated/ProjectUIWindowRegistration.Generated.cs` |
 
 KCP 示例入口和强类型路由仍保留，但 `GameStartup` 已改为启动 [MiniBomber 全链路 Demo](Demos/MiniBomber.md)，不再默认打开 `KcpTestWindow`。需要单独验证时，在自定义启动或测试入口调用 `await ui.OpenAsync<KcpTestWindow>()`。该窗口可启动 KCP Server、连接 Client、发送 Normal/RPC 消息，并演示：
 
@@ -296,6 +299,13 @@ KCP 示例入口和强类型路由仍保留，但 `GameStartup` 已改为启动 
 Preset 不进入 YooAsset，也不参与运行时加载。
 
 ## 14. 验证记录
+
+### 2026-08-15（HotUpdate 程序集拆分后的窗口逻辑引用）
+
+- 症状：执行 `MiniCore/UI/Generate Window Registry` 时，`LoginWindow` 等窗口的 Presenter 被判定为无效或不可直接构造。
+- 根因：HotUpdate 拆分为 `MiniCore.HotUpdate.Shared`、`MiniCore.HotUpdate.Client` 和 `MiniCore.HotUpdate.Server` 后，12 个窗口 Prefab 的 `logicTypeName` 仍保存旧程序集限定名 `MiniCore.HotUpdate`；这些窗口的 Presenter 实际均编译进 `MiniCore.HotUpdate.Client`。
+- 修复：将 11 个 MiniBomber 窗口和 `KcpTestWindow` 的 Presenter 程序集限定名统一更新为 `MiniCore.HotUpdate.Client`，不增加旧程序集名兼容或运行时回退。
+- 验证：在已打开的 Unity Editor 中刷新资源并重新执行窗口注册表生成，Editor 日志确认共 12 个窗口生成成功，随后 `MiniCore.HotUpdate.Client` 完成重新编译；全项目静态扫描不再存在窗口 Prefab 对旧 `MiniCore.HotUpdate` 程序集名的引用。本次未运行测试或打包。
 
 ### 2026-08-05（Modal 遮罩可见性）
 

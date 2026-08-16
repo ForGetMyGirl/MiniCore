@@ -86,7 +86,7 @@ namespace MiniCore.Demo.MiniBomber
             try
             {
                 View.PromptText.text = "正在注册账号...";
-                MiniBomberRegisterResponse response = await account.RegisterAsync(accountName, password, playerName);
+                AuthenticationRegisterResponse response = await account.RegisterAsync(accountName, password, playerName);
                 if (!released)
                 {
                     View.PromptText.text = response.Msg;

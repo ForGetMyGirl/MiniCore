@@ -39,6 +39,7 @@ namespace MiniCore.EditorTools.Demos.MiniBomber
             EnsureFolder(UIRoot);
             EnsureFolder(SceneRoot);
             CreateAssetIfMissing<MiniBomberRuntimeConfig>($"{ConfigRoot}/MiniBomberRuntimeConfig.asset");
+            CreateAssetIfMissing<MiniBomberClientNetworkProfile>($"{ConfigRoot}/MiniBomberClientNetworkProfile.asset");
             CreateAssetIfMissing<MiniBomberRuleConfig>($"{ConfigRoot}/MiniBomberRuleConfig.asset");
             CreateDefaultMapIfMissing($"{MapRoot}/MiniBomberDefaultMap.asset");
             CreateSimpleSceneIfMissing($"{SceneRoot}/LoginScene.unity", "LoginScene");

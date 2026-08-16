@@ -10,7 +10,8 @@ namespace MiniCore.EditorTools
     {
         #region Private 私有成员
 
-        private const string GeneratedRegistryPath = "Assets/Scripts/MiniCore/HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs"; // Handler 注册表自身不触发递归失效。
+        private const string ClientGeneratedRegistryPath = "Assets/Scripts/MiniCore/HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs"; // 客户端注册表自身不触发递归失效。
+        private const string ServerGeneratedRegistryPath = "Assets/Scripts/MiniCore/HotUpdate/Server/Generated/Network/ServerHotUpdateHandlerRegistration.Generated.cs"; // 服务端注册表自身不触发递归失效。
 
         /// <summary>
         /// 在 Unity 导入、删除或移动已登记热更新程序集源码后使旧 Handler 直接注册表失效。
@@ -71,7 +72,8 @@ namespace MiniCore.EditorTools
         private static bool IsRegisteredSourcePath(string assetPath, bool useRegisteredRootFallback)
         {
             if (string.IsNullOrEmpty(assetPath)
-                || string.Equals(assetPath, GeneratedRegistryPath, StringComparison.Ordinal)
+                || string.Equals(assetPath, ClientGeneratedRegistryPath, StringComparison.Ordinal)
+                || string.Equals(assetPath, ServerGeneratedRegistryPath, StringComparison.Ordinal)
                 || (!assetPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
                     && !assetPath.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase)))
             {

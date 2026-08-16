@@ -1,0 +1,13 @@
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/bin/Debug/net10.0/MiniCore.Server.Protocol.deps.json
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/bin/Debug/net10.0/MiniCore.Server.Protocol.dll
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/bin/Debug/net10.0/MiniCore.Server.Protocol.pdb
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.csproj.AssemblyReference.cache
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.GeneratedMSBuildEditorConfig.editorconfig
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.AssemblyInfoInputs.cache
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.AssemblyInfo.cs
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.csproj.CoreCompileInputs.cache
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.sourcelink.json
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.dll
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/refint/MiniCore.Server.Protocol.dll
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/MiniCore.Server.Protocol.pdb
+/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Protocol/obj/Debug/net10.0/ref/MiniCore.Server.Protocol.dll

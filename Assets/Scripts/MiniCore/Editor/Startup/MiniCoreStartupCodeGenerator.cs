@@ -30,6 +30,22 @@ namespace MiniCore.EditorTools
         #region Internal 内部成员
 
         /// <summary>
+        /// 在命令行中同步客户端启动代码；失败时直接让 Unity 返回非零结果。
+        /// </summary>
+        public static void SynchronizeFromCommandLine()
+        {
+            MiniCoreStartupSettings settings = GetOrCreateSettings();
+            if (!Generate(settings, out string error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            Debug.Log("MiniCore 客户端启动代码同步完成。");
+        }
+
+        /// <summary>
         /// 获取或创建项目唯一的启动配置资源，并同步当前可发现模块。
         /// </summary>
         /// <returns>已同步的项目启动配置。</returns>
@@ -431,6 +447,11 @@ namespace MiniCore.EditorTools
             var synchronized = new List<MiniCoreAppServiceSettings>(services.Count);
             foreach (AppServiceInfo serviceInfo in services)
             {
+                if ((serviceInfo.Attribute.RuntimeTargets & AppServiceRuntimeTargets.Client) == 0)
+                {
+                    continue;
+                }
+
                 if (!existing.TryGetValue(serviceInfo.Type.AssemblyQualifiedName, out MiniCoreAppServiceSettings serviceSettings))
                 {
                     serviceSettings = new MiniCoreAppServiceSettings
@@ -529,6 +550,12 @@ namespace MiniCore.EditorTools
             builder.AppendLine("        public static async MTask StartAsync()");
             builder.AppendLine("        {");
             AppendAppModuleRegistration(builder, appModules);
+            if (HasEnabledClientService(settings, services, typeof(MiniCore.UI.IUIService)))
+            {
+                builder.AppendLine("            global::MiniCore.UI.UIWindowRegistry.ResetProject();");
+                builder.AppendLine("            ProjectUIWindowRegistration.Register(global::MiniCore.UI.UIWindowRegistry.Project);");
+            }
+
             builder.AppendLine("            await StartConfiguredAsync();");
             builder.AppendLine();
             builder.AppendLine("            GameStartup gameStartup = Global.Pin<GameStartup>();");
@@ -608,7 +635,38 @@ namespace MiniCore.EditorTools
                 }
 
                 AppServiceInfo provider = services.FirstOrDefault(item => item.Type.AssemblyQualifiedName == serviceSettings.AssemblyQualifiedTypeName);
-                if (provider != null && typeof(IAsyncAppService).IsAssignableFrom(provider.Type))
+                if (provider != null
+                    && (provider.Attribute.RuntimeTargets & AppServiceRuntimeTargets.Client) != 0
+                    && typeof(IAsyncAppService).IsAssignableFrom(provider.Type))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 判断客户端启动配置是否启用了指定服务契约。
+        /// </summary>
+        /// <param name="settings">项目启动配置。</param>
+        /// <param name="services">已发现服务实现。</param>
+        /// <param name="contract">待检查的服务接口。</param>
+        /// <returns>客户端目标存在已启用 Provider 时返回 true。</returns>
+        private static bool HasEnabledClientService(MiniCoreStartupSettings settings, List<AppServiceInfo> services, Type contract)
+        {
+            for (int index = 0; index < settings.Services.Count; index++)
+            {
+                MiniCoreAppServiceSettings serviceSettings = settings.Services[index];
+                if (serviceSettings?.Enabled != true)
+                {
+                    continue;
+                }
+
+                AppServiceInfo provider = services.FirstOrDefault(item => item.Type.AssemblyQualifiedName == serviceSettings.AssemblyQualifiedTypeName);
+                if (provider != null
+                    && (provider.Attribute.RuntimeTargets & AppServiceRuntimeTargets.Client) != 0
+                    && provider.Attribute.ServiceTypes.Contains(contract))
                 {
                     return true;
                 }
@@ -640,6 +698,11 @@ namespace MiniCore.EditorTools
                     throw new InvalidOperationException($"启用了不存在的 AppService：{serviceSettings.AssemblyQualifiedTypeName}。");
                 }
 
+                if ((provider.Attribute.RuntimeTargets & AppServiceRuntimeTargets.Client) == 0)
+                {
+                    continue;
+                }
+
                 foreach (Type contract in provider.Attribute.ServiceTypes)
                 {
                     if (selectedByContract.TryGetValue(contract, out AppServiceInfo duplicate))
@@ -657,13 +720,7 @@ namespace MiniCore.EditorTools
             {
                 AppServiceInfo provider = ordered[index];
                 Type[] contracts = selectedByContract.Where(pair => pair.Value.Type == provider.Type).Select(pair => pair.Key).OrderBy(type => type.FullName, StringComparer.Ordinal).ToArray();
-                bool skipInBatchMode = !provider.Attribute.RunInBatchMode;
-                string indent = skipInBatchMode ? "                " : "            ";
-                if (skipInBatchMode)
-                {
-                    builder.AppendLine("            if (!UnityEngine.Application.isBatchMode)");
-                    builder.AppendLine("            {");
-                }
+                const string indent = "            ";
 
                 for (int contractIndex = 0; contractIndex < contracts.Length; contractIndex++)
                 {
@@ -674,7 +731,8 @@ namespace MiniCore.EditorTools
                         continue;
                     }
 
-                    MiniCoreAppServiceSettings serviceSettings = settings.Services.First(item => item.AssemblyQualifiedTypeName == provider.Type.AssemblyQualifiedName);
+                    MiniCoreAppServiceSettings serviceSettings = settings.Services.FirstOrDefault(item => item.AssemblyQualifiedTypeName == provider.Type.AssemblyQualifiedName)
+                        ?? new MiniCoreAppServiceSettings { AssemblyQualifiedTypeName = provider.Type.AssemblyQualifiedName };
                     string args = BuildServiceArgumentExpression(provider, serviceSettings);
                     string variableName = "service" + index.ToString(CultureInfo.InvariantCulture);
                     builder.AppendLine($"{indent}{GetTypeCodeName(provider.Type)} {variableName} = Global.RegisterAppService<{GetTypeCodeName(contract)}, {GetTypeCodeName(provider.Type)}>({args});");
@@ -682,7 +740,8 @@ namespace MiniCore.EditorTools
                     {
                         string protocolBuilderName = "protocolBuilder" + index.ToString(CultureInfo.InvariantCulture);
                         builder.AppendLine($"{indent}var {protocolBuilderName} = new global::MiniCore.Model.NetworkProtocolBuilder();");
-                        builder.AppendLine($"{indent}global::MiniCore.Protocol.Generated.ProjectProtocolRegistration.Register({protocolBuilderName});");
+                        builder.AppendLine($"{indent}global::MiniCore.Protocol.Generated.CoordinatorOuterProtocolRegistration.Register({protocolBuilderName});");
+                        builder.AppendLine($"{indent}global::MiniCore.Protocol.Generated.BusinessClientProtocolRegistration.Register({protocolBuilderName});");
                         builder.AppendLine($"{indent}HotUpdateHandlerRegistration.Register({protocolBuilderName});");
                         builder.AppendLine($"{indent}{variableName}.ConfigureProtocol({protocolBuilderName}.Build());");
                     }
@@ -694,10 +753,6 @@ namespace MiniCore.EditorTools
                     started.Add(provider.Type);
                 }
 
-                if (skipInBatchMode)
-                {
-                    builder.AppendLine("            }");
-                }
             }
         }
 

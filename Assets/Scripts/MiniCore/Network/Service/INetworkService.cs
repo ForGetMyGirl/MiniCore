@@ -182,12 +182,23 @@ namespace MiniCore.Service
         /// <returns>当前会话和队列接受或拒绝该消息的原因。</returns>
         NetworkSendResult TrySend<TMessage>(string sessionId, TMessage message) where TMessage : INormalMessage;
         /// <summary>
-        /// 调用默认会话 RPC。
+        /// 调用默认会话 RPC；未指定时最多等待十秒响应。
         /// </summary>
-        MTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request) where TRequest : IRpcRequest where TResponse : IRpcResponse;
+        /// <typeparam name="TRequest">RPC 请求类型。</typeparam>
+        /// <typeparam name="TResponse">RPC 响应类型。</typeparam>
+        /// <param name="request">需要发送的 RPC 请求。</param>
+        /// <param name="timeoutSeconds">当前调用等待响应的秒数。</param>
+        /// <returns>服务端响应或本地连接错误响应。</returns>
+        MTask<TResponse> CallAsync<TRequest, TResponse>(TRequest request, int timeoutSeconds = 10) where TRequest : IRpcRequest where TResponse : IRpcResponse;
         /// <summary>
-        /// 调用指定会话 RPC。
+        /// 调用指定会话 RPC；未指定时最多等待十秒响应。
         /// </summary>
-        MTask<TResponse> CallAsync<TRequest, TResponse>(string sessionId, TRequest request) where TRequest : IRpcRequest where TResponse : IRpcResponse;
+        /// <typeparam name="TRequest">RPC 请求类型。</typeparam>
+        /// <typeparam name="TResponse">RPC 响应类型。</typeparam>
+        /// <param name="sessionId">目标逻辑会话标识。</param>
+        /// <param name="request">需要发送的 RPC 请求。</param>
+        /// <param name="timeoutSeconds">当前调用等待响应的秒数。</param>
+        /// <returns>服务端响应或本地连接错误响应。</returns>
+        MTask<TResponse> CallAsync<TRequest, TResponse>(string sessionId, TRequest request, int timeoutSeconds = 10) where TRequest : IRpcRequest where TResponse : IRpcResponse;
     }
 }

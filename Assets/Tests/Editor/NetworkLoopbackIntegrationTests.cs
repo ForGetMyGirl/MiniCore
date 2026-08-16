@@ -51,7 +51,7 @@ namespace MiniCore.EditorTests
             Global.RegisterAppModule<IApplicationEventBus, ApplicationEventBusModule>();
             NetworkService network = Global.RegisterAppService<INetworkService, NetworkService>();
             var protocolBuilder = new NetworkProtocolBuilder();
-            ProjectProtocolRegistration.Register(protocolBuilder);
+            BusinessClientProtocolRegistration.Register(protocolBuilder);
             HotUpdateHandlerRegistration.Register(protocolBuilder);
             network.ConfigureProtocol(protocolBuilder.Build());
 

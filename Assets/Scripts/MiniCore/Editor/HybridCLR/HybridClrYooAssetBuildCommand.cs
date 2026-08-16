@@ -94,7 +94,7 @@ namespace MiniCore.EditorTools
                 return false;
             }
 
-            return ValidateRuntimeArtifacts(settings.GetEntriesInLoadOrder(), aotAssemblyPaths, out error);
+            return ValidateRuntimeArtifacts(settings.GetEntriesInLoadOrder(MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget), aotAssemblyPaths, out error);
         }
 
         /// <summary>
@@ -104,7 +104,7 @@ namespace MiniCore.EditorTools
         public static void RegenerateRuntimeRegistryFromCurrentAssets()
         {
             HybridClrBuildValidator.EnsureConfigured();
-            MiniCoreHotUpdateAssemblyEntry[] entries = MiniCoreHotUpdateAssemblySettings.Current.GetEntriesInLoadOrder();
+            MiniCoreHotUpdateAssemblyEntry[] entries = MiniCoreHotUpdateAssemblySettings.Current.GetEntriesInLoadOrder(MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget);
             string[] aotAssemblyPaths = GetCurrentAotMetadataAssetPaths();
             WriteAotMetadataRegistry(entries, aotAssemblyPaths);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
@@ -120,7 +120,7 @@ namespace MiniCore.EditorTools
         private static void BuildDefaultPackageFromGeneratedArtifacts()
         {
             HybridClrBuildValidator.EnsureConfigured();
-            MiniCoreHotUpdateAssemblyEntry[] entries = MiniCoreHotUpdateAssemblySettings.Current.GetEntriesInLoadOrder();
+            MiniCoreHotUpdateAssemblyEntry[] entries = MiniCoreHotUpdateAssemblySettings.Current.GetEntriesInLoadOrder(MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget);
             string[] aotAssemblyPaths = SynchronizeHybridClrArtifacts(entries);
             BuildDefaultPackage();
             if (!ValidateRuntimeArtifacts(entries, aotAssemblyPaths, out string error))
@@ -479,7 +479,7 @@ namespace MiniCore.EditorTools
             MiniCoreHotUpdateAssemblyEntry startupEntry = null;
             for (int index = 0; index < entries.Length; index++)
             {
-                if (entries[index].IsStartup)
+                if (entries[index].IsStartupFor(MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget))
                 {
                     startupEntry = entries[index];
                     break;

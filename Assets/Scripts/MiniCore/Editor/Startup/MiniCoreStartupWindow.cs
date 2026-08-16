@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using MiniCore.Model;
+using MiniCore.Service;
 using MiniCore.Unity;
 using UnityEditor;
 using UnityEngine;
@@ -59,7 +60,9 @@ namespace MiniCore.EditorTools
             List<MiniCoreStartupCodeGenerator.AppModuleInfo> appModules = MiniCoreStartupCodeGenerator.DiscoverAppModules();
             List<Type> components = DiscoverOrdinaryComponents(services, appModules);
             GUILayout.Label("MiniCore 项目启动配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("每个 AppService 接口选择一个 Provider；选择“不启用”时该接口不会注册。普通业务组件继续由 GameStartup 按流程创建。", MessageType.Info);
+            EditorGUILayout.HelpBox(
+                "左侧只配置运行目标包含 Client 的 AppService；选择“不启用”时该接口不会注册。Dedicated Server 必需服务由固定宿主自动装配，只在右侧能力目录中展示。普通业务组件继续由 GameStartup 按流程创建。",
+                MessageType.Info);
 
             float catalogWidth = Mathf.Clamp(position.width * 0.30f, 340f, 500f);
             float configurationWidth = Mathf.Max(760f, position.width - catalogWidth - 18f);
@@ -259,8 +262,11 @@ namespace MiniCore.EditorTools
         /// <param name="services">已发现服务实现。</param>
         private void DrawServices(List<MiniCoreStartupCodeGenerator.AppServiceInfo> services)
         {
-            GUILayout.Label("AppService", EditorStyles.boldLabel);
-            List<AppServiceContractGroup> groups = AppServiceProviderConfiguration.BuildGroups(services, settings);
+            GUILayout.Label("客户端 AppService", EditorStyles.boldLabel);
+            List<AppServiceContractGroup> groups = AppServiceProviderConfiguration.BuildGroups(
+                services,
+                settings,
+                AppServiceRuntimeTargets.Client);
             for (int groupIndex = 0; groupIndex < groups.Count; groupIndex++)
             {
                 AppServiceContractGroup group = groups[groupIndex];
@@ -371,7 +377,11 @@ namespace MiniCore.EditorTools
             EditorGUILayout.SelectableLabel(provider.Type.FullName, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
             EditorGUILayout.LabelField("描述", GetCatalogDescription(provider.Attribute.Description), EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.LabelField("提供接口", string.Join("、", provider.Attribute.ServiceTypes.Select(item => item.Name)), EditorStyles.miniLabel);
-            EditorGUILayout.LabelField("运行目标", provider.Attribute.RunInBatchMode ? "普通客户端 + BatchMode" : "仅普通客户端（BatchMode 跳过）", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("运行目标", provider.Attribute.RuntimeTargets.ToString(), EditorStyles.miniLabel);
+            if (provider.Attribute.RequiredInDedicatedServer)
+            {
+                EditorGUILayout.LabelField("Dedicated Server", "强制自动启用", EditorStyles.miniLabel);
+            }
 
             Type[] dependencies = provider.Attribute.RequiresServices ?? Array.Empty<Type>();
             if (dependencies.Length > 0)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MiniCore.Service;
 using MiniCore.Unity;
 
 namespace MiniCore.EditorTools
@@ -17,10 +18,12 @@ namespace MiniCore.EditorTools
         /// </summary>
         /// <param name="services">项目中发现的全部服务实现。</param>
         /// <param name="settings">当前项目启动设置。</param>
+        /// <param name="runtimeTarget">当前配置界面允许选择的运行目标。</param>
         /// <returns>按接口完整类型名排序的分组。</returns>
         internal static List<AppServiceContractGroup> BuildGroups(
             List<MiniCoreStartupCodeGenerator.AppServiceInfo> services,
-            MiniCoreStartupSettings settings)
+            MiniCoreStartupSettings settings,
+            AppServiceRuntimeTargets runtimeTarget = AppServiceRuntimeTargets.All)
         {
             if (services == null)
             {
@@ -36,6 +39,11 @@ namespace MiniCore.EditorTools
             for (int serviceIndex = 0; serviceIndex < services.Count; serviceIndex++)
             {
                 MiniCoreStartupCodeGenerator.AppServiceInfo provider = services[serviceIndex];
+                if ((provider.Attribute.RuntimeTargets & runtimeTarget) == 0)
+                {
+                    continue;
+                }
+
                 Type[] contracts = provider.Attribute.ServiceTypes;
                 for (int contractIndex = 0; contractIndex < contracts.Length; contractIndex++)
                 {

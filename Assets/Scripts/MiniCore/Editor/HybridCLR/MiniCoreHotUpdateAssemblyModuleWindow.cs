@@ -193,7 +193,7 @@ namespace MiniCore.EditorTools
             for (int index = 0; index < entries.Count; index++)
             {
                 MiniCoreHotUpdateAssemblyEntry entry = entries[index];
-                if (!entry.IsStartup)
+                if (!entry.IsStartupFor(MiniCoreHotUpdateAssemblySettings.ActiveRuntimeTarget))
                 {
                     continue;
                 }
@@ -285,7 +285,8 @@ namespace MiniCore.EditorTools
                 references = new[]
                 {
                     "MiniCore.Runtime",
-                    "MiniCore.Protocol",
+                    "MiniCore.Protocol.Common",
+                    "MiniCore.Protocol.Outer",
                     "MiniCore.Serialization",
                     "MiniCore.Network",
                     "MiniCore.Unity",

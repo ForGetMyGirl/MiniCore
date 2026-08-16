@@ -1,0 +1,24 @@
+{
+  "name": "MiniCore.Server",
+  "rootNamespace": "",
+  "references": [
+    "MiniCore.Runtime",
+    "MiniCore.Serialization",
+    "MiniCore.Network",
+    "MiniCore.Protocol.Control",
+    "MiniCore.Protocol.Control.Inner",
+    "MiniCore.Unity",
+    "MiniCore.Unity.YooAsset"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "UNITY_EDITOR || UNITY_SERVER"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

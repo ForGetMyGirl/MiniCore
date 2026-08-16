@@ -98,7 +98,7 @@ namespace MiniCore.Demo.MiniBomber
                 }
 
                 View.PromptText.text = "连接成功，正在登录...";
-                MiniBomberLoginResponse response = await account.LoginAsync(accountName, password);
+                MiniBomberResumeSessionResponse response = await account.LoginAsync(accountName, password);
                 if (released)
                 {
                     return;

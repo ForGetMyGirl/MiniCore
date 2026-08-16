@@ -3135,7 +3135,7 @@ MonoBehaviour:
   safeAreaTarget: {fileID: 8601416628017910275}
   windowId: 0e25757e69174af6a87d9654894c350c
   routeName: LoginWindow
-  logicTypeName: MiniCore.Demo.MiniBomber.LoginWindowPresenter, MiniCore.HotUpdate,
+  logicTypeName: MiniCore.Demo.MiniBomber.LoginWindowPresenter, MiniCore.HotUpdate.Client,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
   assetAddress: LoginWindow
   template: 0

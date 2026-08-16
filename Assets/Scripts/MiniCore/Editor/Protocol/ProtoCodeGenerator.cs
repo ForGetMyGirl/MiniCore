@@ -19,12 +19,19 @@ namespace MiniCore.EditorTools
         #region Private 私有成员
 
         private const string ProtoRoot = "Proto";
-        private const string InternalProtoDirectory = "Proto/Internal";
+        private const string ControlProtoDirectory = "Proto/Control";
+        private const string BusinessProtoDirectory = "Proto/Business";
         private const string ClientSettingsProtoPath = "Proto/Internal/ClientSettings.proto";
         private const string ClientSettingsOutputDirectory = "Assets/Scripts/MiniCore/Unity/Service/Persistence/Generated";
+        private const string ControlOutputDirectory = "Assets/Scripts/MiniCore/Protocol/Control/Generated";
+        private const string ProtocolControlAssemblyName = "MiniCore.Protocol.Control";
+        private const string ProtocolControlInnerAssemblyName = "MiniCore.Protocol.Control.Inner";
+        private const string ProtocolCommonAssemblyName = "MiniCore.Protocol.Common";
+        private const string ProtocolOuterAssemblyName = "MiniCore.Protocol.Outer";
+        private const string ProtocolInnerAssemblyName = "MiniCore.Protocol.Inner";
         private const string OpcodeManifestPath = "Proto/Manifest/OpcodeManifest.json";
         private const string OwnershipManifestPath = "ProjectSettings/MiniCoreProtocolGeneratedFiles.json";
-        private const int OwnershipManifestVersion = 2;
+        private const int OwnershipManifestVersion = 3;
         private const string OwnershipManifestGenerator = "MiniCore.Protocol.ProtoCodeGenerator";
         private const string PendingHandlerSynchronizationKey = "MiniCore.Protocol.PendingOpcodeSynchronization";
         private const string ProtocVersion = "29.5";
@@ -43,7 +50,7 @@ namespace MiniCore.EditorTools
         #region Public 公共成员
 
         /// <summary>
-        /// 生成框架内部存档 PB 与当前项目的全部业务协议代码。
+        /// 生成框架内部存档、固定控制面与当前项目的全部业务协议代码。
         /// </summary>
         [MenuItem("MiniCore/Protocol/Generate All", priority = 2100)]
         public static void Generate()
@@ -82,63 +89,58 @@ namespace MiniCore.EditorTools
         internal static string GenerateAll()
         {
             string protoRoot = GetFullPath(ProtoRoot);
-            string outputDirectory = MiniCoreProtocolSettings.instance.ProjectOutputDirectory;
-            ValidateProjectOutputDirectory(outputDirectory);
-            string outputFullPath = GetFullPath(outputDirectory);
-            Directory.CreateDirectory(outputFullPath);
+            string businessOutputDirectory = MiniCoreProtocolSettings.instance.ProjectOutputDirectory;
+            ValidateProjectOutputDirectory(businessOutputDirectory);
+            ValidateControlOutputDirectory();
+            string businessOutputFullPath = GetFullPath(businessOutputDirectory);
+            string controlOutputFullPath = GetFullPath(ControlOutputDirectory);
+            CreateScopeOutputDirectories(businessOutputFullPath);
+            CreateScopeOutputDirectories(controlOutputFullPath);
             Directory.CreateDirectory(GetFullPath(ClientSettingsOutputDirectory));
 
             string protoc = GetProtocPath();
             ValidateProtocVersion(protoc);
             RunProtoc(protoc, protoRoot, GetFullPath(ClientSettingsProtoPath), GetFullPath(ClientSettingsOutputDirectory));
 
-            string[] protoFiles = GetBusinessProtoFiles(protoRoot);
-            var definitions = new List<ProtoDefinition>(protoFiles.Length);
-            for (int index = 0; index < protoFiles.Length; index++)
-            {
-                string protoFile = protoFiles[index];
-                RunProtoc(protoc, protoRoot, protoFile, outputFullPath);
-                definitions.Add(ReadDefinition(protoFile));
-            }
+            string[] controlProtoFiles = GetControlProtoFiles(protoRoot);
+            string[] businessProtoFiles = GetBusinessProtoFiles(protoRoot);
+            ValidateUniqueProtoFileNames(controlProtoFiles, businessProtoFiles);
+            var controlDefinitions = new List<ProtoDefinition>(controlProtoFiles.Length);
+            var businessDefinitions = new List<ProtoDefinition>(businessProtoFiles.Length);
+            GenerateProtocolDefinitions(protoc, protoRoot, controlOutputFullPath, controlProtoFiles, controlDefinitions);
+            GenerateProtocolDefinitions(protoc, protoRoot, businessOutputFullPath, businessProtoFiles, businessDefinitions);
+
+            var allDefinitions = new List<ProtoDefinition>(controlDefinitions.Count + businessDefinitions.Count);
+            allDefinitions.AddRange(controlDefinitions);
+            allDefinitions.AddRange(businessDefinitions);
 
             OpcodeManifest opcodeManifest = LoadOpcodeManifest();
-            AssignOpcodes(definitions, opcodeManifest);
+            AssignOpcodes(allDefinitions, opcodeManifest);
             SaveOpcodeManifest(opcodeManifest);
-            WriteGeneratedProtocolFiles(outputFullPath, definitions);
-            SaveOwnershipManifest(outputDirectory, definitions);
-            return $"已生成框架内部存档 PB、{protoFiles.Length} 个项目 Proto 和 {CountMessages(definitions)} 个网络协议注册项。";
+            WriteGeneratedProtocolFiles(controlOutputFullPath, controlDefinitions, false);
+            WriteGeneratedProtocolFiles(businessOutputFullPath, businessDefinitions, true);
+            SaveOwnershipManifest(businessOutputDirectory, controlDefinitions, businessDefinitions);
+            return $"已生成框架内部存档 PB、{controlProtoFiles.Length} 个固定控制面 Proto、{businessProtoFiles.Length} 个业务 Proto 和 {CountMessages(allDefinitions)} 个网络协议注册项。";
         }
 
         /// <summary>
-        /// 获取项目业务 Proto，排除工具文件和框架内部协议。
+        /// 获取固定控制面 Proto。
+        /// </summary>
+        /// <param name="protoRoot">Proto 根目录完整路径。</param>
+        /// <returns>稳定排序的控制面 Proto 路径。</returns>
+        internal static string[] GetControlProtoFiles(string protoRoot)
+        {
+            return GetProtoFiles(Path.Combine(protoRoot, "Control"));
+        }
+
+        /// <summary>
+        /// 获取项目业务 Proto。
         /// </summary>
         /// <param name="protoRoot">Proto 根目录完整路径。</param>
         /// <returns>稳定排序的业务 Proto 路径。</returns>
         internal static string[] GetBusinessProtoFiles(string protoRoot)
         {
-            string toolsRoot = Path.GetFullPath(Path.Combine(protoRoot, "Tools")) + Path.DirectorySeparatorChar;
-            string internalRoot = Path.GetFullPath(Path.Combine(protoRoot, "Internal")) + Path.DirectorySeparatorChar;
-            string[] files = Directory.GetFiles(protoRoot, "*.proto", SearchOption.AllDirectories);
-            var result = new List<string>(files.Length);
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int index = 0; index < files.Length; index++)
-            {
-                string fullPath = Path.GetFullPath(files[index]);
-                if (fullPath.StartsWith(toolsRoot, StringComparison.OrdinalIgnoreCase) || fullPath.StartsWith(internalRoot, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (!names.Add(Path.GetFileName(fullPath)))
-                {
-                    throw new InvalidOperationException($"项目 Proto 文件名重复：{Path.GetFileName(fullPath)}。统一输出目录要求文件名全局唯一。");
-                }
-
-                result.Add(fullPath);
-            }
-
-            result.Sort(StringComparer.Ordinal);
-            return result.ToArray();
+            return GetProtoFiles(Path.Combine(protoRoot, "Business"));
         }
 
         #endregion
@@ -146,10 +148,124 @@ namespace MiniCore.EditorTools
         #region Private 私有成员
 
         /// <summary>
-        /// 验证项目输出目录位于 Assets 下并归属于已登记的热更新程序集。
+        /// 创建 Common、Outer 与 Inner 三个协议输出目录。
+        /// </summary>
+        /// <param name="outputRoot">协议生成根目录完整路径。</param>
+        private static void CreateScopeOutputDirectories(string outputRoot)
+        {
+            Directory.CreateDirectory(outputRoot);
+            Directory.CreateDirectory(Path.Combine(outputRoot, "Common"));
+            Directory.CreateDirectory(Path.Combine(outputRoot, "Outer"));
+            Directory.CreateDirectory(Path.Combine(outputRoot, "Inner"));
+        }
+
+        /// <summary>
+        /// 调用 protoc 生成一组协议并读取网络角色定义。
+        /// </summary>
+        /// <param name="protoc">protoc 可执行文件完整路径。</param>
+        /// <param name="protoRoot">Proto 根目录完整路径。</param>
+        /// <param name="outputRoot">目标生成根目录。</param>
+        /// <param name="protoFiles">待生成的 Proto 文件。</param>
+        /// <param name="definitions">用于接收协议定义的集合。</param>
+        private static void GenerateProtocolDefinitions(
+            string protoc,
+            string protoRoot,
+            string outputRoot,
+            IReadOnlyList<string> protoFiles,
+            ICollection<ProtoDefinition> definitions)
+        {
+            for (int index = 0; index < protoFiles.Count; index++)
+            {
+                string protoFile = protoFiles[index];
+                ProtoDefinition definition = ReadDefinition(protoFile);
+                RunProtoc(protoc, protoRoot, protoFile, GetScopeOutputDirectory(outputRoot, definition.Scope));
+                definitions.Add(definition);
+            }
+        }
+
+        /// <summary>
+        /// 获取指定目录下的全部 Proto，并按完整路径稳定排序。
+        /// </summary>
+        /// <param name="sourceRoot">待扫描目录完整路径。</param>
+        /// <returns>稳定排序的 Proto 路径。</returns>
+        private static string[] GetProtoFiles(string sourceRoot)
+        {
+            if (!Directory.Exists(sourceRoot))
+            {
+                throw new DirectoryNotFoundException($"缺少协议源码目录：{ToProjectPath(sourceRoot)}。");
+            }
+
+            string[] files = Directory.GetFiles(sourceRoot, "*.proto", SearchOption.AllDirectories);
+            for (int index = 0; index < files.Length; index++)
+            {
+                files[index] = Path.GetFullPath(files[index]);
+            }
+
+            Array.Sort(files, StringComparer.Ordinal);
+            return files;
+        }
+
+        /// <summary>
+        /// 校验控制面和业务协议文件名在统一 C# 命名空间内不重复。
+        /// </summary>
+        /// <param name="controlProtoFiles">控制面协议文件。</param>
+        /// <param name="businessProtoFiles">业务协议文件。</param>
+        private static void ValidateUniqueProtoFileNames(
+            IReadOnlyList<string> controlProtoFiles,
+            IReadOnlyList<string> businessProtoFiles)
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            ValidateUniqueProtoFileNames(controlProtoFiles, names);
+            ValidateUniqueProtoFileNames(businessProtoFiles, names);
+        }
+
+        /// <summary>
+        /// 将一组 Proto 文件名加入唯一性集合。
+        /// </summary>
+        /// <param name="protoFiles">待校验协议文件。</param>
+        /// <param name="names">已经占用的文件名集合。</param>
+        private static void ValidateUniqueProtoFileNames(
+            IReadOnlyList<string> protoFiles,
+            ISet<string> names)
+        {
+            for (int index = 0; index < protoFiles.Count; index++)
+            {
+                string fileName = Path.GetFileName(protoFiles[index]);
+                if (!names.Add(fileName))
+                {
+                    throw new InvalidOperationException($"Proto 文件名重复：{fileName}。统一生成命名空间要求文件名全局唯一。");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 验证业务输出目录位于 Assets 下并由三个热更新业务协议程序集承载。
         /// </summary>
         /// <param name="outputDirectory">项目相对输出目录。</param>
         private static void ValidateProjectOutputDirectory(string outputDirectory)
+        {
+            ValidateAssetsOutputDirectory(outputDirectory);
+            ValidateScopeAssembly(outputDirectory, ProtocolScope.Common, ProtocolCommonAssemblyName);
+            ValidateScopeAssembly(outputDirectory, ProtocolScope.Outer, ProtocolOuterAssemblyName);
+            ValidateScopeAssembly(outputDirectory, ProtocolScope.Inner, ProtocolInnerAssemblyName);
+        }
+
+        /// <summary>
+        /// 验证固定控制面输出目录由 AOT Control 程序集承载。
+        /// </summary>
+        private static void ValidateControlOutputDirectory()
+        {
+            ValidateAssetsOutputDirectory(ControlOutputDirectory);
+            ValidateScopeAssembly(ControlOutputDirectory, ProtocolScope.Common, ProtocolControlAssemblyName);
+            ValidateScopeAssembly(ControlOutputDirectory, ProtocolScope.Outer, ProtocolControlAssemblyName);
+            ValidateScopeAssembly(ControlOutputDirectory, ProtocolScope.Inner, ProtocolControlInnerAssemblyName);
+        }
+
+        /// <summary>
+        /// 验证协议生成根目录位于 Assets 下且不会通过链接逃逸。
+        /// </summary>
+        /// <param name="outputDirectory">项目相对输出目录。</param>
+        private static void ValidateAssetsOutputDirectory(string outputDirectory)
         {
             if (string.IsNullOrWhiteSpace(outputDirectory)
                 || Path.IsPathRooted(outputDirectory)
@@ -166,23 +282,48 @@ namespace MiniCore.EditorTools
             {
                 throw new InvalidOperationException("项目 Proto 输出目录不能通过符号链接或路径跳转离开 Assets。");
             }
+        }
 
-            string nearestAssemblyDefinition = FindNearestAssemblyDefinition(outputDirectory);
-            if (nearestAssemblyDefinition == null)
+        /// <summary>
+        /// 验证一个协议作用域输出目录所属的程序集名称。
+        /// </summary>
+        /// <param name="outputRoot">协议生成根目录。</param>
+        /// <param name="scope">Common、Outer 或 Inner 作用域。</param>
+        /// <param name="expectedAssemblyName">期望的程序集名称。</param>
+        private static void ValidateScopeAssembly(
+            string outputRoot,
+            ProtocolScope scope,
+            string expectedAssemblyName)
+        {
+            string scopeDirectory = NormalizeAssetPath(outputRoot) + "/" + scope;
+            string asmdefPath = FindNearestAssemblyDefinition(scopeDirectory);
+            if (!TryReadAssemblyDefinitionName(asmdefPath, out string assemblyName)
+                || !string.Equals(assemblyName, expectedAssemblyName, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException($"输出目录不属于任何 asmdef：{outputDirectory}。");
+                string actual = asmdefPath == null ? "没有 asmdef" : ToProjectPath(asmdefPath);
+                throw new InvalidOperationException(
+                    $"协议输出目录 {scopeDirectory} 必须属于 {expectedAssemblyName}，当前为 {actual}。");
+            }
+        }
+
+        /// <summary>
+        /// 读取程序集定义中的稳定程序集名称。
+        /// </summary>
+        /// <param name="assemblyDefinitionPath">程序集定义完整路径。</param>
+        /// <param name="assemblyName">成功时返回程序集名称。</param>
+        /// <returns>文件存在且包含有效名称时返回 true。</returns>
+        private static bool TryReadAssemblyDefinitionName(string assemblyDefinitionPath, out string assemblyName)
+        {
+            assemblyName = null;
+            if (string.IsNullOrWhiteSpace(assemblyDefinitionPath) || !File.Exists(assemblyDefinitionPath))
+            {
+                return false;
             }
 
-            if (!MiniCoreHotUpdateAssemblySettings.TryGetRegisteredAssemblyForOutputDirectory(
-                    outputDirectory,
-                    out _,
-                    out string asmdefPath))
-            {
-                string detail = asmdefPath == null
-                    ? "不属于任何 asmdef"
-                    : $"所属 asmdef 尚未登记：{asmdefPath}";
-                throw new InvalidOperationException($"项目 Proto 输出目录 {detail}：{outputDirectory}。");
-            }
+            AssemblyDefinitionData definition = JsonUtility.FromJson<AssemblyDefinitionData>(
+                File.ReadAllText(assemblyDefinitionPath));
+            assemblyName = definition?.Name;
+            return !string.IsNullOrWhiteSpace(assemblyName);
         }
 
         /// <summary>
@@ -298,7 +439,7 @@ namespace MiniCore.EditorTools
                 throw new InvalidOperationException($"业务 Proto 必须声明 csharp_namespace：{ToProjectPath(protoFile)}。");
             }
 
-            var definition = new ProtoDefinition(protoFile, namespaceMatch.Groups[1].Value);
+            var definition = new ProtoDefinition(protoFile, namespaceMatch.Groups[1].Value, ResolveScope(protoFile));
             MatchCollection matches = MessageRegex.Matches(content);
             for (int index = 0; index < matches.Count; index++)
             {
@@ -315,6 +456,43 @@ namespace MiniCore.EditorTools
             }
 
             return definition;
+        }
+
+        /// <summary>
+        /// 根据 Control/Business 下的方向目录确定协议作用域。
+        /// </summary>
+        /// <param name="protoFile">Proto 文件完整路径。</param>
+        /// <returns>目标协议作用域。</returns>
+        private static ProtocolScope ResolveScope(string protoFile)
+        {
+            string relative = ToProjectPath(protoFile).Replace('\\', '/');
+            if (relative.StartsWith(ControlProtoDirectory + "/Inner/", StringComparison.Ordinal)
+                || relative.StartsWith(BusinessProtoDirectory + "/Inner/", StringComparison.Ordinal))
+            {
+                return ProtocolScope.Inner;
+            }
+
+            if (relative.StartsWith(ControlProtoDirectory + "/Common/", StringComparison.Ordinal)
+                || relative.StartsWith(BusinessProtoDirectory + "/Common/", StringComparison.Ordinal))
+            {
+                return ProtocolScope.Common;
+            }
+
+            if (!relative.StartsWith(ControlProtoDirectory + "/Outer/", StringComparison.Ordinal)
+                && !relative.StartsWith(BusinessProtoDirectory + "/Outer/", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"Proto 必须位于 Control/Business 的 Common、Outer 或 Inner 目录：{relative}。");
+            }
+
+            return ProtocolScope.Outer;
+        }
+
+        /// <summary>
+        /// 取得协议作用域对应的代码输出目录。
+        /// </summary>
+        private static string GetScopeOutputDirectory(string outputRoot, ProtocolScope scope)
+        {
+            return Path.Combine(outputRoot, scope.ToString());
         }
 
         /// <summary>
@@ -406,26 +584,52 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 生成角色、分 Proto 注册入口和项目统一注册入口。
+        /// 生成角色、分 Proto 注册入口，并按需生成业务统一注册入口。
         /// </summary>
-        private static void WriteGeneratedProtocolFiles(string outputDirectory, IReadOnlyList<ProtoDefinition> definitions)
+        /// <param name="outputDirectory">目标生成根目录。</param>
+        /// <param name="definitions">待写出的协议定义。</param>
+        /// <param name="writeBusinessRegistrations">是否生成业务客户端和服务端统一入口。</param>
+        private static void WriteGeneratedProtocolFiles(
+            string outputDirectory,
+            IReadOnlyList<ProtoDefinition> definitions,
+            bool writeBusinessRegistrations)
         {
-            var registrationTypes = new List<string>();
+            var clientRegistrationTypes = new List<string>();
+            var serverRegistrationTypes = new List<string>();
             for (int index = 0; index < definitions.Count; index++)
             {
                 ProtoDefinition definition = definitions[index];
+                string scopeOutputDirectory = GetScopeOutputDirectory(outputDirectory, definition.Scope);
                 if (definition.Messages.Count == 0)
                 {
                     continue;
                 }
 
                 string stem = Path.GetFileNameWithoutExtension(definition.SourcePath);
-                WriteFileIfChanged(Path.Combine(outputDirectory, stem + ".ProtocolRole.g.cs"), BuildRoleContent(definition));
-                WriteFileIfChanged(Path.Combine(outputDirectory, stem + ".ProtocolRegistration.g.cs"), BuildRegistrationContent(definition));
-                registrationTypes.Add($"global::{definition.Namespace}.{stem}ProtocolRegistration");
+                WriteFileIfChanged(Path.Combine(scopeOutputDirectory, stem + ".ProtocolRole.g.cs"), BuildRoleContent(definition));
+                WriteFileIfChanged(Path.Combine(scopeOutputDirectory, stem + ".ProtocolRegistration.g.cs"), BuildRegistrationContent(definition));
+                string registrationType = $"global::{definition.Namespace}.{stem}ProtocolRegistration";
+                if (definition.Scope == ProtocolScope.Inner)
+                {
+                    serverRegistrationTypes.Add(registrationType);
+                }
+                else
+                {
+                    clientRegistrationTypes.Add(registrationType);
+                }
             }
 
-            WriteFileIfChanged(Path.Combine(outputDirectory, "ProjectProtocolRegistration.g.cs"), BuildProjectRegistrationContent(registrationTypes));
+            if (!writeBusinessRegistrations)
+            {
+                return;
+            }
+
+            WriteFileIfChanged(
+                Path.Combine(GetScopeOutputDirectory(outputDirectory, ProtocolScope.Outer), "BusinessClientProtocolRegistration.g.cs"),
+                BuildProjectRegistrationContent("BusinessClientProtocolRegistration", "业务客户端 Common 与 Outer", clientRegistrationTypes));
+            WriteFileIfChanged(
+                Path.Combine(GetScopeOutputDirectory(outputDirectory, ProtocolScope.Inner), "BusinessServerProtocolRegistration.g.cs"),
+                BuildProjectRegistrationContent("BusinessServerProtocolRegistration", "业务服务端 Inner", serverRegistrationTypes));
         }
 
         /// <summary>
@@ -498,9 +702,13 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
-        /// 生成当前项目的统一协议注册入口。
+        /// 生成业务协议的统一注册入口。
         /// </summary>
-        private static string BuildProjectRegistrationContent(IReadOnlyList<string> registrationTypes)
+        /// <param name="className">生成类名。</param>
+        /// <param name="description">协议范围说明。</param>
+        /// <param name="registrationTypes">按稳定顺序登记的分协议注册类型。</param>
+        /// <returns>完整 C# 生成源码。</returns>
+        private static string BuildProjectRegistrationContent(string className, string description, IReadOnlyList<string> registrationTypes)
         {
             var builder = new StringBuilder();
             builder.AppendLine("// Auto-generated by ProtoCodeGenerator. Do not edit by hand.");
@@ -509,9 +717,9 @@ namespace MiniCore.EditorTools
             builder.AppendLine("namespace MiniCore.Protocol.Generated");
             builder.AppendLine("{");
             builder.AppendLine("    /// <summary>");
-            builder.AppendLine("    /// 当前项目全部网络协议的无状态统一注册入口。");
+            builder.AppendLine($"    /// {description} 协议的无状态统一注册入口。");
             builder.AppendLine("    /// </summary>");
-            builder.AppendLine("    public static class ProjectProtocolRegistration");
+            builder.AppendLine($"    public static class {className}");
             builder.AppendLine("    {");
             builder.AppendLine("        /// <summary>");
             builder.AppendLine("        /// 按稳定顺序将全部项目消息注册到临时协议构建器。");
@@ -532,36 +740,64 @@ namespace MiniCore.EditorTools
         /// <summary>
         /// 保存本工具拥有的生成文件清单，并只清理上次清单中已失效的文件。
         /// </summary>
-        private static void SaveOwnershipManifest(string outputDirectory, IReadOnlyList<ProtoDefinition> definitions)
+        /// <param name="businessOutputDirectory">业务协议生成根目录。</param>
+        /// <param name="controlDefinitions">固定控制面协议定义。</param>
+        /// <param name="businessDefinitions">业务协议定义。</param>
+        private static void SaveOwnershipManifest(
+            string businessOutputDirectory,
+            IReadOnlyList<ProtoDefinition> controlDefinitions,
+            IReadOnlyList<ProtoDefinition> businessDefinitions)
         {
             GeneratedFileManifest previous = File.Exists(GetFullPath(OwnershipManifestPath))
                 ? JsonUtility.FromJson<GeneratedFileManifest>(File.ReadAllText(GetFullPath(OwnershipManifestPath)))
                 : null;
-            string normalizedOutputDirectory = NormalizeAssetPath(outputDirectory);
+            string normalizedBusinessOutputDirectory = NormalizeAssetPath(businessOutputDirectory);
+            string normalizedControlOutputDirectory = NormalizeAssetPath(ControlOutputDirectory);
+            var allDefinitions = new List<ProtoDefinition>(controlDefinitions.Count + businessDefinitions.Count);
+            allDefinitions.AddRange(controlDefinitions);
+            allDefinitions.AddRange(businessDefinitions);
             var current = new GeneratedFileManifest
             {
                 Version = OwnershipManifestVersion,
                 Generator = OwnershipManifestGenerator,
-                OutputDirectory = normalizedOutputDirectory,
-                SourceDigest = ComputeSourceDigest(definitions)
+                BusinessOutputDirectory = normalizedBusinessOutputDirectory,
+                ControlOutputDirectory = normalizedControlOutputDirectory,
+                SourceDigest = ComputeSourceDigest(allDefinitions)
             };
-            for (int index = 0; index < definitions.Count; index++)
-            {
-                ProtoDefinition definition = definitions[index];
-                string stem = Path.GetFileNameWithoutExtension(definition.SourcePath);
-                current.Files.Add(normalizedOutputDirectory + "/" + stem + ".cs");
-                if (definition.Messages.Count > 0)
-                {
-                    current.Files.Add(normalizedOutputDirectory + "/" + stem + ".ProtocolRole.g.cs");
-                    current.Files.Add(normalizedOutputDirectory + "/" + stem + ".ProtocolRegistration.g.cs");
-                }
-            }
-            current.Files.Add(normalizedOutputDirectory + "/ProjectProtocolRegistration.g.cs");
+            AddOwnedDefinitionFiles(current.Files, normalizedControlOutputDirectory, controlDefinitions);
+            AddOwnedDefinitionFiles(current.Files, normalizedBusinessOutputDirectory, businessDefinitions);
+            current.Files.Add(normalizedBusinessOutputDirectory + "/Outer/BusinessClientProtocolRegistration.g.cs");
+            current.Files.Add(normalizedBusinessOutputDirectory + "/Inner/BusinessServerProtocolRegistration.g.cs");
             current.Files.Sort(StringComparer.Ordinal);
 
             DeleteObsoleteOwnedFiles(previous, current.Files);
 
             WriteFileIfChanged(GetFullPath(OwnershipManifestPath), JsonUtility.ToJson(current, true) + Environment.NewLine);
+        }
+
+        /// <summary>
+        /// 将一组协议定义对应的生成文件加入所有权清单。
+        /// </summary>
+        /// <param name="files">待追加的所有权路径集合。</param>
+        /// <param name="outputDirectory">协议生成根目录。</param>
+        /// <param name="definitions">协议定义。</param>
+        private static void AddOwnedDefinitionFiles(
+            ICollection<string> files,
+            string outputDirectory,
+            IReadOnlyList<ProtoDefinition> definitions)
+        {
+            for (int index = 0; index < definitions.Count; index++)
+            {
+                ProtoDefinition definition = definitions[index];
+                string stem = Path.GetFileNameWithoutExtension(definition.SourcePath);
+                string scopeDirectory = outputDirectory + "/" + definition.Scope;
+                files.Add(scopeDirectory + "/" + stem + ".cs");
+                if (definition.Messages.Count > 0)
+                {
+                    files.Add(scopeDirectory + "/" + stem + ".ProtocolRole.g.cs");
+                    files.Add(scopeDirectory + "/" + stem + ".ProtocolRegistration.g.cs");
+                }
+            }
         }
 
         /// <summary>
@@ -573,7 +809,7 @@ namespace MiniCore.EditorTools
             GeneratedFileManifest previous,
             IReadOnlyCollection<string> currentFiles)
         {
-            if (!TryGetTrustedOwnershipRoot(previous, out string oldOutputDirectory))
+            if (!TryGetTrustedOwnershipRoots(previous, out string[] oldOutputDirectories))
             {
                 return;
             }
@@ -583,6 +819,7 @@ namespace MiniCore.EditorTools
             {
                 string oldPath = NormalizeAssetPath(previous.Files[index]);
                 if (expected.Contains(oldPath)
+                    || !TryFindOwnedRoot(oldOutputDirectories, oldPath, out string oldOutputDirectory)
                     || !IsDirectOwnedGeneratedPath(oldOutputDirectory, oldPath)
                     || !HasExpectedGeneratedMarker(oldPath))
                 {
@@ -597,27 +834,63 @@ namespace MiniCore.EditorTools
         /// 验证旧清单版本、生成器来源和输出目录归属，不信任清单中的任意 Assets 路径。
         /// </summary>
         /// <param name="manifest">待验证的旧清单。</param>
-        /// <param name="outputDirectory">成功时返回规范化的旧输出根目录。</param>
+        /// <param name="outputDirectories">成功时返回规范化的旧输出根目录。</param>
         /// <returns>旧清单可用于安全清理时返回 true。</returns>
-        private static bool TryGetTrustedOwnershipRoot(
+        private static bool TryGetTrustedOwnershipRoots(
             GeneratedFileManifest manifest,
-            out string outputDirectory)
+            out string[] outputDirectories)
         {
-            outputDirectory = null;
+            outputDirectories = null;
             if (manifest == null
-                || manifest.Version != OwnershipManifestVersion
                 || !string.Equals(manifest.Generator, OwnershipManifestGenerator, StringComparison.Ordinal)
                 || manifest.Files == null)
             {
                 return false;
             }
 
-            string normalized = NormalizeAssetPath(manifest.OutputDirectory);
+            string[] candidates;
+            if (manifest.Version == 2)
+            {
+                candidates = new[] { manifest.OutputDirectory };
+            }
+            else if (manifest.Version == OwnershipManifestVersion)
+            {
+                candidates = new[] { manifest.BusinessOutputDirectory, manifest.ControlOutputDirectory };
+            }
+            else
+            {
+                return false;
+            }
+
+            var trusted = new List<string>(candidates.Length);
+            for (int index = 0; index < candidates.Length; index++)
+            {
+                string normalized = NormalizeAssetPath(candidates[index]);
+                if (!IsTrustedProtocolOutputDirectory(normalized))
+                {
+                    return false;
+                }
+
+                trusted.Add(normalized);
+            }
+
+            outputDirectories = trusted.ToArray();
+            return outputDirectories.Length > 0;
+        }
+
+        /// <summary>
+        /// 判断协议生成根目录路径和程序集边界均可信。
+        /// </summary>
+        /// <param name="outputDirectory">待验证的 Assets 相对目录。</param>
+        /// <returns>路径安全且属于已知协议程序集时返回 true。</returns>
+        private static bool IsTrustedProtocolOutputDirectory(string outputDirectory)
+        {
+            string normalized = NormalizeAssetPath(outputDirectory);
             if (string.IsNullOrWhiteSpace(normalized)
                 || Path.IsPathRooted(normalized)
                 || normalized.IndexOf("..", StringComparison.Ordinal) >= 0
                 || !normalized.StartsWith("Assets/", StringComparison.Ordinal)
-                || !MiniCoreHotUpdateAssemblySettings.IsOutputDirectoryRegistered(normalized, out _))
+                || !IsProtocolOutputDirectory(normalized))
             {
                 return false;
             }
@@ -630,8 +903,61 @@ namespace MiniCore.EditorTools
                 return false;
             }
 
-            outputDirectory = normalized;
             return true;
+        }
+
+        /// <summary>
+        /// 判断生成根目录是否属于业务协议或固定控制面协议程序集。
+        /// </summary>
+        /// <param name="outputDirectory">待检查的 Assets 相对目录。</param>
+        /// <returns>三个作用域的程序集边界均匹配时返回 true。</returns>
+        private static bool IsProtocolOutputDirectory(string outputDirectory)
+        {
+            bool control = string.Equals(NormalizeAssetPath(outputDirectory), NormalizeAssetPath(ControlOutputDirectory), StringComparison.Ordinal);
+            return IsScopeAssembly(outputDirectory, ProtocolScope.Common, control ? ProtocolControlAssemblyName : ProtocolCommonAssemblyName)
+                && IsScopeAssembly(outputDirectory, ProtocolScope.Outer, control ? ProtocolControlAssemblyName : ProtocolOuterAssemblyName)
+                && IsScopeAssembly(outputDirectory, ProtocolScope.Inner, control ? ProtocolControlInnerAssemblyName : ProtocolInnerAssemblyName);
+        }
+
+        /// <summary>
+        /// 判断协议作用域目录是否属于指定程序集。
+        /// </summary>
+        /// <param name="outputRoot">协议生成根目录。</param>
+        /// <param name="scope">协议作用域。</param>
+        /// <param name="expectedAssemblyName">期望程序集名称。</param>
+        /// <returns>程序集名称匹配时返回 true。</returns>
+        private static bool IsScopeAssembly(string outputRoot, ProtocolScope scope, string expectedAssemblyName)
+        {
+            string scopeDirectory = NormalizeAssetPath(outputRoot) + "/" + scope;
+            string assemblyDefinitionPath = FindNearestAssemblyDefinition(scopeDirectory);
+            return TryReadAssemblyDefinitionName(assemblyDefinitionPath, out string assemblyName)
+                && string.Equals(assemblyName, expectedAssemblyName, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 查找生成文件所属的可信生成根目录。
+        /// </summary>
+        /// <param name="outputDirectories">可信生成根目录。</param>
+        /// <param name="assetPath">待检查生成文件。</param>
+        /// <param name="outputDirectory">匹配的生成根目录。</param>
+        /// <returns>文件位于其中一个生成根目录时返回 true。</returns>
+        private static bool TryFindOwnedRoot(
+            IReadOnlyList<string> outputDirectories,
+            string assetPath,
+            out string outputDirectory)
+        {
+            for (int index = 0; index < outputDirectories.Count; index++)
+            {
+                string candidate = outputDirectories[index];
+                if (assetPath.StartsWith(candidate + "/", StringComparison.Ordinal))
+                {
+                    outputDirectory = candidate;
+                    return true;
+                }
+            }
+
+            outputDirectory = null;
+            return false;
         }
 
         /// <summary>
@@ -645,20 +971,31 @@ namespace MiniCore.EditorTools
             if (string.IsNullOrWhiteSpace(assetPath)
                 || Path.IsPathRooted(assetPath)
                 || assetPath.IndexOf("..", StringComparison.Ordinal) >= 0
-                || !string.Equals(
-                    NormalizeAssetPath(Path.GetDirectoryName(assetPath)),
-                    outputDirectory,
-                    StringComparison.Ordinal))
+                || !IsOwnedScopeDirectory(outputDirectory, NormalizeAssetPath(Path.GetDirectoryName(assetPath))))
             {
                 return false;
             }
 
             string fileName = Path.GetFileName(assetPath);
             return string.Equals(fileName, "ProjectProtocolRegistration.g.cs", StringComparison.Ordinal)
+                || string.Equals(fileName, "ServerProjectProtocolRegistration.g.cs", StringComparison.Ordinal)
+                || string.Equals(fileName, "BusinessClientProtocolRegistration.g.cs", StringComparison.Ordinal)
+                || string.Equals(fileName, "BusinessServerProtocolRegistration.g.cs", StringComparison.Ordinal)
                 || fileName.EndsWith(".ProtocolRole.g.cs", StringComparison.Ordinal)
                 || fileName.EndsWith(".ProtocolRegistration.g.cs", StringComparison.Ordinal)
                 || (fileName.EndsWith(".cs", StringComparison.Ordinal)
                     && !fileName.EndsWith(".g.cs", StringComparison.Ordinal));
+        }
+
+        /// <summary>
+        /// 判断生成文件目录是旧版根目录或固定 Common、Outer、Inner 子目录。
+        /// </summary>
+        private static bool IsOwnedScopeDirectory(string outputDirectory, string candidate)
+        {
+            return string.Equals(candidate, outputDirectory, StringComparison.Ordinal)
+                || string.Equals(candidate, outputDirectory + "/Common", StringComparison.Ordinal)
+                || string.Equals(candidate, outputDirectory + "/Outer", StringComparison.Ordinal)
+                || string.Equals(candidate, outputDirectory + "/Inner", StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -683,7 +1020,10 @@ namespace MiniCore.EditorTools
             }
 
             string fileName = Path.GetFileName(assetPath);
-            if (string.Equals(fileName, "ProjectProtocolRegistration.g.cs", StringComparison.Ordinal))
+            if (string.Equals(fileName, "ProjectProtocolRegistration.g.cs", StringComparison.Ordinal)
+                || string.Equals(fileName, "ServerProjectProtocolRegistration.g.cs", StringComparison.Ordinal)
+                || string.Equals(fileName, "BusinessClientProtocolRegistration.g.cs", StringComparison.Ordinal)
+                || string.Equals(fileName, "BusinessServerProtocolRegistration.g.cs", StringComparison.Ordinal))
             {
                 return string.Equals(
                     firstLine,
@@ -875,6 +1215,8 @@ namespace MiniCore.EditorTools
         {
             public int Version;
             public string Generator;
+            public string BusinessOutputDirectory;
+            public string ControlOutputDirectory;
             public string OutputDirectory;
             public string SourceDigest;
             public List<string> Files = new List<string>();
@@ -895,16 +1237,36 @@ namespace MiniCore.EditorTools
             public uint Opcode;
         }
 
+        [Serializable]
+        private sealed class AssemblyDefinitionData
+        {
+            [SerializeField] private string name; // Unity asmdef 的稳定程序集名称。
+
+            /// <summary>
+            /// 获取程序集名称。
+            /// </summary>
+            internal string Name => name;
+        }
+
+        private enum ProtocolScope
+        {
+            Common,
+            Outer,
+            Inner
+        }
+
         private sealed class ProtoDefinition
         {
             public string SourcePath { get; }
             public string Namespace { get; }
+            public ProtocolScope Scope { get; }
             public List<MessageDefinition> Messages { get; } = new List<MessageDefinition>();
 
-            public ProtoDefinition(string sourcePath, string namespaceName)
+            public ProtoDefinition(string sourcePath, string namespaceName, ProtocolScope scope)
             {
                 SourcePath = sourcePath;
                 Namespace = namespaceName;
+                Scope = scope;
             }
         }
 

@@ -1,18 +1,21 @@
 # MiniBomber 全链路 Demo 制作与验证
 
-本文档对应 `Demos/MiniBomber` 的当前实现，用于同时验证 MiniCore 的账号、KCP/WebSocket 网络、服务器权威状态同步、UI Root、场景切换、Dedicated Server、YooAsset 和 HybridCLR 热更新链路。
+本文档对应 `Demos/MiniBomber` 的当前实现，用于展示独立认证服务、Coordinator 服务发现、多 Role Dedicated Server、数据库服务、服务器权威状态同步、UI Root、场景切换、YooAsset 和 HybridCLR 热更新链路。框架级部署约束见 [Dedicated Server 架构](../DedicatedServerArchitecture.md)，从零开始的通用操作流程见 [MiniCore 框架部署入门](../FrameworkDeploymentGettingStarted.md)。
 
 ## 1. 当前实现边界
 
 已实现的代码链路：
 
-- 单文件协议 `Proto/Demos/MiniBomber/MiniBomber.proto`，包含账号、大厅、房间、战斗输入、快照、事件和最终成绩。
+- `Proto/Business/Outer/MiniBomber.proto` 中的客户端可见 Lobby/Game 业务协议，以及 `Proto/Business/Inner/Match.proto` 中只对服务端可见的匹配协议。
 - Dedicated Server 权威房间和 `30Hz` 固定时间步战斗，客户端按 `30Hz` 发送输入，服务器按 `15Hz` 广播动态快照。
 - 整数毫米权威坐标、整数余数移动、格子阻挡、炸弹、连锁爆炸、击杀、复活保护和服务器排名。
-- 账号注册/登录、开发版随机盐 SHA-256 摘要、版本握手、会话令牌和 `15` 秒断线恢复。
+- 根目录 `Server/AuthenticationServer` 提供独立 HTTP 注册/登录，并在登录响应中下发 Coordinator WebSocket 地址。
+- Coordinator 维护 DS 注册、心跳、Starting/Ready/Draining 与服务目录；不转发业务 RPC。
+- Lobby、Match、Game Role 使用同一 DS 包，由各部署副本中的 JSON 决定当前进程注册哪些 Handler 和创建哪些业务 Component。
+- 根目录 `Server/DatabaseServer` 使用 MiniCore Inner RPC、EF Core/Pomelo/MySQL，并以 `ServiceKind.Database` 注册；DS 可以通过 `persistenceMode=None` 完全不使用它。
 - 大厅创建/加入/刷新房间，房主设置、准备、开始、房主转移和战斗加载超时。
 - Windows 键盘和 Android 虚拟摇杆/炸弹按钮的统一输入；Android 支持持续移动时同时放置炸弹，并在 Demo 运行期间保持屏幕常亮。
-- 客户端固定连接 `MiniBomberConstants` 中的 Demo 服务地址；原生 PC/Android 使用 KCP，浏览器 WebGL 使用 WebSocket，登录界面不暴露地址和端口输入。
+- 客户端业务资产 `MiniBomberClientNetworkProfile` 只保存认证 HTTPS 入口；Coordinator、Lobby、Game、Match、Database 地址均不进入客户端配置。
 - 登录、大厅、房间、战斗、成绩和重连的 Client Flow、View 与 Presenter。
 - 客户端展示插值、简单本地预测、小误差收敛和超过 `0.75` 格的直接校正。预测不参与权威判定。
 
@@ -25,9 +28,9 @@
 
 ### 源码与程序集边界
 
-Demo 的手写运行时代码统一位于 `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber`，按 `Entry`、`Domain`、`Client`、`Server`、`Network`、`Configuration` 分区。输入、场景绑定、世界表现和 ScriptableObject 配置也属于 Demo 自身，不再散落到 `MiniCore.Unity`。
+MiniBomber 手写运行时代码仍位于 `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber`，但通过 asmref 编入三个不同程序集：共享 DTO/规则进入 `MiniCore.HotUpdate.Shared`，客户端 UI/Flow/Handler 进入 `MiniCore.HotUpdate.Client`，服务端权威状态/Role Handler 进入 `MiniCore.HotUpdate.Server`。服务端程序集不会参与客户端 Player 编译或热更新清单。
 
-Demo 的 Editor 工具物理位于 `HotUpdate/Demos/MiniBomber/Editor`，但通过该目录的 `MiniCore.Editor.asmref` 编入 `MiniCore.Editor`，不会进入 HotUpdate Player 程序集。协议源仍位于 `Proto/Demos/MiniBomber`，生成消息仍属于 `MiniCore.Protocol`；协议是网络契约，不应为了目录集中而倒置为 HotUpdate 对 Protocol 的反向依赖。场景和 Prefab 继续位于 `Assets/Scenes/Demos/MiniBomber` 与 `Assets/AssetRes/Demos/MiniBomber`，Editor 测试继续位于 `Assets/Tests/Editor/Demos/MiniBomber`。
+Demo 的 Editor 工具物理位于 `HotUpdate/Demos/MiniBomber/Editor`，但通过 `MiniCore.Editor.asmref` 编入 `MiniCore.Editor`。客户端可见业务协议生成到热更新 `MiniCore.Protocol.Outer`，共享类型生成到热更新 `MiniCore.Protocol.Common`，Match 和 Database RPC 生成到热更新 `MiniCore.Protocol.Inner`；Coordinator 控制面单独生成到 AOT Control/Control.Inner。场景和 Prefab 继续位于 `Assets/Scenes/Demos/MiniBomber` 与 `Assets/AssetRes/Demos/MiniBomber`。
 
 ## 2. 启动与场景时序
 
@@ -39,7 +42,8 @@ Bootstrap 只负责 YooAsset、AOT 补充元数据和 HotUpdate DLL。加载 DLL
   → MiniCoreStartup.StartAsync
   → GameStartup.StartAsync
   → MiniBomberClientStartupComponent
-  → 创建 MiniBomber Client Components
+  → 加载 MiniBomberClientNetworkProfile
+  → EnableNetwork=true 时创建 MiniBomber Client Components
   → YooAssetSceneService 切换 LoginScene
   → UIService 自动加载 ApplicationUIRoot
   → 打开 LoginWindow
@@ -48,33 +52,44 @@ Bootstrap 只负责 YooAsset、AOT 补充元数据和 HotUpdate DLL。加载 DLL
 ```text
 Dedicated ServerBootstrapScene
   → 更新资源与加载 HotUpdate DLL
-  → MiniCoreStartup.StartAsync
-  → GameStartup.StartAsync
+  → MiniCoreServerStartup.StartAsync
+  → 把 MiniBomberDedicatedServerApplication 交给 AOT DedicatedServerHost
+  → AOT 宿主读取 MiniCoreServerRuntime.json
+  → AOT 注册网络、控制面与服务发现，业务注册 Role Handler
+  → 启动监听并启动/注册 Coordinator 控制面
   → MiniBomberServerStartupComponent
-  → MiniBomberServerRuntimeComponent 同时启动 KCP 与 WebSocket
+  → 按 Role 创建 Match/Lobby/Game 业务 Component
+  → 报告 Ready
 ```
 
-Dedicated Server 必须以 `-batchmode` 运行。该分支不切换 Login/Lobby/BattleScene，`UIService` 也不创建 `ApplicationUIRoot`。
+Dedicated Server 通常以 `-batchmode` 运行，但运行形态不是由这个参数决定：服务端 Player 的目标程序集清单直接指向薄 `MiniCoreServerStartup`，系统级注册发现由 AOT `DedicatedServerHost` 在调用业务前完成；`GameStartup` 只存在于客户端程序集。
 
-`GameStartup` 只负责运行形态分流：
-
-- 未带自动压测参数的普通客户端：创建 `MiniBomberClientStartupComponent`，由它加载共享配置、创建账号/大厅/房间/战斗组件并进入登录流程。
-- Batch/Dedicated Server：创建 `MiniBomberServerStartupComponent`，由它加载共享规则和地图，并在 `0.0.0.0:20000` 同时启动 KCP（UDP）与 WebSocket（TCP）监听。
-- `-serverPort <port>` 同时覆盖 KCP 与 WebSocket 的数值端口；UDP 与 TCP 可以使用相同端口号。
-- 旧 KCP 测试代码仍保留，但不再启动时自动打开 `KcpTestWindow`。
+- 客户端：`MiniBomberClientStartupComponent` 加载共享规则和仅含认证入口的网络 Profile；`EnableNetwork=false` 时不进入任何 MiniBomber 网络流程。
+- Coordinator：创建 `CoordinatorRegistryComponent`，维护控制面目录；Coordinator-only 不创建玩法运行时。
+- Match：创建普通业务组件 `MiniBomberMatchServerComponent`；Match Handler 只在包含 Match Role 的进程注册。
+- Lobby/Game：加载共享规则与地图，再创建当前权威业务运行时。
+- 监听地址、广播地址、Role 与 Coordinator 内网地址全部来自 DS Player 自己的 `StreamingAssets/MiniCoreServerRuntime.json`，不读取客户端资产，也不需要重新编译。
 
 客户端流程窗口的完成边界不是“场景句柄加载结束”，而是“场景加载、目标数据刷新和目标窗口进入 Active 全部完成”。`SceneLoadingWindow` 在此边界之后才关闭，因此登录窗口不会在大厅尚未可用时重新露出。创建房间同样先完成 RoomWindow 导航，再关闭发起操作的 Popup。
 
-两项 Startup Component 都是无 `[ComponentCatalog]` 的普通 `AComponent`，代码固定放在 `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber/Entry`。它们不是框架新服务，也不会进入项目启动配置；职责只是让项目级 `GameStartup` 不直接持有 Demo 的配置、客户端状态组件和服务端运行时细节。
+客户端和服务端 Startup Component 都是无 `[ComponentCatalog]` 的普通业务 `AComponent`，不是框架新服务。框架级强制能力是 DS 专用的 `IServiceDiscoveryService`；它负责当前进程的注册、心跳、目录和状态上报，业务组件只消费已经准备好的 Role 与服务目录。
 
-### 开发阶段账号存储
+### 认证与地址发现
 
-MiniBomber 当前只面向内网联调，账号链路刻意保持单一：
+客户端默认连接流程：
 
-- 注册时生成 `16` 字节随机盐，以 `SHA-256(salt + UTF8(password))` 保存不可逆摘要，登录时使用固定时间比较。
-- 不保存、打印或回传明文密码；账号数据库仍通过项目选中的 `ISaveService` 保存，当前配置会再对整个存档文件加密并校验完整性。
-- 不保存算法版本，不兼容或迁移旧密码格式，也没有生产环境使用的慢哈希参数。账号字段格式变化后，删除开发存档并重新注册。
-- 这是为了快速验证 Demo 全链路，不是公网账号安全方案。转为正式产品前应改用专门的密码哈希算法和独立账号服务。
+```text
+MiniBomberClientNetworkProfile.AuthenticationBaseUrl
+  → HTTPS POST /api/auth/login
+  → 返回 AccountId、SessionToken、CoordinatorWebSocketUrl
+  → 客户端临时直连 Coordinator，ResolveService(Lobby)
+  → Coordinator 返回 LobbyWebSocketUrl
+  → 客户端关闭 Coordinator 会话并直连 Lobby
+```
+
+`AuthenticationServer` 是可替换的 MiniBomber 业务实现，不属于 MiniCore 启动依赖，也不注册 Coordinator。它使用独立账号库，不通过 DatabaseServer。当前账号密码使用 PBKDF2；会话令牌的跨服务校验/轮换和传输加密强化不在本阶段范围。
+
+MiniCore 框架本身没有 `AuthenticationBaseUrl`、Coordinator 或 Lobby 配置。其他离线项目既不需要创建 `MiniBomberClientNetworkProfile`，也可以完全不启用网络与 HTTP AppService。
 
 ## 3. 一次性生成默认资产
 
@@ -87,6 +102,7 @@ MiniCore > Demos > MiniBomber > Create Default Assets
 菜单是幂等的，只创建缺失项，不覆盖已修改场景或配置。它会创建：
 
 - `MiniBomberRuntimeConfig.asset`
+- `MiniBomberClientNetworkProfile.asset`
 - `MiniBomberRuleConfig.asset`
 - `MiniBomberDefaultMap.asset`，默认 `17×13`
 - `LoginScene.unity`
@@ -275,7 +291,7 @@ MiniBomber 是服务器权威状态同步，不是帧同步：
 
 ```text
 客户端 BomberInputFrame
-  → 30Hz KCP 输入
+  → 30Hz Outer RPC 输入
   → 服务器 30Hz 整数权威模拟
   → 15Hz 世界快照 + 即时炸弹/爆炸/击杀/复活事件
   → 客户端插值、预测与校正
@@ -292,32 +308,56 @@ MiniBomber 是服务器权威状态同步，不是帧同步：
 
 权威数值不使用 `Vector3`、Rigidbody 或确定性浮点库。位置是整数毫米，时间是 Tick/整数毫秒，输入量化到 `-1000..1000`。客户端 float 只影响显示。
 
-## 8. 局域网部署
+## 8. 多进程部署
 
-推荐结构：
-
-```text
-Mac mini M4
-├── macOS Dedicated Server        UDP 20000（KCP）+ TCP 20000（WebSocket）
-└── HTTP 静态资源服务          TCP 8080
-
-Windows 笔记本                     Windows x86_64 Client
-Android 手机                         Android ARM64 Client
-浏览器                                WebGL Client
-```
-
-1. 为 Mac mini 设置固定 IP 或路由器 DHCP 保留。
-2. 防火墙或云安全组同时放行 UDP `20000`（KCP）与 TCP `20000`（WebSocket）；静态资源服务使用独立 HTTP/HTTPS 端口。
-3. 客户端不再手工填写地址；发布前在 `MiniBomberConstants` 中设置部署端点并重新构建对应 HotUpdate 资源。
-4. 先启动 Server，再启动两个 Client。
-
-服务器启动参数示例：
+推荐最小结构：
 
 ```text
-MiniBomberServer -batchmode -nographics -serverPort 20000 -logFile MiniBomberServer.log
+AuthenticationServer (.NET 10 Web)
+  └── 账号 MySQL
+
+DatabaseServer (.NET 10 Worker，可选)
+  └── 游戏数据 MySQL
+
+同一份 Dedicated Server Player 的部署副本
+  ├── Coordinator-01  roles=[Coordinator]
+  ├── Lobby-01        roles=[Lobby]
+  ├── Match-01        roles=[Match]
+  └── Game-01         roles=[Game]
 ```
 
-首次调试先使用 OfflinePlayMode，排除 HTTP 配置干扰；再将 Client `HotUpdateScene/UpdateMainWindow` 切到 HostPlayMode，填写指向 Mac mini 的主/备 URL。Server 若也需要在启动时取得新 HotUpdate DLL，将 `ServerBootstrapScene/ServerBootstrap` 的包模式同样改为 HostPlayMode。
+1. 编辑 `Server/AuthenticationServer/appsettings.json`，配置账号库、令牌参数和对外 Coordinator WebSocket 地址。
+2. 需要持久化时编辑 `Server/DatabaseServer/appsettings.json`，配置游戏库、Inner RPC 监听和 Coordinator 内网地址；不需要时将所有 DS 副本设为 `persistenceMode=None`，无需启动 DBServer。
+3. 复制同一份 DS Player，为每份副本编辑 `StreamingAssets/MiniCoreServerRuntime.json`。每个实例使用唯一 `instanceId` 和监听端口，`advertised` 填写其他进程或客户端实际可达的地址。
+4. 先启动唯一 Coordinator，再启动可选 DBServer，以及 Lobby、Match、Game。普通 DS 会先以 `Starting` 注册，业务组件就绪后自动报告 `Ready`。
+5. MiniBomber 客户端 Profile 只配置 AuthenticationServer HTTPS 入口；其余地址都由登录响应和 Coordinator 动态下发。
+
+运行期间重启 DatabaseServer 不要求重启 GameCluster：DatabaseServer 会自动重新注册 Ready，GameCluster 的下一次 Load 会重新发现并连接。重启 Coordinator 后，DatabaseServer 与普通 DS 都会自动重连、重新注册和恢复原状态；Coordinator 不保存持久目录，因此短暂恢复窗口内客户端可能暂时查询不到服务。
+
+Role 配置示例：
+
+```json
+{
+  "instanceId": "Match-01",
+  "roles": ["Match"],
+  "coordinator": { "innerHost": "10.0.1.10", "innerPort": 7000 },
+  "listeners": {
+    "innerHost": "0.0.0.0",
+    "innerPort": 7200,
+    "outerHost": "0.0.0.0",
+    "outerPort": 7201,
+    "outerPath": "/minicore"
+  },
+  "advertised": {
+    "innerHost": "10.0.1.12",
+    "innerPort": 7200,
+    "outerWebSocketUrl": "wss://match.example.com/minicore"
+  },
+  "persistenceMode": "Database"
+}
+```
+
+Coordinator 不转发 Lobby、Match、Game 或 Database 业务消息。调用方先从服务目录取得 Ready 实例，再使用现有 MiniCore RPC 直连目标 Inner/Outer 地址。完整字段与启动顺序见 [Dedicated Server 架构](../DedicatedServerArchitecture.md)。
 
 ## 9. 多端构建
 
@@ -334,6 +374,8 @@ MiniBomberServer -batchmode -nographics -serverPort 20000 -logFile MiniBomberSer
 - 使用 macOS Dedicated Server 或 Standalone 构建目标。
 - Build Settings 只把 `Assets/Scenes/Demos/MiniBomber/ServerBootstrapScene.unity` 作为第一启动场景。
 - 运行时带 `-batchmode -nographics`。
+- 构建处理器只向该目标注入 `MiniCoreServerRuntime.json`；复制部署包后可以直接修改副本配置。
+- 默认目标程序集不包含 Client UI/Handler；若开发环境确需同包客户端代码，可显式启用“DS 额外包含 Client”。
 
 ### Windows Client
 
@@ -350,9 +392,8 @@ MiniBomberServer -batchmode -nographics -serverPort 20000 -logFile MiniBomberSer
 ### WebGL Client
 
 - 切换 WebGL 目标，Build Settings 以 `Assets/Scenes/HotUpdateScene.unity` 为第一启动场景。
-- 浏览器不能创建原生 TCP/UDP Socket，因此运行时能力选择会自动改用 WebSocket，不会尝试 KCP。
-- 当前固定地址使用 `ws://`，WebGL 页面必须通过 HTTP 提供；若页面通过 HTTPS 发布，必须在公网域名上配置可信证书和 WSS 反向代理，再把固定地址改为 `wss://`。
-- Dedicated Server 的 WebSocket 路径固定为 `/minibomber`，与 KCP 复用业务协议、Session、RPC 和 Handler。
+- 浏览器使用 AuthenticationServer 的 HTTPS API 和 Coordinator/Lobby 的 WebSocket 外网地址。
+- HTTPS 页面必须接收 `wss://` 地址；TLS 证书与反向代理属于部署层，DS JSON 的 `advertised.outerWebSocketUrl` 应填写客户端实际可达入口。
 
 资源发布根目录按平台隔离：
 
@@ -394,11 +435,10 @@ V2 不修改 Proto、AOT API、Input System 包或原生插件。如果修改了
 6. 跨端：Windows 与 Android 同房比赛，对比双端得分、时间、事件和最终排名。
 7. 热更新：已安装 V1 的设备只下载 V2 DefaultPackage，验证道具开关和资源更新。
 
-## 12. 已有自动验证
+## 12. 历史自动验证范围
 
-Editor 回归测试位于 `Assets/Tests/Editor/Demos/MiniBomber`，当前覆盖：
+Editor 回归测试位于 `Assets/Tests/Editor/Demos/MiniBomber`。以下是改造前后保留的主要业务覆盖；独立 AuthenticationServer 已删除原 Unity 本地密码仓库与对应密码测试，应在后续为 .NET 服务另行建立验证：
 
-- 随机盐 SHA-256 的正确密码、错误密码和损坏存档验证。
 - 输入超时后只停止移动，权威位置不改变。
 - 断线角色停在当前位置，不发生传送。
 - 自杀死亡惩罚和服务器最终排名。
@@ -415,6 +455,21 @@ Editor 回归测试位于 `Assets/Tests/Editor/Demos/MiniBomber`，当前覆盖�
 运行入口：Unity Test Runner 的 EditMode，筛选 `MiniCore.Tests.Editor.Demos.MiniBomber`。
 
 ## 13. 验证记录
+
+### 2026-08-15（RPC 简化超时、长连接心跳与服务自动恢复）
+
+- API：Unity `INetworkService` 与 .NET `MiniCoreRpcClient` 的 RPC 方法统一使用末尾可选 `timeoutSeconds=10`；没有引入 Options 或重复重载。客户端查询 Coordinator 为 `8` 秒，控制面为 `3` 秒，数据库 Load/Save 为 `5/8` 秒，Match 开始和场景就绪为 `15` 秒。
+- 长连接：Unity 与 .NET 默认每 `2` 秒 Ping，连续 `10` 秒没有 Pong 才断开；.NET 客户端改为唯一接收循环、RpcId Pending 表和串行发送入口，迟到响应忽略，断线一次性结束全部 Pending RPC。
+- 恢复：DatabaseServer 的 `7300` 业务 Listener 不再随 Coordinator 控制连接异常退出；DBServer 与普通 DS 均以 `1/2/4/8/15` 秒上限退避重新注册并恢复 Ready。GameCluster 的数据库 Load 可重连重试一次，Save 结果未知时先 Load 核验，最终统一返回 `503 DatabaseUnavailable`。
+- 编译：.NET 10 解决方案为 `0` 错误、`0` 警告；Unity 2021.3.45f2 隔离副本分别以 WebGL 客户端和 Linux Dedicated Server 条件完成脚本编译，均无 C# 错误。只保留项目既有的 `ReferenceCollectorEditor` 未使用字段和 `MTaskTests` 未等待调用警告；未运行测试、Player、YooAsset/HybridCLR 构建或数据库迁移。
+
+### 2026-08-15（多 Role DS、独立认证/数据库服务与客户端裁剪）
+
+- 启动：客户端与 Dedicated Server 使用不同热更新入口；DS 读取自身 JSON，自动注册网络、Role Handler 和 Coordinator 服务发现后再进入业务组件。
+- 地址：客户端 Profile 只保存 AuthenticationServer HTTPS 入口；认证响应下发 Coordinator，Coordinator 再下发 Ready Lobby，业务数据不经过 Coordinator 转发。
+- 服务：根目录新增 .NET 10 AuthenticationServer 与可选 DatabaseServer；DBServer 复用 MiniCore Inner 帧/RPC，以 `ServiceKind.Database` 注册并使用 EF Core/Pomelo/MySQL。
+- 裁剪：Client/Server 业务代码、业务 Common/Outer/Inner 协议与 AOT Control/Control.Inner 均有独立程序集；客户端构建校验阻止服务端程序集、Inner 协议、Control.Inner、Handler 清单和 DS JSON 泄漏。
+- 验证约束：本轮只进行 Unity 与 .NET 编译检查，不运行测试，不执行 Player、HybridCLR 或 YooAsset 构建。
 
 ### 2026-08-12（WebGL 与原生端共用 Dedicated Server 接入）
 
@@ -527,7 +582,10 @@ Editor 回归测试位于 `Assets/Tests/Editor/Demos/MiniBomber`，当前覆盖�
 | Android 炸弹按钮没输入 | BombButton 不需要绑定到 View 字段；确认它挂有 OnScreenButton，Control Path 为 `<Gamepad>/buttonSouth`，PlaceBomb Action 监听相同路径。 |
 | Android 移动时不能同时放炸弹 | 确认客户端使用订阅 `PlaceBomb.performed` 的新输入代码，并检查 ApplicationUIRoot 的 Pointer Behavior 没有被改为单指模式；只更新 Prefab 而未发布对应 HotUpdate DLL 不会生效。 |
 | Android 动态角色或特效缺失并报告 class ID | 确认 `Assets/Linker/MiniCore.link.xml` 存在，且 `UpdateMainWindow` 在下载完成后显式调用公开的 `UnityEngineTypePreserver.ProtectDynamicContentTypes()`；然后重新生成 HybridCLR、构建并安装 Player，只更新热更包或补充 AOT 元数据不够。 |
-| 客户端连不上 Mac | 用 Mac 局域网 IP，检查 UDP 20000 和同网段，不要填 localhost。 |
+| 客户端认证成功但找不到 Lobby | 检查认证响应中的 Coordinator 外网地址、Lobby 是否已注册 `Ready`，以及 Lobby 的 `advertised.outerWebSocketUrl` 是否对客户端可达。 |
+| DS 无法启动 | 检查 Player 自身 `StreamingAssets/MiniCoreServerRuntime.json`，确认 `instanceId`、Role、监听端口和 Coordinator 内网地址有效且端口未占用。 |
+| Lobby/Game 找不到 Database | 确认 `persistenceMode=Database`、DatabaseServer 已以 `ServiceKind.Database` 注册 Ready；不使用数据库时应明确设为 `None`。 |
+| 登录后显示 `DatabaseUnavailable` | 检查 DatabaseServer 进程与 `7300` Listener、Coordinator 中 Database-01 是否 Ready，以及 GameCluster 到该内网地址是否可达；框架会自动重连，不应再显示底层 `Session MiniBomber.Database not connected`。 |
 | 重连后角色回原点 | 这不是设计行为；检查服务器是否使用新 HotUpdate DLL，并验证输入超时测试。 |
 | 设备仍运行 V1 | 确认执行 CompileDll/Prepare，上传完整新版本，Host URL 指向对应平台。 |
 | Android 报 `NotSupportAdjustorThunk` | 先确认异常是否来自复杂值类型跨 HotUpdate/AOT 泛型边界；若 AOT 公共类型已经修改，执行 Android `HybridCLR > Generate > All` 后重新构建并安装 Player，不能只发布热更包。 |

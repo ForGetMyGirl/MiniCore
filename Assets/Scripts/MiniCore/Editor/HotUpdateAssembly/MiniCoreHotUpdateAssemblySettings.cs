@@ -14,14 +14,38 @@ namespace MiniCore.EditorTools
     {
         #region Private 私有成员
 
-        private const string ProtocolAssemblyName = "MiniCore.Protocol"; // 框架协议热更新程序集名称。
-        private const string ProtocolAssemblyPath = "Assets/Scripts/MiniCore/Protocol/MiniCore.Protocol.asmdef"; // 协议 asmdef 路径。
-        private const string StartupAssemblyName = "MiniCore.HotUpdate"; // 默认启动程序集名称。
-        private const string StartupAssemblyPath = "Assets/Scripts/MiniCore/HotUpdate/MiniCore.HotUpdate.asmdef"; // 默认启动 asmdef 路径。
+        private const string SharedAssemblyName = "MiniCore.HotUpdate.Shared"; // 两侧共用业务热更新程序集名称。
+        private const string SharedAssemblyPath = "Assets/Scripts/MiniCore/HotUpdate/MiniCore.HotUpdate.asmdef"; // 两侧共用业务 asmdef 路径。
+        private const string ClientAssemblyName = "MiniCore.HotUpdate.Client"; // 客户端业务热更新程序集名称。
+        private const string ClientAssemblyPath = "Assets/Scripts/MiniCore/HotUpdate/Client/MiniCore.HotUpdate.Client.asmdef"; // 客户端业务 asmdef 路径。
+        private const string ServerAssemblyName = "MiniCore.HotUpdate.Server"; // 服务端业务热更新程序集名称。
+        private const string ServerAssemblyPath = "Assets/Scripts/MiniCore/HotUpdate/Server/MiniCore.HotUpdate.Server.asmdef"; // 服务端业务 asmdef 路径。
         private const string DefaultStartupTypeName = "MiniCore.HotUpdate.MiniCoreStartup"; // 默认启动类型完整名称。
         private const string DefaultStartupMethodName = "StartAsync"; // 默认启动方法名称。
+        private const string CommonProtocolAssemblyName = "MiniCore.Protocol.Common"; // 业务 Common 热更新程序集名称。
+        private const string CommonProtocolAssemblyPath = "Assets/Scripts/MiniCore/Protocol/Generated/Common/MiniCore.Protocol.Common.asmdef"; // 业务 Common asmdef 路径。
+        private const string OuterProtocolAssemblyName = "MiniCore.Protocol.Outer"; // 业务 Outer 热更新程序集名称。
+        private const string OuterProtocolAssemblyPath = "Assets/Scripts/MiniCore/Protocol/Generated/Outer/MiniCore.Protocol.Outer.asmdef"; // 业务 Outer asmdef 路径。
+        private const string InnerProtocolAssemblyName = "MiniCore.Protocol.Inner"; // 业务 Inner 热更新程序集名称。
+        private const string InnerProtocolAssemblyPath = "Assets/Scripts/MiniCore/Protocol/Generated/Inner/MiniCore.Protocol.Inner.asmdef"; // 业务 Inner asmdef 路径。
+        private const string ControlProtocolAssemblyName = "MiniCore.Protocol.Control"; // 固定 AOT 控制面程序集名称。
+        private const string ControlInnerProtocolAssemblyName = "MiniCore.Protocol.Control.Inner"; // 固定 AOT 控制面 Inner 程序集名称。
+        private static readonly string[] AotFrameworkAssemblyDefinitionPaths =
+        {
+            "Assets/Scripts/MiniCore/Runtime/MiniCore.Runtime.asmdef",
+            "Assets/Scripts/MiniCore/Serialization/MiniCore.Serialization.asmdef",
+            "Assets/Scripts/MiniCore/Network/MiniCore.Network.asmdef",
+            "Assets/Scripts/MiniCore/Platform/Browser/MiniCore.Platform.Browser.asmdef",
+            "Assets/Scripts/MiniCore/Protocol/Control/MiniCore.Protocol.Control.asmdef",
+            "Assets/Scripts/MiniCore/Protocol/Control/Generated/Inner/MiniCore.Protocol.Control.Inner.asmdef",
+            "Assets/Scripts/MiniCore/Unity/MiniCore.Unity.asmdef",
+            "Assets/Scripts/MiniCore/Unity/YooAsset/MiniCore.Unity.YooAsset.asmdef",
+            "Assets/Scripts/MiniCore/Server/MiniCore.Server.asmdef",
+            "Assets/Scripts/Project/Bootstrap/Project.Bootstrap.asmdef"
+        }; // 会进入 Player 的固定 AOT 框架程序集定义。
 
-        [SerializeField] private List<MiniCoreHotUpdateAssemblyEntry> entries = new List<MiniCoreHotUpdateAssemblyEntry>(4); // 项目热更新程序集登记表。
+        [SerializeField] private List<MiniCoreHotUpdateAssemblyEntry> entries = new List<MiniCoreHotUpdateAssemblyEntry>(6); // 项目业务热更新程序集登记表。
+        [SerializeField] private bool includeClientAssembliesInDedicatedServer; // DS 是否额外携带纯客户端热更新程序集。
 
         #endregion
 
@@ -47,6 +71,33 @@ namespace MiniCore.EditorTools
             Array.Sort(result, CompareEntries);
             return result;
         }
+
+        /// <summary>
+        /// 按加载顺序取得指定运行目标真正需要携带的程序集。
+        /// </summary>
+        public MiniCoreHotUpdateAssemblyEntry[] GetEntriesInLoadOrder(HotUpdateAssemblyRuntimeTargets target)
+        {
+            bool includeClient = target == HotUpdateAssemblyRuntimeTargets.DedicatedServer
+                && includeClientAssembliesInDedicatedServer;
+            MiniCoreHotUpdateAssemblyEntry[] result = entries.FindAll(entry => entry != null
+                && (entry.Supports(target)
+                    || includeClient && entry.RuntimeTargets == HotUpdateAssemblyRuntimeTargets.Client)).ToArray();
+            Array.Sort(result, CompareEntries);
+            return result;
+        }
+
+        /// <summary>
+        /// 获取当前 Unity 构建目标对应的热更新运行侧。
+        /// </summary>
+        public static HotUpdateAssemblyRuntimeTargets ActiveRuntimeTarget =>
+            EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneOSX
+            || EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows
+            || EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64
+            || EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneLinux64
+                ? EditorUserBuildSettings.standaloneBuildSubtarget == StandaloneBuildSubtarget.Server
+                    ? HotUpdateAssemblyRuntimeTargets.DedicatedServer
+                    : HotUpdateAssemblyRuntimeTargets.Client
+                : HotUpdateAssemblyRuntimeTargets.Client;
 
         /// <summary>
         /// 登记一个新的热更新程序集并立即持久化项目设置。
@@ -100,15 +151,26 @@ namespace MiniCore.EditorTools
             var byName = new Dictionary<string, MiniCoreHotUpdateAssemblyEntry>(entries.Count, StringComparer.Ordinal);
             var byPath = new HashSet<string>(StringComparer.Ordinal);
             var loadOrders = new HashSet<int>();
-            int startupCount = 0;
-            bool containsProtocol = false;
-            bool containsDefaultStartup = false;
+            int clientStartupCount = 0;
+            int serverStartupCount = 0;
+            bool containsShared = false;
+            bool containsClient = false;
+            bool containsServer = false;
+            bool containsCommonProtocol = false;
+            bool containsOuterProtocol = false;
+            bool containsInnerProtocol = false;
             for (int index = 0; index < entries.Count; index++)
             {
                 MiniCoreHotUpdateAssemblyEntry entry = entries[index];
                 if (entry == null || string.IsNullOrWhiteSpace(entry.AssemblyName))
                 {
                     error = $"第 {index + 1} 条热更新程序集名称为空。";
+                    return false;
+                }
+
+                if (IsAotProtocolAssembly(entry.AssemblyName))
+                {
+                    error = $"协议程序集 {entry.AssemblyName} 属于 AOT 契约，禁止加入 HybridCLR 热更新清单。";
                     return false;
                 }
 
@@ -150,29 +212,61 @@ namespace MiniCore.EditorTools
                     return false;
                 }
 
-                containsProtocol |= string.Equals(entry.AssemblyName, ProtocolAssemblyName, StringComparison.Ordinal);
-                containsDefaultStartup |= string.Equals(entry.AssemblyName, StartupAssemblyName, StringComparison.Ordinal);
+                if (entry.RuntimeTargets == HotUpdateAssemblyRuntimeTargets.None)
+                {
+                    error = $"热更新程序集 {entry.AssemblyName} 没有运行目标。";
+                    return false;
+                }
+
+                if ((string.Equals(entry.AssemblyName, CommonProtocolAssemblyName, StringComparison.Ordinal)
+                     || string.Equals(entry.AssemblyName, OuterProtocolAssemblyName, StringComparison.Ordinal))
+                    && entry.RuntimeTargets != HotUpdateAssemblyRuntimeTargets.All)
+                {
+                    error = $"业务协议 {entry.AssemblyName} 必须同时提供给客户端和 Dedicated Server。";
+                    return false;
+                }
+
+                if (string.Equals(entry.AssemblyName, InnerProtocolAssemblyName, StringComparison.Ordinal)
+                    && entry.RuntimeTargets != HotUpdateAssemblyRuntimeTargets.DedicatedServer)
+                {
+                    error = "业务 Inner 协议只能登记到 Dedicated Server。";
+                    return false;
+                }
+
+                containsShared |= string.Equals(entry.AssemblyName, SharedAssemblyName, StringComparison.Ordinal);
+                containsClient |= string.Equals(entry.AssemblyName, ClientAssemblyName, StringComparison.Ordinal);
+                containsServer |= string.Equals(entry.AssemblyName, ServerAssemblyName, StringComparison.Ordinal);
+                containsCommonProtocol |= string.Equals(entry.AssemblyName, CommonProtocolAssemblyName, StringComparison.Ordinal);
+                containsOuterProtocol |= string.Equals(entry.AssemblyName, OuterProtocolAssemblyName, StringComparison.Ordinal);
+                containsInnerProtocol |= string.Equals(entry.AssemblyName, InnerProtocolAssemblyName, StringComparison.Ordinal);
                 if (entry.IsStartup)
                 {
-                    startupCount++;
                     if (string.IsNullOrWhiteSpace(entry.StartupTypeName)
                         || string.IsNullOrWhiteSpace(entry.StartupMethodName))
                     {
                         error = $"启动程序集 {entry.AssemblyName} 必须配置启动类型和静态方法。";
                         return false;
                     }
+
+                    clientStartupCount += entry.IsStartupFor(HotUpdateAssemblyRuntimeTargets.Client) ? 1 : 0;
+                    serverStartupCount += entry.IsStartupFor(HotUpdateAssemblyRuntimeTargets.DedicatedServer) ? 1 : 0;
                 }
             }
 
-            if (!containsProtocol || !containsDefaultStartup)
+            if (!containsShared
+                || !containsClient
+                || !containsServer
+                || !containsCommonProtocol
+                || !containsOuterProtocol
+                || !containsInnerProtocol)
             {
-                error = "MiniCore.Protocol 与 MiniCore.HotUpdate 都必须登记为热更新程序集。";
+                error = "业务 Common、Outer、Inner 与 Shared、Client、Server 六个基础热更新程序集都必须登记。";
                 return false;
             }
 
-            if (startupCount != 1)
+            if (clientStartupCount != 1 || serverStartupCount != 1)
             {
-                error = $"热更新程序集必须且只能配置一个启动入口，当前数量：{startupCount}。";
+                error = $"客户端和 Dedicated Server 必须各有且仅有一个启动入口，当前为 {clientStartupCount}/{serverStartupCount}。";
                 return false;
             }
 
@@ -196,6 +290,11 @@ namespace MiniCore.EditorTools
                         return false;
                     }
                 }
+            }
+
+            if (!ValidateAotFrameworkDependencies(byName, out error))
+            {
+                return false;
             }
 
             error = null;
@@ -306,26 +405,33 @@ namespace MiniCore.EditorTools
         #region Public 公共成员
 
         /// <summary>
-        /// 首次创建项目设置时登记协议程序集和默认启动程序集。
+        /// 确保六个框架基础热更新程序集使用当前架构规定的名称、路径和运行目标。
+        /// 开发者额外登记的业务程序集会保留，旧的混合程序集登记会被移除。
         /// </summary>
         public void EnsureDefaultEntries()
         {
-            if (entries != null && entries.Count > 0)
+            MiniCoreHotUpdateAssemblyEntry[] requiredEntries = CreateRequiredEntries();
+            if (!RequiresDefaultEntryRepair(requiredEntries))
             {
                 return;
             }
 
-            entries = new List<MiniCoreHotUpdateAssemblyEntry>(2)
+            int existingCount = entries?.Count ?? 0;
+            var repairedEntries = new List<MiniCoreHotUpdateAssemblyEntry>(existingCount + requiredEntries.Length);
+            repairedEntries.AddRange(requiredEntries);
+            if (entries != null)
             {
-                new MiniCoreHotUpdateAssemblyEntry(ProtocolAssemblyName, ProtocolAssemblyPath, 100),
-                new MiniCoreHotUpdateAssemblyEntry(
-                    StartupAssemblyName,
-                    StartupAssemblyPath,
-                    1000,
-                    true,
-                    DefaultStartupTypeName,
-                    DefaultStartupMethodName)
-            };
+                for (int index = 0; index < entries.Count; index++)
+                {
+                    MiniCoreHotUpdateAssemblyEntry entry = entries[index];
+                    if (entry != null && !IsFrameworkManagedAssemblyName(entry.AssemblyName))
+                    {
+                        repairedEntries.Add(entry);
+                    }
+                }
+            }
+
+            entries = repairedEntries;
             Save(true);
         }
 
@@ -343,6 +449,145 @@ namespace MiniCore.EditorTools
         }
 
         /// <summary>
+        /// 创建当前架构要求的六个框架基础热更新程序集条目。
+        /// </summary>
+        /// <returns>按稳定加载顺序排列的基础条目。</returns>
+        private static MiniCoreHotUpdateAssemblyEntry[] CreateRequiredEntries()
+        {
+            return new[]
+            {
+                new MiniCoreHotUpdateAssemblyEntry(CommonProtocolAssemblyName, CommonProtocolAssemblyPath, 100),
+                new MiniCoreHotUpdateAssemblyEntry(OuterProtocolAssemblyName, OuterProtocolAssemblyPath, 200),
+                new MiniCoreHotUpdateAssemblyEntry(
+                    InnerProtocolAssemblyName,
+                    InnerProtocolAssemblyPath,
+                    300,
+                    false,
+                    null,
+                    null,
+                    HotUpdateAssemblyRuntimeTargets.DedicatedServer),
+                new MiniCoreHotUpdateAssemblyEntry(SharedAssemblyName, SharedAssemblyPath, 500),
+                new MiniCoreHotUpdateAssemblyEntry(
+                    ClientAssemblyName,
+                    ClientAssemblyPath,
+                    1000,
+                    true,
+                    DefaultStartupTypeName,
+                    DefaultStartupMethodName,
+                    HotUpdateAssemblyRuntimeTargets.Client,
+                    HotUpdateAssemblyRuntimeTargets.Client),
+                new MiniCoreHotUpdateAssemblyEntry(
+                    ServerAssemblyName,
+                    ServerAssemblyPath,
+                    1100,
+                    true,
+                    "MiniCore.HotUpdate.Server.MiniCoreServerStartup",
+                    DefaultStartupMethodName,
+                    HotUpdateAssemblyRuntimeTargets.DedicatedServer,
+                    HotUpdateAssemblyRuntimeTargets.DedicatedServer)
+            };
+        }
+
+        /// <summary>
+        /// 判断当前序列化清单是否需要恢复框架管理的基础条目。
+        /// </summary>
+        /// <param name="requiredEntries">当前架构要求的基础条目。</param>
+        /// <returns>存在缺失、重复、旧路径或旧混合程序集条目时返回 true。</returns>
+        private bool RequiresDefaultEntryRepair(IReadOnlyList<MiniCoreHotUpdateAssemblyEntry> requiredEntries)
+        {
+            if (entries == null)
+            {
+                return true;
+            }
+
+            for (int requiredIndex = 0; requiredIndex < requiredEntries.Count; requiredIndex++)
+            {
+                MiniCoreHotUpdateAssemblyEntry required = requiredEntries[requiredIndex];
+                int matchCount = 0;
+                for (int entryIndex = 0; entryIndex < entries.Count; entryIndex++)
+                {
+                    MiniCoreHotUpdateAssemblyEntry current = entries[entryIndex];
+                    if (current != null && string.Equals(current.AssemblyName, required.AssemblyName, StringComparison.Ordinal))
+                    {
+                        matchCount++;
+                        if (!HasSameFrameworkConfiguration(current, required))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                if (matchCount != 1)
+                {
+                    return true;
+                }
+            }
+
+            for (int index = 0; index < entries.Count; index++)
+            {
+                MiniCoreHotUpdateAssemblyEntry entry = entries[index];
+                if (entry != null && IsObsoleteMixedAssemblyName(entry.AssemblyName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 比较现有基础条目与当前架构要求是否完全一致。
+        /// </summary>
+        /// <param name="current">当前序列化条目。</param>
+        /// <param name="required">当前架构要求的条目。</param>
+        /// <returns>路径、顺序、运行目标和启动入口都一致时返回 true。</returns>
+        private static bool HasSameFrameworkConfiguration(
+            MiniCoreHotUpdateAssemblyEntry current,
+            MiniCoreHotUpdateAssemblyEntry required)
+        {
+            return string.Equals(
+                       NormalizeAssetPath(current.AssemblyDefinitionPath),
+                       NormalizeAssetPath(required.AssemblyDefinitionPath),
+                       StringComparison.Ordinal)
+                && current.LoadOrder == required.LoadOrder
+                && current.RuntimeTargets == required.RuntimeTargets
+                && current.IsStartup == required.IsStartup
+                && string.Equals(current.StartupTypeName, required.StartupTypeName, StringComparison.Ordinal)
+                && string.Equals(current.StartupMethodName, required.StartupMethodName, StringComparison.Ordinal)
+                && current.IsStartupFor(HotUpdateAssemblyRuntimeTargets.Client)
+                    == required.IsStartupFor(HotUpdateAssemblyRuntimeTargets.Client)
+                && current.IsStartupFor(HotUpdateAssemblyRuntimeTargets.DedicatedServer)
+                    == required.IsStartupFor(HotUpdateAssemblyRuntimeTargets.DedicatedServer);
+        }
+
+        /// <summary>
+        /// 判断程序集名称是否由框架基础清单统一管理。
+        /// </summary>
+        /// <param name="assemblyName">待检查的程序集名称。</param>
+        /// <returns>属于当前六个基础程序集或旧混合程序集时返回 true。</returns>
+        private static bool IsFrameworkManagedAssemblyName(string assemblyName)
+        {
+            return string.Equals(assemblyName, CommonProtocolAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, OuterProtocolAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, InnerProtocolAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, SharedAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, ClientAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, ServerAssemblyName, StringComparison.Ordinal)
+                || IsObsoleteMixedAssemblyName(assemblyName);
+        }
+
+        /// <summary>
+        /// 判断程序集名称是否属于拆分前已废弃的混合程序集。
+        /// </summary>
+        /// <param name="assemblyName">待检查的程序集名称。</param>
+        /// <returns>属于旧 Protocol 或 HotUpdate 混合程序集时返回 true。</returns>
+        private static bool IsObsoleteMixedAssemblyName(string assemblyName)
+        {
+            return string.Equals(assemblyName, "MiniCore.Protocol", StringComparison.Ordinal)
+                || string.Equals(assemblyName, "MiniCore.HotUpdate", StringComparison.Ordinal);
+        }
+
+        /// <summary>
         /// 按加载顺序和程序集名称比较两条登记记录。
         /// </summary>
         /// <param name="left">左侧登记。</param>
@@ -356,6 +601,51 @@ namespace MiniCore.EditorTools
             return orderComparison != 0
                 ? orderComparison
                 : string.Compare(left.AssemblyName, right.AssemblyName, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 判断程序集是否为固定 AOT 控制面协议契约。
+        /// </summary>
+        /// <param name="assemblyName">待检查的程序集名称。</param>
+        /// <returns>属于 Control 或 Control.Inner 时返回 true。</returns>
+        private static bool IsAotProtocolAssembly(string assemblyName)
+        {
+            return string.Equals(assemblyName, ControlProtocolAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, ControlInnerProtocolAssemblyName, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// 校验固定 AOT 框架程序集没有反向引用任何已登记热更新程序集。
+        /// </summary>
+        /// <param name="hotUpdateEntries">按程序集名称索引的热更新登记。</param>
+        /// <param name="error">失败时返回非法依赖说明。</param>
+        /// <returns>全部固定 AOT 框架程序集依赖合法时返回 true。</returns>
+        private static bool ValidateAotFrameworkDependencies(
+            IReadOnlyDictionary<string, MiniCoreHotUpdateAssemblyEntry> hotUpdateEntries,
+            out string error)
+        {
+            for (int pathIndex = 0; pathIndex < AotFrameworkAssemblyDefinitionPaths.Length; pathIndex++)
+            {
+                string path = AotFrameworkAssemblyDefinitionPaths[pathIndex];
+                if (!TryReadAssemblyDefinition(path, out AssemblyDefinitionData definition, out error))
+                {
+                    return false;
+                }
+
+                string[] references = definition.references ?? Array.Empty<string>();
+                for (int referenceIndex = 0; referenceIndex < references.Length; referenceIndex++)
+                {
+                    string referencedName = ResolveAssemblyReferenceName(references[referenceIndex]);
+                    if (referencedName != null && hotUpdateEntries.ContainsKey(referencedName))
+                    {
+                        error = $"固定 AOT 程序集 {definition.name} 禁止引用热更新程序集 {referencedName}：{path}";
+                        return false;
+                    }
+                }
+            }
+
+            error = null;
+            return true;
         }
 
         /// <summary>

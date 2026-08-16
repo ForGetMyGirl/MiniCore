@@ -2,6 +2,17 @@
 
 本文档说明 MiniCore 当前由 **HybridCLR + YooAsset** 组成的 Android/Player 打包与后续热更新流程。它以项目中的实际菜单命令和启动代码为准，适用于 `DefaultPackage`。
 
+当前项目登记的是有运行目标的程序集清单，而不是一份客户端与服务端共享的 DLL 列表：
+
+| 运行目标 | 默认热更新程序集 |
+| --- | --- |
+| 客户端 | `MiniCore.Protocol.Common`、`MiniCore.Protocol.Outer`、`MiniCore.HotUpdate.Shared`、`MiniCore.HotUpdate.Client` |
+| Dedicated Server | `MiniCore.Protocol.Common`、`MiniCore.Protocol.Outer`、`MiniCore.Protocol.Inner`、`MiniCore.HotUpdate.Shared`、`MiniCore.HotUpdate.Server` |
+
+Dedicated Server 可以通过项目设置中的“DS 额外包含 Client”显式加入 Client 业务程序集；客户端目标没有对称开关，永远不能加入 Server 业务程序集。业务 Common/Outer/Inner 是按运行侧裁剪的 HybridCLR 协议：客户端加载 Common/Outer，DS 加载 Common/Outer/Inner。AOT 程序集不能反向引用这些热更新程序集。
+
+`MiniCore.Protocol.Control/Control.Inner`、`MiniCore.Unity`、`MiniCore.Unity.YooAsset` 和 `MiniCore.Server` 是稳定 AOT 程序集，不生成热更新 DLL。Control 进入客户端与 DS，Control.Inner 只进入 DS。Smoke/Benchmark Runner 位于 `MiniCore.Development.Network`，只在 Editor 或 Development Build 编译，也不属于业务热更新清单。
+
 ## 1. 先理解两个构建入口
 
 | 操作 | 产物与职责 | 何时需要 |
@@ -34,7 +45,7 @@
 
 ## 4. 日常修改热更新代码：最短安全流程
 
-适用范围：只修改 `MiniCore.HotUpdate` 中的业务、Handler、测试或协议处理代码；平台和 Development Build 不变；没有改动 HybridCLR/AOT 配置或新的 AOT 泛型使用。
+适用范围：只修改业务 Common/Outer/Inner 协议或 `MiniCore.HotUpdate.Shared/Client/Server` 中的业务/Handler；修改保持向后兼容；平台、运行目标、Development Build、Control 协议和 AOT 泛型需求不变。
 
 1. 执行 `MiniCore > Build > DefaultPackage > 热更编译 (Compile Active Target + Build)`。
 2. 根据目的选择：
@@ -67,7 +78,19 @@
 
 ## 6. 发布在线热更新包
 
-项目启动时由 `UpdateMainWindow` 初始化 `DefaultPackage`，在 Host 模式依次请求远端版本、更新清单、下载缺失资源，然后加载 AOT 元数据，并按项目登记的依赖顺序加载 `MiniCore.Protocol`、`MiniCore.HotUpdate` 及其他热更新 DLL。因此，在线热更发布的是 **YooAsset 的完整新包版本**，不是单独上传一个 DLL。
+项目启动时由 `UpdateMainWindow` 初始化 `DefaultPackage`，在 Host 模式依次请求远端版本、更新清单、下载缺失资源，然后加载 AOT 元数据，并按当前运行目标登记的依赖顺序加载业务协议和业务代码热更新 DLL。Control 协议已编入 AOT Player。在线热更发布的是 **YooAsset 的完整新包版本**，不是单独上传一个 DLL。
+
+### Dedicated Server 部署配置注入
+
+Dedicated Server 的源配置固定放在仓库根目录的 `Server/DedicatedServer/Config/MiniCoreServerRuntime.json`，不在 `Assets` 下。构建 DS Player 时，`DedicatedServerConfigBuildProcessor` 使用 `BuildPlayerContext.AddAdditionalPathToStreamingAssets` 将它单独注入为 `StreamingAssets/MiniCoreServerRuntime.json`。
+
+客户端 Player 构建预处理会同时阻止以下泄漏：
+
+- 服务端运行配置被注入或误放进 `Assets/StreamingAssets`；
+- `MiniCore.Protocol.Inner` 或 `MiniCore.HotUpdate.Server` 出现在客户端目标清单；
+- Control/Control.Inner、业务 Inner、Server DLL bytes 或服务端 Handler 清单出现在客户端热更新资源目录。
+
+因此复制客户端包或反编译客户端程序集都得不到 DS Role、内网监听、Coordinator 内网地址、Inner DTO 或服务端 Handler。部署人员可以复制同一份 DS 包，再分别编辑各副本中的 JSON，无需重新编译。
 
 1. 按改动范围执行第 3 节“完整生成”或第 4 节“热更编译”菜单。
 2. 在 YooAsset 构建输出中找到本次 Android / `DefaultPackage` / 时间戳版本目录；两个菜单都使用 UTC `yyyyMMddHHmmss` 作为包版本。
@@ -78,11 +101,15 @@
 
 当前项目没有把构建产物自动上传 CDN/对象存储的脚本，也没有在仓库内定义发布服务器目录规范。因此第 3 步应交由现有的部署渠道执行；在接入自动发布前，发布人必须记录包版本、目标平台、Development/Release 状态、资源根地址和验证设备结果。
 
+DS、.NET 服务、systemd、反向代理、客户端资源与回滚的通用操作流程见 [MiniCore 框架部署入门](FrameworkDeploymentGettingStarted.md)。文档只提供无真实基础设施信息的模板；生产参数必须保存在仓库之外。
+
 ### 在线热更新不能覆盖的改动
 
 以下改动必须通过新的 Player 首包（APK/IPA/桌面包）发布，不能仅发资源包：
 
 - 修改 AOT/Player 侧代码、Unity 原生插件、Android Manifest、签名或 Player 设置；
+- 修改 `MiniCore.Protocol.Control/Control.Inner` 的消息、Opcode 注册或 DTO；
+- 对业务 Common/Outer/Inner 做字段改号、Opcode 复用等破坏性变更，或旧 Player 缺少新业务 DLL 所需的 AOT 元数据；
 - 需要新增或改变 AOT 泛型/元数据，而旧 Player 不具备兼容基础；
 - 修改启动器 `UpdateMainWindow`、首包资源模式或远端地址配置；
 - Unity、HybridCLR 或底层原生库升级。
@@ -119,14 +146,36 @@
 ## 9. 日常决策速查
 
 ```text
-是否改了平台、Development Build、Player/AOT 运行时代码、HybridCLR/AOT 配置或泛型/AOT依赖？
+是否改了平台、Development Build、Control 协议、Player/AOT 运行时代码、HybridCLR/AOT 配置或泛型/AOT依赖？
   是 → 完整生成 (Generate All + Build) → Build 首包 或 发布完整新资源包
-  否 → 是否改了 MiniCore.HotUpdate 或 DefaultPackage 资源？
+  否 → 是否改了任一当前目标 HotUpdate 业务程序集或 DefaultPackage 资源？
          是 → 热更编译 (Compile Active Target + Build) → Build 首包 或 发布新资源包
          否 → 直接 Build（如仅改 Player 设置、签名或图标）
 ```
 
 ## 10. 验证记录
+
+### 2026-08-15（控制面 AOT、业务协议恢复 HybridCLR）
+
+- 修正：上一版把 Common/Outer/Inner 整体固定为 AOT，虽然切断了链接错误，却同时失去了业务协议热更新能力；本记录取代该过渡结论。
+- 边界：Coordinator 查询、注册、心跳、状态和目录同步进入 AOT Control/Control.Inner；MiniBomber、NetworkLab、Match 和 Database 协议进入业务 Common/Outer/Inner 热更新程序集。
+- 依赖：固定 `MiniCore.Server` 只引用 Control/Control.Inner；构建设置新增通用 AOT → HotUpdate 反向依赖校验，并禁止 Control DLL bytes 进入热更新资源。
+- 兼容：删除的认证 RPC 只在 Opcode Manifest 中永久保号；AuthenticationServer HTTP DTO 不进入 MiniCore RPC。
+- 验证范围：执行协议/启动代码生成及 Unity 客户端、Dedicated Server、.NET Server 编译；未执行 Player、HybridCLR、YooAsset 构建或测试。
+
+### 2026-08-15（过渡方案：协议程序集固定为 AOT）
+
+- 症状：Dedicated Server 目标执行“完整生成”时，HybridCLR 的 `GenerateStrippedAOTDlls` 内部 Player 构建在 UnityLinker 阶段报告无法解析 `MiniCore.Protocol.Inner`。
+- 根因：固定 AOT `MiniCore.Server` 静态引用 Common/Outer/Inner 控制面协议，但三个协议程序集同时被登记为 HybridCLR 热更新 DLL；生成剥离 AOT DLL 时 HybridCLR 会从临时 Player 移除热更新程序集，形成不合法的 AOT → HotUpdate 反向依赖。
+- 过渡修复：曾将 Common/Outer/Inner 整体改为 AOT；该做法已由上面的 Control/Business 分层替代，不再是当前发布规则。
+- 验证范围：仅执行 Unity C# 编译检查，不执行 Player、HybridCLR、YooAsset 构建或测试；实际完整生成由发布人员在目标 Editor 中重新执行。
+
+### 2026-08-15（客户端/服务端目标程序集与 DS 配置隔离）
+
+- 改造：HotUpdate 拆分为 Shared、Client、Server，项目协议拆分为 Common、Outer、Inner；构建命令按运行目标过滤并生成独立加载清单。
+- 配置：DS JSON 源文件移至 `Server/DedicatedServer/Config`，仅 Dedicated Server Player 构建时注入 StreamingAssets。
+- 防泄漏：客户端构建前校验 Server/Inner 程序集、服务端 Handler 和 DS JSON 均不存在。
+- 本次约束：只完成 C# 编译检查；未执行 Player、YooAsset 或 HybridCLR 构建，因此实际产物仍应在后续正式构建流程中确认。
 
 ### 2026-08-12（完整生成内部构建与最终资源校验分阶段）
 
