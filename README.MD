@@ -133,13 +133,16 @@ HotUpdateScene
 | 强类型事件、应用/局部频道、订阅生命周期与编辑器诊断 | [强类型事件中心](Docs/Eventing.md) |
 | 程序集边界、Global 生命周期、完整启动链 | [架构总览](Docs/Architecture.md) |
 | Proto、RPC、Handler、Opcode 的开发流程 | [网络与协议](Docs/NetworkLayerAnalysis.md) |
+| Coordinator、多 Role Dedicated Server、服务发现与独立 .NET 服务边界 | [Dedicated Server 架构](Docs/DedicatedServerArchitecture.md) |
 | WebGL、未来微信/抖音平台适配、WebSocket、存储与网关边界 | [WebGL 与小游戏平台适配](Docs/WebPlatformAdaptation.md) |
 | UI Root、窗口生命周期、强类型 API、Authoring 与 KCP 示例 | [UI 框架](Docs/UIFramework.md) |
 | 登录、大厅、房间、状态同步战斗、三端构建与热更新实战 | [MiniBomber 全链路 Demo](Docs/Demos/MiniBomber.md) |
+| 从零部署 Coordinator、GameCluster、认证、数据库与客户端 | [框架部署入门](Docs/FrameworkDeploymentGettingStarted.md) |
 | TCP/KCP/UDP 的 Editor 与 Player 冒烟测试 | [网络冒烟测试](Docs/NetworkSmokeTesting.md) |
 | HybridCLR、YooAsset 首包构建与在线热更新发布 | [打包与热更新流程](Docs/BuildAndHotUpdateWorkflow.md) |
 | 性能基线、测试方法和优化路线 | [性能测试指南](Docs/PerformanceTestingGuide.md) / [优化路线图](Docs/OptimizationRoadmap.md) / [阶段性优化总结](Docs/PhaseOptimizationSummary.md) |
 | AI 或自动化修改前应遵循的边界与验证 | [AI 项目上下文](Docs/AI_CONTEXT.md) |
+| 文档结构、交叉链接、记录归档与部署敏感信息边界 | [文档维护约定](Docs/DocumentationConventions.md) |
 
 服务化迁移、加密存档、HTTP 绝对地址规则和“本地运行数据记录”的行为，均以 [项目启动与服务配置](Docs/StartupModules.md) 为准。
 
