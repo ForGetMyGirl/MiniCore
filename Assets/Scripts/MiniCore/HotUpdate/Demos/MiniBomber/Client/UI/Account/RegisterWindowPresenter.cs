@@ -1,12 +1,9 @@
 using System;
-using System.Text;
 using MiniCore.Core;
 using MiniCore.Model;
-using MiniCore.Protocol.Generated;
 using MiniCore.Service;
 using MiniCore.Threading;
 using MiniCore.UI;
-using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
@@ -33,10 +30,9 @@ namespace MiniCore.Demo.MiniBomber
         {
             account = Global.Get<AccountSessionComponent>(this);
             commandRunning = false;
-            View.PromptText.text = string.Empty;
-            SetCommandInteractable(true);
-            Bindings.Add(View.SubmitButton, Submit);
-            Bindings.Add(View.CloseButton, Close);
+            View.ShowPrompt(string.Empty);
+            View.SetCommandInteractable(true);
+            View.BindActions(Bindings, Submit, Close);
         }
 
         /// <summary>
@@ -72,24 +68,34 @@ namespace MiniCore.Demo.MiniBomber
         /// <returns>注册流程完成任务。</returns>
         private async MTask SubmitAsync()
         {
-            if (!string.Equals(View.PasswordInput.text, View.ConfirmPasswordInput.text, StringComparison.Ordinal))
+            View.GetRegistrationInput(out string accountName, out string password, out string confirmPassword, out string playerName);
+            if (string.IsNullOrEmpty(password))
             {
-                View.PromptText.text = "两次输入的密码不一致";
+                View.ShowPrompt("请输入密码");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(confirmPassword))
+            {
+                View.ShowPrompt("请再次输入密码");
+                return;
+            }
+
+            if (!string.Equals(password, confirmPassword, StringComparison.Ordinal))
+            {
+                View.ShowPrompt("两次输入的密码不一致");
                 return;
             }
 
             commandRunning = true;
-            SetCommandInteractable(false);
-            string accountName = View.AccountInput.text;
-            string password = View.PasswordInput.text;
-            string playerName = View.PlayerNameInput.text;
+            View.SetCommandInteractable(false);
             try
             {
-                View.PromptText.text = "正在注册账号...";
-                AuthenticationRegisterResponse response = await account.RegisterAsync(accountName, password, playerName);
+                View.ShowPrompt("正在注册账号...");
+                MiniBomberCommandResult result = await account.RegisterAsync(accountName, password, playerName);
                 if (!released)
                 {
-                    View.PromptText.text = response.Msg;
+                    View.ShowPrompt(result.Message);
                 }
             }
             catch (Exception exception)
@@ -97,7 +103,7 @@ namespace MiniCore.Demo.MiniBomber
                 LogSwitch.Error($"MiniBomber 注册请求失败：{exception}");
                 if (!released)
                 {
-                    View.PromptText.text = "注册失败，请检查网络连接后重试";
+                    View.ShowPrompt("注册暂时失败，请稍后重试");
                 }
             }
             finally
@@ -105,7 +111,7 @@ namespace MiniCore.Demo.MiniBomber
                 commandRunning = false;
                 if (!released)
                 {
-                    SetCommandInteractable(true);
+                    View.SetCommandInteractable(true);
                 }
             }
         }
@@ -121,16 +127,6 @@ namespace MiniCore.Demo.MiniBomber
             }
 
             Context.Service.CloseAsync(Context.Handle).Forget();
-        }
-
-        /// <summary>
-        /// 切换注册弹窗按钮，避免一个账号请求被重复发送。
-        /// </summary>
-        /// <param name="interactable">是否允许点击。</param>
-        private void SetCommandInteractable(bool interactable)
-        {
-            View.SubmitButton.interactable = interactable;
-            View.CloseButton.interactable = interactable;
         }
 
         #endregion

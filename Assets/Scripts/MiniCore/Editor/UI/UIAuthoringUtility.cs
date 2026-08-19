@@ -96,7 +96,7 @@ namespace MiniCore.EditorTools.UI
         /// </summary>
         /// <param name="view">待更新 View。</param>
         /// <param name="assetPath">Prefab 资产路径。</param>
-        /// <param name="logicType">Presenter 或 ViewModel 类型。</param>
+        /// <param name="logicType">Presenter 类型。</param>
         public static void ConfigureView(AUIWindowView view, string assetPath, Type logicType)
         {
             SerializedObject serialized = new SerializedObject(view);
@@ -182,7 +182,7 @@ namespace MiniCore.EditorTools.UI
         }
 
         /// <summary>
-        /// 获取全部可直接构造的窗口 Presenter 或 ViewModel 类型。
+        /// 获取全部可直接构造的窗口 Presenter 类型。
         /// </summary>
         /// <returns>按完整类型名排序的候选数组。</returns>
         public static Type[] GetLogicTypes()

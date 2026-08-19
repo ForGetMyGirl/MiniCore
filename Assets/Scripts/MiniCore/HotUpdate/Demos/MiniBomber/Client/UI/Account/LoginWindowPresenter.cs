@@ -1,12 +1,9 @@
 using System;
-using System.Text;
 using MiniCore.Core;
 using MiniCore.Model;
-using MiniCore.Protocol.Generated;
 using MiniCore.Service;
 using MiniCore.Threading;
 using MiniCore.UI;
-using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
@@ -34,10 +31,9 @@ namespace MiniCore.Demo.MiniBomber
             account = Global.Get<AccountSessionComponent>(this);
             flow = Global.Get<MiniBomberClientFlowComponent>(this);
             commandRunning = false;
-            View.PromptText.text = string.Empty;
-            SetCommandInteractable(true);
-            Bindings.Add(View.LoginButton, Login);
-            Bindings.Add(View.RegisterButton, OpenRegister);
+            View.ShowPrompt(string.Empty);
+            View.SetCommandInteractable(true);
+            View.BindActions(Bindings, Login, OpenRegister);
         }
 
         /// <summary>
@@ -75,18 +71,17 @@ namespace MiniCore.Demo.MiniBomber
         private async MTask LoginAsync()
         {
             commandRunning = true;
-            SetCommandInteractable(false);
-            string accountName = View.AccountInput.text;
-            string password = View.PasswordInput.text;
+            View.SetCommandInteractable(false);
+            View.GetCredentials(out string accountName, out string password);
             bool authenticated = false;
             try
             {
-                View.PromptText.text = "正在连接服务器...";
+                View.ShowPrompt("正在连接服务器...");
                 if (!await account.ConnectAsync())
                 {
                     if (!released)
                     {
-                        View.PromptText.text = "连接服务器失败，请检查地址、端口和服务端状态";
+                        View.ShowPrompt("连接服务器失败，请检查地址、端口和服务端状态");
                     }
 
                     return;
@@ -97,19 +92,19 @@ namespace MiniCore.Demo.MiniBomber
                     return;
                 }
 
-                View.PromptText.text = "连接成功，正在登录...";
-                MiniBomberResumeSessionResponse response = await account.LoginAsync(accountName, password);
+                View.ShowPrompt("连接成功，正在登录...");
+                MiniBomberSessionResult result = await account.LoginAsync(accountName, password);
                 if (released)
                 {
                     return;
                 }
 
-                View.PromptText.text = response.Msg;
-                if (response.Code == MiniBomberErrorCode.Success)
+                View.ShowPrompt(result.Command.Message);
+                if (result.Command.IsSuccess)
                 {
                     authenticated = true;
-                    View.PromptText.text = "登录成功，正在进入游戏...";
-                    await flow.NavigateAsync(response.Destination);
+                    View.ShowPrompt("登录成功，正在进入游戏...");
+                    await flow.NavigateAsync(result.Destination, result.Room);
                 }
             }
             catch (Exception exception)
@@ -117,9 +112,9 @@ namespace MiniCore.Demo.MiniBomber
                 LogSwitch.Error($"MiniBomber 登录流程失败：{exception}");
                 if (!released)
                 {
-                    View.PromptText.text = authenticated
+                    View.ShowPrompt(authenticated
                         ? "登录已成功，但界面切换失败，请重试或重新进入客户端"
-                        : "登录失败，请检查网络连接后重试";
+                        : "登录暂时失败，请稍后重试");
                 }
             }
             finally
@@ -127,7 +122,7 @@ namespace MiniCore.Demo.MiniBomber
                 commandRunning = false;
                 if (!released)
                 {
-                    SetCommandInteractable(true);
+                    View.SetCommandInteractable(true);
                 }
             }
         }
@@ -152,15 +147,15 @@ namespace MiniCore.Demo.MiniBomber
         private async MTask OpenRegisterAsync()
         {
             commandRunning = true;
-            SetCommandInteractable(false);
+            View.SetCommandInteractable(false);
             try
             {
-                View.PromptText.text = "正在连接服务器...";
+                View.ShowPrompt("正在连接服务器...");
                 if (!await account.ConnectAsync())
                 {
                     if (!released)
                     {
-                        View.PromptText.text = "连接服务器失败，请检查地址、端口和服务端状态";
+                        View.ShowPrompt("连接服务器失败，请检查地址、端口和服务端状态");
                     }
 
                     return;
@@ -171,11 +166,11 @@ namespace MiniCore.Demo.MiniBomber
                     return;
                 }
 
-                View.PromptText.text = "连接成功，正在打开注册界面...";
+                View.ShowPrompt("连接成功，正在打开注册界面...");
                 await Context.Service.OpenAsync("RegisterWindow");
                 if (!released)
                 {
-                    View.PromptText.text = string.Empty;
+                    View.ShowPrompt(string.Empty);
                 }
             }
             catch (Exception exception)
@@ -183,7 +178,7 @@ namespace MiniCore.Demo.MiniBomber
                 LogSwitch.Error($"MiniBomber 打开注册界面失败：{exception}");
                 if (!released)
                 {
-                    View.PromptText.text = "打开注册界面失败，请重试";
+                    View.ShowPrompt("打开注册界面失败，请重试");
                 }
             }
             finally
@@ -191,19 +186,9 @@ namespace MiniCore.Demo.MiniBomber
                 commandRunning = false;
                 if (!released)
                 {
-                    SetCommandInteractable(true);
+                    View.SetCommandInteractable(true);
                 }
             }
-        }
-
-        /// <summary>
-        /// 统一切换登录界面的命令按钮，阻止连接和鉴权期间重复提交。
-        /// </summary>
-        /// <param name="interactable">是否允许点击。</param>
-        private void SetCommandInteractable(bool interactable)
-        {
-            View.LoginButton.interactable = interactable;
-            View.RegisterButton.interactable = interactable;
         }
 
         #endregion

@@ -85,23 +85,31 @@ namespace MiniCore.EditorTools.UI
         }
 
         /// <summary>
-        /// 生成被动 View 基类源码。
+        /// 生成封装 Unity 控件和语义刷新接口的 View 源码。
         /// </summary>
         /// <returns>完整 C# 文件文本。</returns>
         private string BuildViewSource()
         {
             return $@"using MiniCore.UI;
+using UnityEngine;
 
 namespace MiniCore.HotUpdate
 {{
     /// <summary>
-    /// {windowName} 的被动 Unity View。
+    /// {windowName} 的 Unity View。
     /// </summary>
     public sealed class {windowName}View : AUIWindowView
     {{
         #region UnityProperty Unity 引用属性
 
-        // 在此声明并由 Prefab 绑定 UGUI 控件。
+        // 使用 [SerializeField] private 声明并由 Prefab 绑定 Unity 控件。
+        // 字段仅由 View 使用，不向 Presenter 暴露。
+
+        #endregion
+
+        #region Public 公共成员
+
+        // 在此提供 BindActions、Get/TryGet、Refresh/Set/Show 等语义方法。
 
         #endregion
     }}
@@ -131,6 +139,8 @@ namespace MiniCore.HotUpdate
         /// </summary>
         protected override void OnBind()
         {{
+            // 在此获取 AComponent 依赖、订阅 Model 变化并登记到 Bindings。
+            // Presenter 只调用 View 的语义方法，不直接访问 Unity 控件。
         }}
 
         #endregion

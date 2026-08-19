@@ -63,7 +63,7 @@ namespace MiniCore.Demo.MiniBomber.Unity
         /// 按服务器紧凑位图隐藏已摧毁木箱。
         /// </summary>
         /// <param name="destroyedCells">按格索引排列的 bitset。</param>
-        public void ApplyDestroyedBreakables(byte[] destroyedCells)
+        public void ApplyDestroyedBreakables(IReadOnlyList<byte> destroyedCells)
         {
             if (destroyedCells == null)
             {
@@ -73,7 +73,7 @@ namespace MiniCore.Demo.MiniBomber.Unity
             foreach (KeyValuePair<int, GameObject> pair in breakableBlocks)
             {
                 int byteIndex = pair.Key >> 3;
-                bool destroyed = byteIndex < destroyedCells.Length && (destroyedCells[byteIndex] & (1 << (pair.Key & 7))) != 0;
+                bool destroyed = byteIndex < destroyedCells.Count && (destroyedCells[byteIndex] & (1 << (pair.Key & 7))) != 0;
                 if (destroyed && pair.Value != null)
                 {
                     pair.Value.SetActive(false);

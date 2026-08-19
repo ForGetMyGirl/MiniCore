@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using MiniCore.Core;
 using MiniCore.Demo.MiniBomber.Unity;
 using MiniCore.Model;
-using MiniCore.Protocol.Generated;
 using MiniCore.Threading;
 using UnityEngine;
 
@@ -81,14 +80,14 @@ namespace MiniCore.Demo.MiniBomber
         /// </summary>
         protected override void Update()
         {
-            if (sceneBinding == null || battle.Snapshot == null || Global.Time.UnscaledTime < nextInputSendTime)
+            if (sceneBinding == null || !battle.Model.HasSnapshot || Global.Time.UnscaledTime < nextInputSendTime)
             {
                 return;
             }
 
             nextInputSendTime = Global.Time.UnscaledTime + inputSendInterval;
             battle.SendInput(
-                battle.Snapshot.MatchId,
+                battle.Model.MatchId,
                 ++clientTick,
                 Mathf.RoundToInt(latestMove.x * 1000f),
                 Mathf.RoundToInt(latestMove.y * 1000f),
@@ -188,8 +187,8 @@ namespace MiniCore.Demo.MiniBomber
         /// </summary>
         private void ApplySnapshot()
         {
-            MiniBomberBattleSnapshot snapshot = battle?.Snapshot;
-            if (sceneBinding == null || snapshot == null)
+            MiniBomberBattleModel snapshot = battle?.Model;
+            if (sceneBinding == null || snapshot == null || !snapshot.HasSnapshot)
             {
                 return;
             }
@@ -200,14 +199,14 @@ namespace MiniCore.Demo.MiniBomber
             snapshotIds.Clear();
             for (int index = 0; index < snapshot.Players.Count; index++)
             {
-                MiniBomberBattlePlayerDto player = snapshot.Players[index];
+                MiniBomberBattlePlayerModel player = snapshot.Players[index];
                 snapshotIds.Add(player.PlayerId);
                 if (!playerViews.TryGetValue(player.PlayerId, out BomberPlayerView view))
                 {
                     view = sceneBinding.CreatePlayer();
                     view.Initialize(player.PlayerId, cellSize);
                     playerViews.Add(player.PlayerId, view);
-                    if (player.PlayerId == account.PlayerId && sceneBinding.CameraController != null)
+                    if (player.PlayerId == account.Model.PlayerId && sceneBinding.CameraController != null)
                     {
                         localPlayerView = view;
                         sceneBinding.CameraController.SetTarget(view.transform);
@@ -234,7 +233,7 @@ namespace MiniCore.Demo.MiniBomber
             snapshotIds.Clear();
             for (int index = 0; index < snapshot.Bombs.Count; index++)
             {
-                MiniBomberBattleBombDto bomb = snapshot.Bombs[index];
+                MiniBomberBattleBombModel bomb = snapshot.Bombs[index];
                 snapshotIds.Add(bomb.BombId);
                 if (!bombViews.TryGetValue(bomb.BombId, out BomberBombView view))
                 {
@@ -252,7 +251,7 @@ namespace MiniCore.Demo.MiniBomber
                 bombViews.Remove(id);
             }
 
-            sceneBinding.MapView?.ApplyDestroyedBreakables(snapshot.DestroyedBreakableCells?.ToByteArray());
+            sceneBinding.MapView?.ApplyDestroyedBreakables(snapshot.DestroyedBreakableCells);
         }
 
         /// <summary>
@@ -265,7 +264,7 @@ namespace MiniCore.Demo.MiniBomber
                 return;
             }
 
-            IReadOnlyList<MiniBomberBattleEventDto> events = battle.RecentEvents;
+            IReadOnlyList<MiniBomberBattleEventModel> events = battle.Model.RecentEvents;
             if (events.Count == 0)
             {
                 return;
@@ -273,18 +272,18 @@ namespace MiniCore.Demo.MiniBomber
 
             for (int index = 0; index < events.Count; index++)
             {
-                MiniBomberBattleEventDto item = events[index];
+                MiniBomberBattleEventModel item = events[index];
                 if (item.EventId <= lastPresentedEventId)
                 {
                     continue;
                 }
 
                 lastPresentedEventId = item.EventId;
-                if (item.Type == MiniBomberBattleEventType.MiniBomberEventExplosionStarted)
+                if (item.Kind == MiniBomberBattleEventKind.ExplosionStarted)
                 {
                     sceneBinding.CreateExplosion().Play(item.CellX, item.CellZ);
                 }
-                else if (item.Type == MiniBomberBattleEventType.MiniBomberEventBlockDestroyed)
+                else if (item.Kind == MiniBomberBattleEventKind.BlockDestroyed)
                 {
                     sceneBinding.MapView?.HideBreakable(item.CellX, item.CellZ);
                 }

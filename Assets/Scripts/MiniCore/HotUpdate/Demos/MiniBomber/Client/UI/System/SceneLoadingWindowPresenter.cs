@@ -1,12 +1,6 @@
-using System;
-using System.Text;
 using MiniCore.Core;
-using MiniCore.Model;
-using MiniCore.Protocol.Generated;
 using MiniCore.Service;
-using MiniCore.Threading;
 using MiniCore.UI;
-using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
@@ -33,7 +27,7 @@ namespace MiniCore.Demo.MiniBomber
             scenes.ProgressChanged += RenderProgress;
             Bindings.Add(() => scenes.ProgressChanged -= RenderProgress);
             RenderProgress(scenes.Progress);
-            View.PromptText.text = "正在加载场景...";
+            View.ShowPrompt("正在加载场景...");
         }
 
         /// <summary>
@@ -54,7 +48,7 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="progress">零到一的加载进度。</param>
         private void RenderProgress(float progress)
         {
-            View.ProgressSlider.value = Mathf.Clamp01(progress);
+            View.RefreshProgress(progress);
         }
 
         #endregion

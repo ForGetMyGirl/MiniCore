@@ -139,25 +139,34 @@ ScreenWindowView                  AUIWindowView + CanvasGroup
 
 ## 6. AUIWindowView Authoring
 
-窗口定义直接序列化在所有 View 的基类 `AUIWindowView` 中，不再有单独的 `UIWindowAuthoring` 组件。派生 View 只声明控件引用和显示逻辑：
+窗口定义直接序列化在所有 View 的基类 `AUIWindowView` 中，不再有单独的 `UIWindowAuthoring` 组件。派生 View 使用私有序列化字段持有控件，并通过语义方法向 Presenter 暴露用户意图、输入读取和界面刷新：
 
 ```csharp
 public sealed class InventoryWindowView : AUIWindowView
 {
     [SerializeField] private Button closeButton;
-    [SerializeField] private Transform itemRoot;
+    [SerializeField] private TMP_Text countText;
 
-    public Button CloseButton => closeButton;
-    public Transform ItemRoot => itemRoot;
+    public void BindActions(UIBindingSet bindings, Action close)
+    {
+        if (close != null) bindings.Add(closeButton, close.Invoke);
+    }
+
+    public void RefreshCount(int count)
+    {
+        countText.text = count.ToString();
+    }
 }
 ```
+
+Presenter 禁止直接访问 Unity 控件，也不接收完整业务 Model。简单界面使用明确参数；只有多个 Model 需要组合成复杂窗口展示时才建立窗口专用 ViewData，并且只包含该窗口实际使用的字段。ViewData 是一次展示投影，不回写业务状态，也不成为第二份权威数据。
 
 基类 Inspector 管理以下配置：
 
 - WindowId、Route、YooAsset Address
 - Template、Render Space、Layer
 - Instance、Duplicate Open、Cache 策略
-- Presenter/ViewModel 类型
+- Presenter 类型
 - Modal 与遮罩点击策略
 - 可选 Transition Driver
 - Safe Area 策略与目标
@@ -232,7 +241,9 @@ Loading → Staging → Opening → Active → Closing → Cached / Destroyed
 
 Modal 遮罩由 Session 在窗口同一 Layer 中动态创建，拉伸铺满 Layer，Sibling 顺序始终位于窗口正下方。默认使用黑色 `Alpha 0.8`，确保弹窗和背景有明确层次；遮罩和窗口一起关闭，是否允许点击遮罩关闭由 View 配置决定。
 
-Presenter/ViewModel 使用 Session 任务域；View 每次激活创建独立任务域。关闭、加载失败、动画异常和服务退出进入同一清理路径，绑定、安全区订阅、逻辑、遮罩和资源租约都会释放。
+Presenter 使用 Session 任务域；View 每次激活创建独立任务域。关闭、加载失败、动画异常和服务退出进入同一清理路径，绑定、安全区订阅、逻辑、遮罩和资源租约都会释放。
+
+MiniCore 不提供空壳 ViewModel 或自动数据绑定。业务采用 `AComponent + MVP` 时，Model 是协议与 Unity 无关的长期业务数据，AComponent 是 Model 的唯一业务写入者，Presenter 负责订阅 Model 变化、协调 Component 命令并调用 View 语义方法；跨窗口和场景编排交给 Flow Component。PB 消息只在 Handler/Component 边界短暂存在，不能保存进 Model，也不能传给 Presenter 或 View。
 
 ## 10. 强类型 API
 
@@ -299,6 +310,13 @@ KCP 示例入口和强类型路由仍保留，但 `GameStartup` 已改为启动 
 Preset 不进入 YooAsset，也不参与运行时加载。
 
 ## 14. 验证记录
+
+### 2026-08-18（MVP 边界与 ViewModel 空壳清理）
+
+- 约定：窗口 View 的 Unity 字段统一使用 `[SerializeField] private`，Presenter 只通过 `Bind/Get/TryGet/Refresh/Set/Show` 等语义方法访问 View。
+- 数据边界：复杂窗口按需使用只含展示字段的 ViewData；禁止把完整 Model、PB 消息或协议集合传入 View。
+- 框架清理：删除没有数据绑定能力且从未使用的 `AUIWindowViewModel<TView>`，Inspector、向导、生成器和生命周期说明统一只称 Presenter。
+- 向导：新 View 模板明确生成私有 Unity 字段区与语义方法位置，Presenter 模板明确标出 Component 获取、Model 订阅和首次渲染位置。
 
 ### 2026-08-15（HotUpdate 程序集拆分后的窗口逻辑引用）
 

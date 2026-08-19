@@ -1,10 +1,3 @@
-using System;
-using MiniCore.Core;
-using MiniCore.Model;
-using MiniCore.Protocol.Generated;
-using MiniCore.Service;
-using MiniCore.Threading;
-
 namespace MiniCore.Demo.MiniBomber
 {
     /// <summary>

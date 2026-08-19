@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
@@ -17,7 +16,7 @@ namespace MiniCore.Demo.MiniBomber
     {
         #region Private 私有成员
 
-        private readonly List<MiniBomberRoomSummaryDto> rooms = new List<MiniBomberRoomSummaryDto>(32); // 当前大厅房间列表。
+        private readonly MiniBomberLobbyModel model = new MiniBomberLobbyModel(); // 当前大厅长期业务数据。
         private INetworkService network; // 项目网络服务。
         private AccountSessionComponent account; // 当前账号会话。
 
@@ -31,19 +30,9 @@ namespace MiniCore.Demo.MiniBomber
         public event Action Changed;
 
         /// <summary>
-        /// 只读房间列表。
+        /// 获取当前大厅的只读业务数据。
         /// </summary>
-        public IReadOnlyList<MiniBomberRoomSummaryDto> Rooms => rooms;
-
-        /// <summary>
-        /// 大厅修订号。
-        /// </summary>
-        public long Revision { get; private set; }
-
-        /// <summary>
-        /// 服务器报告的在线人数。
-        /// </summary>
-        public int OnlinePlayerCount { get; private set; }
+        public MiniBomberLobbyModel Model => model;
 
         /// <summary>
         /// 取得账号和网络依赖。
@@ -58,22 +47,19 @@ namespace MiniCore.Demo.MiniBomber
         /// 请求并替换完整大厅快照。
         /// </summary>
         /// <returns>服务器响应。</returns>
-        public async MTask<MiniBomberLobbySnapshotResponse> RefreshAsync()
+        public async MTask<MiniBomberCommandResult> RefreshAsync()
         {
             MiniBomberLobbySnapshotResponse response = await network.CallAsync<MiniBomberLobbySnapshotRequest, MiniBomberLobbySnapshotResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberLobbySnapshotRequest
             {
-                PlayerId = account.PlayerId
+                PlayerId = account.Model.PlayerId
             });
             if (response.Code == MiniBomberErrorCode.Success)
             {
-                rooms.Clear();
-                rooms.AddRange(response.Rooms);
-                Revision = response.Revision;
-                OnlinePlayerCount = response.OnlinePlayerCount;
+                ApplySnapshot(response);
                 Changed?.Invoke();
             }
 
-            return response;
+            return new MiniBomberCommandResult(response.Code, response.Msg);
         }
 
         /// <summary>
@@ -82,9 +68,9 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="revision">服务器最新修订号。</param>
         public void ApplyChangedNotice(long revision)
         {
-            if (revision > Revision)
+            if (revision > model.Revision)
             {
-                Revision = revision;
+                model.Revision = revision;
                 Changed?.Invoke();
             }
         }
@@ -99,11 +85,41 @@ namespace MiniCore.Demo.MiniBomber
         protected override void OnDispose()
         {
             Changed = null;
-            rooms.Clear();
+            model.MutableRooms.Clear();
+            model.Revision = 0;
+            model.OnlinePlayerCount = 0;
             network = null;
             account = null;
             Global.ReleaseAll(this);
             base.OnDispose();
+        }
+
+        #endregion
+
+        #region Private 私有成员
+
+        /// <summary>
+        /// 将大厅响应中的 PB 房间摘要复制到长期 Model，并复用已有条目。
+        /// </summary>
+        /// <param name="response">服务器大厅快照响应。</param>
+        private void ApplySnapshot(MiniBomberLobbySnapshotResponse response)
+        {
+            model.Revision = response.Revision;
+            model.OnlinePlayerCount = response.OnlinePlayerCount;
+            while (model.MutableRooms.Count < response.Rooms.Count)
+            {
+                model.MutableRooms.Add(new MiniBomberLobbyRoomModel());
+            }
+
+            for (int index = 0; index < response.Rooms.Count; index++)
+            {
+                MiniBomberProtocolModelMapper.ApplyLobbyRoom(response.Rooms[index], model.MutableRooms[index]);
+            }
+
+            if (model.MutableRooms.Count > response.Rooms.Count)
+            {
+                model.MutableRooms.RemoveRange(response.Rooms.Count, model.MutableRooms.Count - response.Rooms.Count);
+            }
         }
 
         #endregion

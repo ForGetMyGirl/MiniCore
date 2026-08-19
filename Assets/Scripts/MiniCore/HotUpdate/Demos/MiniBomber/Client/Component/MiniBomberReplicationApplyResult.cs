@@ -1,5 +1,3 @@
-using MiniCore.Protocol.Generated;
-
 namespace MiniCore.Demo.MiniBomber
 {
     /// <summary>

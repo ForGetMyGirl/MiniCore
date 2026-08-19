@@ -15,7 +15,7 @@ namespace MiniCore.UI
 
         private const float DefaultModalMaskAlpha = 0.8f; // 自动 Modal 遮罩的默认不透明度。
         private readonly IUIWindowSessionHost host; // 窗口运行时宿主。
-        private readonly MTaskDomain domain; // Presenter/ViewModel 共用的会话任务域。
+        private readonly MTaskDomain domain; // Presenter 使用的会话任务域。
         private readonly UIBindingSet bindings = new UIBindingSet(); // 本次会话的统一解绑集合。
         private readonly MTaskCompletionSource<UIWindowHandle> activeCompletion = new MTaskCompletionSource<UIWindowHandle>(); // Active 完成源。
         private readonly MSharedTask<UIWindowHandle> activeTask; // 并发打开共享等待任务。
@@ -24,7 +24,7 @@ namespace MiniCore.UI
         private readonly object arguments; // 本次打开参数。
         private readonly IUIWindowResultChannel resultChannel; // 可选业务结果通道。
         private AUIWindowView view; // 当前会话使用的 View。
-        private IUIWindowLogic logic; // 当前 Presenter 或 ViewModel。
+        private IUIWindowLogic logic; // 当前 Presenter。
         private IUITransitionDriver transition; // 当前 View 的动画驱动。
         private GameObject modalMask; // 当前会话拥有的模态遮罩。
         private bool closeRequested; // 加载或动画阶段收到的关闭请求。

@@ -46,14 +46,17 @@ namespace MiniCore.Tests.Editor.Demos.MiniBomber
 
             BattleHudWindowView view = prefab.GetComponent<BattleHudWindowView>();
             Assert.That(view, Is.Not.Null, "BattleHudWindow 根节点缺少 BattleHudWindowView。");
-            Assert.That(view.MobileControlRoot, Is.Not.Null, "BattleHudWindowView 未绑定 MobileControlRoot。");
             SerializedObject serializedView = new SerializedObject(view);
+            SerializedProperty mobileControlRootProperty = serializedView.FindProperty("MobileControlRoot");
+            Assert.That(mobileControlRootProperty, Is.Not.Null, "BattleHudWindowView 缺少 MobileControlRoot 序列化字段。");
+            GameObject mobileControlRoot = mobileControlRootProperty.objectReferenceValue as GameObject;
+            Assert.That(mobileControlRoot, Is.Not.Null, "BattleHudWindowView 未绑定 MobileControlRoot。");
             SerializedProperty performanceText = serializedView.FindProperty("PerformanceText");
             Assert.That(performanceText, Is.Not.Null, "BattleHudWindowView 缺少 PerformanceText 序列化字段。");
             Assert.That(performanceText.objectReferenceValue, Is.Not.Null, "BattleHudWindowView 未绑定 performanceText。");
             Assert.That(performanceText.objectReferenceValue.name, Is.EqualTo("performanceText"));
 
-            Transform moveJoystick = FindDescendant(view.MobileControlRoot.transform, "MoveJoystick");
+            Transform moveJoystick = FindDescendant(mobileControlRoot.transform, "MoveJoystick");
             Assert.That(moveJoystick, Is.Not.Null, "MobileControlRoot 下缺少 MoveJoystick。");
             Transform joystickHandle = FindDescendant(moveJoystick, "Handle");
             Assert.That(joystickHandle, Is.Not.Null, "MoveJoystick 下缺少 Handle。");
@@ -64,7 +67,7 @@ namespace MiniCore.Tests.Editor.Demos.MiniBomber
             Assert.That(movementRange, Is.Not.Null, "OnScreenStick 缺少 m_MovementRange 序列化字段。");
             Assert.That(movementRange.floatValue, Is.EqualTo(100f));
 
-            Transform bombButton = FindDescendant(view.MobileControlRoot.transform, "BombButton");
+            Transform bombButton = FindDescendant(mobileControlRoot.transform, "BombButton");
             Assert.That(bombButton, Is.Not.Null, "MobileControlRoot 下缺少 BombButton。");
             Component onScreenButton = FindComponent(bombButton, "UnityEngine.InputSystem.OnScreen.OnScreenButton");
             Assert.That(onScreenButton, Is.Not.Null, "BombButton 缺少 Input System 的 OnScreenButton。");

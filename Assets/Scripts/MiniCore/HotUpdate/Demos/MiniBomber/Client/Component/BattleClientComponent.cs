@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
@@ -17,8 +16,8 @@ namespace MiniCore.Demo.MiniBomber
     {
         #region Private 私有成员
 
-        private readonly List<MiniBomberBattleEventDto> recentEvents = new List<MiniBomberBattleEventDto>(32); // Presenter 消费的近期即时事件。
-        private readonly MiniBomberBattleReplicationState replication = new MiniBomberBattleReplicationState(); // 纯 C# 基线和事件序列状态机。
+        private readonly MiniBomberBattleModel model = new MiniBomberBattleModel(); // 当前战斗长期业务数据。
+        private readonly MiniBomberBattleReplicationReducer replication; // PB 到 Model 的复制归并器。
         private INetworkService network; // 项目网络服务。
         private AccountSessionComponent account; // 当前账号会话。
         private long nextInputSequence = 1; // 下一个客户端输入序号。
@@ -27,6 +26,14 @@ namespace MiniCore.Demo.MiniBomber
         #endregion
 
         #region Public 公共成员
+
+        /// <summary>
+        /// 创建客户端战斗状态组件并绑定长期 Model 归并器。
+        /// </summary>
+        public BattleClientComponent()
+        {
+            replication = new MiniBomberBattleReplicationReducer(model);
+        }
 
         /// <summary>
         /// 战斗快照变化事件。
@@ -44,24 +51,9 @@ namespace MiniCore.Demo.MiniBomber
         public event Action ResultChanged;
 
         /// <summary>
-        /// 当前最新权威快照。
+        /// 获取当前战斗的只读业务数据。
         /// </summary>
-        public MiniBomberBattleSnapshot Snapshot => replication.Snapshot;
-
-        /// <summary>
-        /// 最新权威快照到达客户端的单调时间。
-        /// </summary>
-        public double LastSnapshotReceiveTime { get; private set; }
-
-        /// <summary>
-        /// 当前近期即时事件。
-        /// </summary>
-        public IReadOnlyList<MiniBomberBattleEventDto> RecentEvents => recentEvents;
-
-        /// <summary>
-        /// 当前比赛最终结果。
-        /// </summary>
-        public MiniBomberMatchResultNotice Result { get; private set; }
+        public MiniBomberBattleModel Model => model;
 
         /// <summary>
         /// 取得账号和网络依赖。
@@ -85,7 +77,7 @@ namespace MiniCore.Demo.MiniBomber
         {
             var batch = new MiniBomberBattleInputBatch
             {
-                PlayerId = account.PlayerId,
+                PlayerId = account.Model.PlayerId,
                 MatchId = matchId
             };
             batch.Frames.Add(new MiniBomberInputFrameDto
@@ -111,7 +103,7 @@ namespace MiniCore.Demo.MiniBomber
             }
 
             resyncPending = false;
-            LastSnapshotReceiveTime = Global.Time.UnscaledTime;
+            model.LastSnapshotReceiveTime = Global.Time.UnscaledTime;
             SnapshotChanged?.Invoke();
         }
 
@@ -124,13 +116,13 @@ namespace MiniCore.Demo.MiniBomber
             MiniBomberReplicationApplyResult result = replication.ApplyDelta(delta);
             if (result == MiniBomberReplicationApplyResult.RequiresResync)
             {
-                RequestResyncAsync(delta?.MatchId ?? Snapshot?.MatchId ?? 0).Forget();
+                RequestResyncAsync(delta?.MatchId ?? model.MatchId).Forget();
                 return;
             }
 
             if (result == MiniBomberReplicationApplyResult.Applied)
             {
-                LastSnapshotReceiveTime = Global.Time.UnscaledTime;
+                model.LastSnapshotReceiveTime = Global.Time.UnscaledTime;
                 SnapshotChanged?.Invoke();
             }
         }
@@ -144,19 +136,13 @@ namespace MiniCore.Demo.MiniBomber
             MiniBomberReplicationApplyResult result = replication.ApplyEvents(batch);
             if (result == MiniBomberReplicationApplyResult.RequiresResync)
             {
-                RequestResyncAsync(batch?.MatchId ?? Snapshot?.MatchId ?? 0).Forget();
+                RequestResyncAsync(batch?.MatchId ?? model.MatchId).Forget();
                 return;
             }
 
             if (result != MiniBomberReplicationApplyResult.Applied)
             {
                 return;
-            }
-
-            recentEvents.AddRange(batch.Events);
-            if (recentEvents.Count > 32)
-            {
-                recentEvents.RemoveRange(0, recentEvents.Count - 32);
             }
 
             EventsChanged?.Invoke();
@@ -168,7 +154,39 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="result">服务器唯一成绩消息。</param>
         public void ApplyResult(MiniBomberMatchResultNotice result)
         {
-            Result = result;
+            if (result == null)
+            {
+                return;
+            }
+
+            MiniBomberMatchResultModel target = model.Result ?? new MiniBomberMatchResultModel();
+            target.RoomId = result.RoomId;
+            target.MatchId = result.MatchId;
+            target.ReturnToRoomMilliseconds = result.ReturnToRoomMilliseconds;
+            while (target.MutableEntries.Count < result.Results.Count)
+            {
+                target.MutableEntries.Add(new MiniBomberMatchResultEntryModel());
+            }
+
+            for (int index = 0; index < result.Results.Count; index++)
+            {
+                MiniBomberMatchResultEntryDto source = result.Results[index];
+                MiniBomberMatchResultEntryModel entry = target.MutableEntries[index];
+                entry.Rank = source.Rank;
+                entry.PlayerId = source.PlayerId;
+                entry.PlayerName = source.PlayerName ?? string.Empty;
+                entry.Score = source.Score;
+                entry.Kills = source.Kills;
+                entry.Deaths = source.Deaths;
+                entry.IsOnline = source.IsOnline;
+            }
+
+            if (target.MutableEntries.Count > result.Results.Count)
+            {
+                target.MutableEntries.RemoveRange(result.Results.Count, target.MutableEntries.Count - result.Results.Count);
+            }
+
+            model.Result = target;
             ResultChanged?.Invoke();
         }
 
@@ -178,9 +196,6 @@ namespace MiniCore.Demo.MiniBomber
         public void ResetBattle()
         {
             replication.Reset();
-            LastSnapshotReceiveTime = 0d;
-            Result = null;
-            recentEvents.Clear();
             nextInputSequence = 1;
             resyncPending = false;
             SnapshotChanged?.Invoke();
@@ -199,9 +214,6 @@ namespace MiniCore.Demo.MiniBomber
             EventsChanged = null;
             ResultChanged = null;
             replication.Reset();
-            LastSnapshotReceiveTime = 0d;
-            Result = null;
-            recentEvents.Clear();
             network = null;
             account = null;
             resyncPending = false;
@@ -226,14 +238,13 @@ namespace MiniCore.Demo.MiniBomber
             }
 
             resyncPending = true;
-            MiniBomberBattleSnapshot snapshot = Snapshot;
             MiniBomberBattleResyncResponse response = await network.CallAsync<MiniBomberBattleResyncRequest, MiniBomberBattleResyncResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberBattleResyncRequest
             {
-                PlayerId = account.PlayerId,
+                PlayerId = account.Model.PlayerId,
                 MatchId = matchId,
-                KnownServerTick = snapshot?.ServerTick ?? 0,
-                KnownRevision = snapshot?.Revision ?? 0,
-                KnownEventId = replication.LastEventId
+                KnownServerTick = model.ServerTick,
+                KnownRevision = model.Revision,
+                KnownEventId = model.LastEventId
             });
             if (response == null || response.Code != MiniBomberErrorCode.Success)
             {

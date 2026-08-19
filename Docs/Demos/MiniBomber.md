@@ -17,6 +17,7 @@
 - Windows 键盘和 Android 虚拟摇杆/炸弹按钮的统一输入；Android 支持持续移动时同时放置炸弹，并在 Demo 运行期间保持屏幕常亮。
 - 客户端业务资产 `MiniBomberClientNetworkProfile` 只保存认证 HTTPS 入口；Coordinator、Lobby、Game、Match、Database 地址均不进入客户端配置。
 - 登录、大厅、房间、战斗、成绩和重连的 Client Flow、View 与 Presenter。
+- 客户端采用 `AComponent + MVP`：纯 C# Model 保存长期业务数据，Component 负责 PB 转换、命令和唯一写入，Presenter 按需投影，View 只操作私有 Unity 控件。
 - 客户端展示插值、简单本地预测、小误差收敛和超过 `0.75` 格的直接校正。预测不参与权威判定。
 
 需要项目制作者完成的表现资产：
@@ -31,6 +32,24 @@
 MiniBomber 手写运行时代码仍位于 `Assets/Scripts/MiniCore/HotUpdate/Demos/MiniBomber`，但通过 asmref 编入三个不同程序集：共享 DTO/规则进入 `MiniCore.HotUpdate.Shared`，客户端 UI/Flow/Handler 进入 `MiniCore.HotUpdate.Client`，服务端权威状态/Role Handler 进入 `MiniCore.HotUpdate.Server`。服务端程序集不会参与客户端 Player 编译或热更新清单。
 
 Demo 的 Editor 工具物理位于 `HotUpdate/Demos/MiniBomber/Editor`，但通过 `MiniCore.Editor.asmref` 编入 `MiniCore.Editor`。客户端可见业务协议生成到热更新 `MiniCore.Protocol.Outer`，共享类型生成到热更新 `MiniCore.Protocol.Common`，Match 和 Database RPC 生成到热更新 `MiniCore.Protocol.Inner`；Coordinator 控制面单独生成到 AOT Control/Control.Inner。场景和 Prefab 继续位于 `Assets/Scenes/Demos/MiniBomber` 与 `Assets/AssetRes/Demos/MiniBomber`。
+
+### 客户端 `AComponent + MVP` 边界
+
+```text
+PB Message（短生命周期）
+→ Handler / AComponent 复制或增量归并
+→ Account/Lobby/Room/Battle/Flow Model（长期纯数据）
+→ Presenter 按需提取与投影
+→ 简单参数或窗口专用 ViewData
+→ View 刷新私有 Unity 控件
+```
+
+- PB 不池化，不保存到 Model，不进入 Presenter 或 View；网络字节缓冲池保持原实现。
+- Model 不引用 PB、Unity、网络服务或 UI。集合只读暴露，所属 Component 负责写入并发布变化事件。
+- `AccountSessionComponent、LobbyComponent、RoomComponent、BattleClientComponent` 按业务域维护 Model，不按窗口拆 Component。
+- `MiniBomberClientFlowComponent` 只维护场景、窗口、重连和跨业务流程 Model，不复制账号、房间或战斗数据，也不保存按钮状态和格式化 UI 文本。
+- Lobby、Room、MatchResult 使用窗口专用 ViewData；Login、Register、CreateRoom、Loading、Reconnect、Toast、NetworkDebug 使用明确参数。Battle HUD 按时间、排名、击杀事件和性能诊断分区刷新。
+- ViewData 只含当前窗口使用的字段，Presenter 不把完整 Model 传给 View；ViewData 不回写 Component，也不是权威业务状态。
 
 ## 2. 启动与场景时序
 
@@ -259,9 +278,9 @@ BattleHudWindow
 └── DesktopHintRoot
 ```
 
-各 View 需要绑定的字段已以公开 Unity 引用显示在 Inspector：
+各 View 的控件字段均为 `[SerializeField] private`，仍会显示在 Inspector，并保持既有字段名和 Prefab 序列化绑定：
 
-- Login：Host、Port、Account、Password、Login/Register Button、Prompt。
+- Login：Account、Password、Login/Register Button、Prompt。
 - Register：Account、Password、Confirm Password、Player Name、Submit/Close Button、Prompt。
 - Lobby：Player Name、Online Count、Room List Text、Join Room Id、Refresh/Create/Join/Logout Button、Prompt。
 - Create Room：Room Name、Duration Dropdown、Submit/Cancel Button、Prompt。Dropdown 选项顺序必须为 `2、5、10 分钟`。
@@ -273,7 +292,7 @@ BattleHudWindow
 - Toast：Message。
 - Debug：Diagnostics。
 
-登录、注册、大厅和房间按钮由 Presenter 统一管理请求中状态：点击后立即更新 Prompt，并在响应或失败前禁用同组命令按钮。不要再给这些按钮额外挂一份网络请求；服务器成功但客户端窗口切换失败时，Prompt 会明确提示“重新登录可恢复服务器状态”。
+登录、注册、大厅和房间的命令互斥由 Presenter 协调，按钮文本、交互和显隐由 View 的语义方法更新。不要再给这些按钮额外挂一份网络请求；服务器成功但客户端窗口切换失败时，Prompt 会明确提示“重新登录可恢复服务器状态”。
 
 完成 Prefab 后执行：
 
@@ -455,6 +474,14 @@ Editor 回归测试位于 `Assets/Tests/Editor/Demos/MiniBomber`。以下是改�
 运行入口：Unity Test Runner 的 EditMode，筛选 `MiniCore.Tests.Editor.Demos.MiniBomber`。
 
 ## 13. 验证记录
+
+### 2026-08-18（MiniBomber `AComponent + MVP` 干净切换）
+
+- 数据层：新增账号、大厅、房间、战斗、比赛结果和客户端流程纯 C# Model；列表元素拆为独立 Model，集合只读暴露。
+- 协议边界：PB 仅用于收发，Component 把响应和推送复制或增量归并到 Model；不池化 PB，也不保留 PB 对象或子集合引用。
+- UI 边界：全部 MiniBomber View 保持原字段名并改为私有序列化字段；Presenter 不再直接访问 Unity 控件，也不再消费 PB。
+- 刷新策略：Lobby、Room、MatchResult 使用窗口专用 ViewData；Battle HUD 使用修订号与相同值保护进行分区刷新，列表和战斗实体 Model 尽量复用。
+- 流程边界：Flow 只编排场景、窗口、重连和跨业务流程，长期流程数据使用结构化 Model，不保存格式化 UI 文本。
 
 ### 2026-08-15（RPC 简化超时、长连接心跳与服务自动恢复）
 

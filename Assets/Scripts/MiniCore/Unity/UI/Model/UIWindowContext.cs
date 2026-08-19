@@ -12,7 +12,7 @@ namespace MiniCore.UI
 {
 
     /// <summary>
-    /// Presenter 或 ViewModel 在一次窗口会话中可访问的最小上下文。
+    /// Presenter 在一次窗口会话中可访问的最小上下文。
     /// </summary>
     public sealed class UIWindowContext
     {

@@ -29,7 +29,7 @@ namespace MiniCore.UI
 
         [SerializeField, HideInInspector] private string windowId; // 编辑器生成的稳定 128 位身份。
         [SerializeField] private string routeName; // 生成强类型路由使用的稳定名称。
-        [SerializeField, HideInInspector] private string logicTypeName; // Presenter 或 ViewModel 程序集限定名。
+        [SerializeField, HideInInspector] private string logicTypeName; // Presenter 程序集限定名。
         [SerializeField, HideInInspector] private string assetAddress; // YooAsset 运行时地址。
         [SerializeField] private UIWindowTemplate template = UIWindowTemplate.Screen; // 窗口模板。
         [SerializeField] private UIRenderSpace renderSpace = UIRenderSpace.ScreenSpaceOverlay; // 渲染空间。

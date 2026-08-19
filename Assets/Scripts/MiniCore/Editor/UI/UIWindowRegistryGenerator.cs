@@ -291,7 +291,7 @@ namespace MiniCore.EditorTools.UI
             Type logicType = UIAuthoringUtility.ResolveType(view.LogicTypeName);
             if (logicType == null || !typeof(IUIWindowLogic).IsAssignableFrom(logicType) || logicType.IsAbstract || logicType.GetConstructor(Type.EmptyTypes) == null)
             {
-                error = $"窗口 {path} 的 Presenter/ViewModel 无效或不可直接构造：{view.LogicTypeName}。";
+                error = $"窗口 {path} 的 Presenter 无效或不可直接构造：{view.LogicTypeName}。";
                 return false;
             }
 

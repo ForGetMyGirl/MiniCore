@@ -12,7 +12,7 @@ namespace MiniCore.UI
 {
 
     /// <summary>
-    /// 强类型被动 View Presenter 基类。
+    /// 强类型 View Presenter 基类，负责窗口业务协调与 View 数据同步。
     /// </summary>
     /// <typeparam name="TView">Presenter 对应的 View 类型。</typeparam>
     public abstract class AUIWindowPresenter<TView> : IUIWindowLogic where TView : AUIWindowView

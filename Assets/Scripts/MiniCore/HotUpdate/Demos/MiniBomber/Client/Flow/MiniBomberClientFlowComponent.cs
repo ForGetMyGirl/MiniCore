@@ -16,6 +16,7 @@ namespace MiniCore.Demo.MiniBomber
         #region Private 私有成员
 
         private static readonly int[] ReconnectDelayMilliseconds = { 1000, 2000, 4000, 4000, 4000 }; // 计划约定的重连退避序列。
+        private readonly MiniBomberClientFlowModel model = new MiniBomberClientFlowModel(); // 当前跨场景流程业务数据。
         private ISceneService sceneService; // YooAsset 单场景服务。
         private MiniCore.UI.IUIService uiService; // 应用级 UI 服务。
         private INetworkService network; // 网络服务。
@@ -24,7 +25,6 @@ namespace MiniCore.Demo.MiniBomber
         private RoomComponent room; // 房间组件。
         private BattleClientComponent battle; // 战斗组件。
         private MiniBomberRuntimeConfig runtimeConfig; // 可选运行时配置资产。
-        private MiniBomberMatchPrepareNotice pendingPrepare; // 当前加载中的比赛参数。
         private MiniCore.UI.UIWindowHandle reconnectHandle; // 当前重连系统遮罩句柄。
         private MiniCore.UI.UIWindowHandle resultHandle; // 当前成绩弹窗句柄。
         private MiniCore.UI.UIWindowHandle battleHudHandle; // 当前战斗 HUD 精确句柄。
@@ -41,24 +41,9 @@ namespace MiniCore.Demo.MiniBomber
         public event Action Changed;
 
         /// <summary>
-        /// 当前客户端流程状态。
+        /// 获取当前跨场景流程的只读业务数据。
         /// </summary>
-        public MiniBomberClientFlowState State { get; private set; }
-
-        /// <summary>
-        /// 当前比赛倒计时消息。
-        /// </summary>
-        public MiniBomberMatchCountdownNotice Countdown { get; private set; }
-
-        /// <summary>
-        /// 当前重连尝试序号，从一开始。
-        /// </summary>
-        public int ReconnectAttempt { get; private set; }
-
-        /// <summary>
-        /// 最近流程提示或错误。
-        /// </summary>
-        public string Message { get; private set; } = string.Empty;
+        public MiniBomberClientFlowModel Model => model;
 
         /// <summary>
         /// 取得客户端组件依赖并进入登录场景。
@@ -78,7 +63,7 @@ namespace MiniCore.Demo.MiniBomber
             battle.ResultChanged += HandleResultChanged;
             room.Changed += HandleRoomChanged;
             account.Disconnected += HandleTransportDisconnected;
-            State = MiniBomberClientFlowState.Login;
+            model.State = MiniBomberClientFlowState.Login;
             MiniCore.UI.UIWindowHandle loadingHandle = await OpenWindowIfAvailableAsync(MiniBomberConstants.SceneLoadingWindowRoute);
             try
             {
@@ -97,59 +82,59 @@ namespace MiniCore.Demo.MiniBomber
         /// 根据登录或恢复响应切换到大厅、房间或战斗流程。
         /// </summary>
         /// <param name="destination">服务器权威目标状态。</param>
-        /// <param name="roomSnapshot">可选恢复房间快照。</param>
+        /// <param name="roomModel">可选恢复房间 Model。</param>
         /// <returns>场景切换和状态应用完成任务。</returns>
-        public async MTask NavigateAsync(MiniBomberClientDestination destination, MiniBomberRoomSnapshotDto roomSnapshot = null)
+        public async MTask NavigateAsync(MiniBomberClientDestinationKind destination, MiniBomberRoomModel roomModel = null)
         {
-            if (roomSnapshot != null)
+            if (roomModel != null)
             {
-                room.ApplySnapshot(roomSnapshot);
+                room.ApplyModel(roomModel);
             }
 
             MiniCore.UI.UIWindowHandle loadingHandle = await OpenWindowIfAvailableAsync(MiniBomberConstants.SceneLoadingWindowRoute);
             try
             {
-                if (destination != MiniBomberClientDestination.MiniBomberDestinationBattle)
+                if (destination != MiniBomberClientDestinationKind.Battle)
                 {
                     await CloseBattleHudAsync();
                 }
 
                 switch (destination)
                 {
-                    case MiniBomberClientDestination.MiniBomberDestinationBattle:
-                        State = MiniBomberClientFlowState.LoadingBattle;
-                        Message = "正在恢复战斗场景";
+                    case MiniBomberClientDestinationKind.Battle:
+                        model.State = MiniBomberClientFlowState.LoadingBattle;
+                        SetNotice(MiniBomberClientFlowNotice.RestoringBattle);
                         Changed?.Invoke();
                         await uiService.CloseNavigationAsync(MiniBomberConstants.MainNavigationGroup);
                         await LoadSceneAsync(runtimeConfig != null ? runtimeConfig.BattleSceneAddress : "BattleScene");
                         await OpenBattleHudAsync();
-                        State = MiniBomberClientFlowState.Battle;
+                        model.State = MiniBomberClientFlowState.Battle;
                         break;
-                    case MiniBomberClientDestination.MiniBomberDestinationRoom:
-                        Message = "正在进入房间";
+                    case MiniBomberClientDestinationKind.Room:
+                        SetNotice(MiniBomberClientFlowNotice.EnteringRoom);
                         Changed?.Invoke();
                         await LoadLobbySceneAsync();
-                        State = MiniBomberClientFlowState.Room;
+                        model.State = MiniBomberClientFlowState.Room;
                         await NavigateWindowIfAvailableAsync(MiniBomberConstants.RoomWindowRoute);
                         break;
-                    case MiniBomberClientDestination.MiniBomberDestinationLobby:
-                        Message = "正在进入大厅";
+                    case MiniBomberClientDestinationKind.Lobby:
+                        SetNotice(MiniBomberClientFlowNotice.EnteringLobby);
                         Changed?.Invoke();
                         await LoadLobbySceneAsync();
-                        State = MiniBomberClientFlowState.Lobby;
+                        model.State = MiniBomberClientFlowState.Lobby;
                         await lobby.RefreshAsync();
                         await NavigateWindowIfAvailableAsync(MiniBomberConstants.LobbyWindowRoute);
                         break;
                     default:
-                        Message = "正在返回登录界面";
+                        SetNotice(MiniBomberClientFlowNotice.ReturningLogin);
                         Changed?.Invoke();
-                        State = MiniBomberClientFlowState.Login;
+                        model.State = MiniBomberClientFlowState.Login;
                         await LoadSceneAsync(runtimeConfig != null ? runtimeConfig.LoginSceneAddress : "LoginScene");
                         await NavigateWindowIfAvailableAsync(MiniBomberConstants.LoginWindowRoute);
                         break;
                 }
 
-                Message = string.Empty;
+                SetNotice(MiniBomberClientFlowNotice.None);
                 Changed?.Invoke();
             }
             finally
@@ -163,40 +148,25 @@ namespace MiniCore.Demo.MiniBomber
         /// </summary>
         /// <param name="notice">服务器比赛准备参数。</param>
         /// <returns>场景切换和就绪 RPC 完成任务。</returns>
-        public async MTask HandleMatchPrepareAsync(MiniBomberMatchPrepareNotice notice)
+        public MTask HandleMatchPrepareAsync(MiniBomberMatchPrepareNotice notice)
         {
             if (notice == null || notice.MatchId <= 0)
             {
-                return;
+                return MTask.CompletedTask;
             }
 
-            pendingPrepare = notice;
-            State = MiniBomberClientFlowState.LoadingBattle;
-            Message = "正在加载战斗场景";
-            battle.ResetBattle();
-            Changed?.Invoke();
-            MiniCore.UI.UIWindowHandle loadingHandle = await OpenWindowIfAvailableAsync(MiniBomberConstants.SceneLoadingWindowRoute);
-            try
+            MiniBomberMatchPrepareModel prepare = new MiniBomberMatchPrepareModel
             {
-                await uiService.CloseNavigationAsync(MiniBomberConstants.MainNavigationGroup);
-                await LoadSceneAsync(notice.BattleSceneAddress);
-                await OpenBattleHudAsync();
-                MiniBomberSceneReadyResponse response = await network.CallAsync<MiniBomberSceneReadyRequest, MiniBomberSceneReadyResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberSceneReadyRequest
-                {
-                    PlayerId = account.PlayerId,
-                    RoomId = notice.RoomId,
-                    MatchId = notice.MatchId
-                }, timeoutSeconds: 15);
-                if (response.Code != MiniBomberErrorCode.Success)
-                {
-                    Message = response.Msg;
-                    Changed?.Invoke();
-                }
-            }
-            finally
-            {
-                await CloseLoadingAsync(loadingHandle);
-            }
+                RoomId = notice.RoomId,
+                MatchId = notice.MatchId,
+                BattleSceneAddress = notice.BattleSceneAddress ?? string.Empty,
+                MapAddress = notice.MapAddress ?? string.Empty,
+                DurationSeconds = notice.DurationSeconds,
+                RandomSeed = notice.RandomSeed,
+                LoadingTimeoutMilliseconds = notice.LoadingTimeoutMilliseconds
+            };
+            model.MatchPrepare = prepare;
+            return HandleMatchPrepareModelAsync(prepare);
         }
 
         /// <summary>
@@ -205,9 +175,16 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="notice">倒计时消息。</param>
         public void ApplyCountdown(MiniBomberMatchCountdownNotice notice)
         {
-            Countdown = notice;
-            State = MiniBomberClientFlowState.Battle;
-            Message = string.Empty;
+            model.Countdown = notice == null
+                ? null
+                : new MiniBomberMatchCountdownModel
+                {
+                    MatchId = notice.MatchId,
+                    ServerStartTimestampMilliseconds = notice.ServerStartTimestampMilliseconds,
+                    CountdownMilliseconds = notice.CountdownMilliseconds
+                };
+            model.State = MiniBomberClientFlowState.Battle;
+            SetNotice(MiniBomberClientFlowNotice.None);
             Changed?.Invoke();
         }
 
@@ -218,19 +195,19 @@ namespace MiniCore.Demo.MiniBomber
         public void HandleDisconnected(string reason, bool mayResume = true)
         {
             account.MarkDisconnected();
-            Message = string.IsNullOrWhiteSpace(reason) ? "网络连接已断开" : reason;
+            SetNotice(MiniBomberClientFlowNotice.Disconnected, reason);
             if (!mayResume)
             {
                 HandleNonResumableDisconnectAsync().Forget();
             }
-            else if (!reconnecting && account.IsAuthenticated)
+            else if (!reconnecting && account.Model.IsAuthenticated)
             {
                 OpenReconnectOverlayAsync().Forget();
                 ReconnectAsync().Forget();
             }
-            else if (!account.IsAuthenticated)
+            else if (!account.Model.IsAuthenticated)
             {
-                State = MiniBomberClientFlowState.Login;
+                model.State = MiniBomberClientFlowState.Login;
                 Changed?.Invoke();
             }
         }
@@ -267,7 +244,10 @@ namespace MiniCore.Demo.MiniBomber
             room = null;
             battle = null;
             runtimeConfig = null;
-            pendingPrepare = null;
+            model.MatchPrepare = null;
+            model.Countdown = null;
+            model.Notice = MiniBomberClientFlowNotice.None;
+            model.Detail = string.Empty;
             reconnectHandle = null;
             resultHandle = null;
             battleHudHandle = null;
@@ -280,19 +260,55 @@ namespace MiniCore.Demo.MiniBomber
         #region Private 私有成员
 
         /// <summary>
+        /// 使用已经脱离 PB 生命周期的比赛参数切换场景并报告加载完成。
+        /// </summary>
+        /// <param name="prepare">协议无关的比赛准备参数。</param>
+        /// <returns>场景切换和就绪 RPC 完成任务。</returns>
+        private async MTask HandleMatchPrepareModelAsync(MiniBomberMatchPrepareModel prepare)
+        {
+            model.State = MiniBomberClientFlowState.LoadingBattle;
+            SetNotice(MiniBomberClientFlowNotice.LoadingBattle);
+            battle.ResetBattle();
+            Changed?.Invoke();
+            MiniCore.UI.UIWindowHandle loadingHandle = await OpenWindowIfAvailableAsync(MiniBomberConstants.SceneLoadingWindowRoute);
+            try
+            {
+                await uiService.CloseNavigationAsync(MiniBomberConstants.MainNavigationGroup);
+                await LoadSceneAsync(prepare.BattleSceneAddress);
+                await OpenBattleHudAsync();
+                MiniBomberSceneReadyResponse response = await network.CallAsync<MiniBomberSceneReadyRequest, MiniBomberSceneReadyResponse>(MiniBomberConstants.DefaultSessionId, new MiniBomberSceneReadyRequest
+                {
+                    PlayerId = account.Model.PlayerId,
+                    RoomId = prepare.RoomId,
+                    MatchId = prepare.MatchId
+                }, timeoutSeconds: 15);
+                if (response.Code != MiniBomberErrorCode.Success)
+                {
+                    SetNotice(MiniBomberClientFlowNotice.SceneReadyFailed, response.Msg);
+                    Changed?.Invoke();
+                }
+            }
+            finally
+            {
+                await CloseLoadingAsync(loadingHandle);
+            }
+        }
+
+        /// <summary>
         /// 执行有上限的断线重连循环并恢复服务器目的地。
         /// </summary>
         /// <returns>重连流程完成任务。</returns>
         private async MTask ReconnectAsync()
         {
             reconnecting = true;
-            State = MiniBomberClientFlowState.Reconnecting;
+            model.State = MiniBomberClientFlowState.Reconnecting;
             try
             {
                 for (int index = 0; index < ReconnectDelayMilliseconds.Length; index++)
                 {
-                    ReconnectAttempt = index + 1;
-                    Message = $"连接中断，{ReconnectDelayMilliseconds[index] / 1000} 秒后进行第 {ReconnectAttempt} 次恢复";
+                    model.ReconnectAttempt = index + 1;
+                    model.NextRetryMilliseconds = ReconnectDelayMilliseconds[index];
+                    SetNotice(MiniBomberClientFlowNotice.ReconnectWaiting);
                     Changed?.Invoke();
                     await MTask.Delay(ReconnectDelayMilliseconds[index]);
                     bool connected = await account.ConnectAsync();
@@ -301,27 +317,28 @@ namespace MiniCore.Demo.MiniBomber
                         continue;
                     }
 
-                    MiniBomberResumeSessionResponse response = await account.ResumeAsync();
-                    if (response.Code == MiniBomberErrorCode.Success)
+                    MiniBomberSessionResult response = await account.ResumeAsync();
+                    if (response.Command.IsSuccess)
                     {
                         await NavigateAsync(response.Destination, response.Room);
                         return;
                     }
                 }
 
-                Message = "重连超时，请重新登录";
-                await NavigateAsync(MiniBomberClientDestination.MiniBomberDestinationLogin);
+                SetNotice(MiniBomberClientFlowNotice.ReconnectTimedOut);
+                await NavigateAsync(MiniBomberClientDestinationKind.Login);
             }
             catch (Exception exception)
             {
                 LogSwitch.Error($"MiniBomber 重连失败：{exception}");
-                Message = "重连失败，请重新登录";
-                State = MiniBomberClientFlowState.Login;
+                SetNotice(MiniBomberClientFlowNotice.ReconnectFailed);
+                model.State = MiniBomberClientFlowState.Login;
             }
             finally
             {
                 reconnecting = false;
-                ReconnectAttempt = 0;
+                model.ReconnectAttempt = 0;
+                model.NextRetryMilliseconds = 0;
                 if (reconnectHandle != null && reconnectHandle.IsValid)
                 {
                     await uiService.CloseAsync(reconnectHandle);
@@ -345,7 +362,7 @@ namespace MiniCore.Demo.MiniBomber
         /// </summary>
         private void HandleResultChanged()
         {
-            State = MiniBomberClientFlowState.Result;
+            model.State = MiniBomberClientFlowState.Result;
             OpenResultAsync().Forget();
             Changed?.Invoke();
         }
@@ -372,13 +389,13 @@ namespace MiniCore.Demo.MiniBomber
         /// </summary>
         private void HandleRoomChanged()
         {
-            if (!returningToRoom && State == MiniBomberClientFlowState.Result && room.Current != null && room.Current.State == MiniBomberRoomState.MiniBomberRoomWaiting)
+            if (!returningToRoom && model.State == MiniBomberClientFlowState.Result && room.Model.HasRoom && room.Model.Status == MiniBomberRoomStatus.Waiting)
             {
                 ReturnToRoomAsync().Forget();
             }
-            else if (!returningToRoom && State == MiniBomberClientFlowState.LoadingBattle && room.Current != null && room.Current.State == MiniBomberRoomState.MiniBomberRoomWaiting)
+            else if (!returningToRoom && model.State == MiniBomberClientFlowState.LoadingBattle && room.Model.HasRoom && room.Model.Status == MiniBomberRoomStatus.Waiting)
             {
-                Message = "有玩家战斗场景加载超时，已返回房间";
+                SetNotice(MiniBomberClientFlowNotice.BattleLoadingTimedOut);
                 ReturnToRoomAsync().Forget();
             }
         }
@@ -398,7 +415,7 @@ namespace MiniCore.Demo.MiniBomber
                     resultHandle = null;
                 }
 
-                await NavigateAsync(MiniBomberClientDestination.MiniBomberDestinationRoom, room.Current);
+                await NavigateAsync(MiniBomberClientDestinationKind.Room);
             }
             finally
             {
@@ -473,7 +490,18 @@ namespace MiniCore.Demo.MiniBomber
         private async MTask HandleNonResumableDisconnectAsync()
         {
             await account.LogoutAsync();
-            await NavigateAsync(MiniBomberClientDestination.MiniBomberDestinationLogin);
+            await NavigateAsync(MiniBomberClientDestinationKind.Login);
+        }
+
+        /// <summary>
+        /// 更新结构化流程提示和可选原始说明。
+        /// </summary>
+        /// <param name="notice">结构化流程提示。</param>
+        /// <param name="detail">服务器或传输返回的可选说明。</param>
+        private void SetNotice(MiniBomberClientFlowNotice notice, string detail = null)
+        {
+            model.Notice = notice;
+            model.Detail = detail ?? string.Empty;
         }
 
         /// <summary>

@@ -20,9 +20,8 @@ MonoBehaviour:
   hotUpdateAssemblies:
   - MiniCore.Protocol.Common
   - MiniCore.Protocol.Outer
-  - MiniCore.Protocol.Inner
   - MiniCore.HotUpdate.Shared
-  - MiniCore.HotUpdate.Server
+  - MiniCore.HotUpdate.Client
   preserveHotUpdateAssemblies: []
   hotUpdateDllCompileOutputRootDir: HybridCLRData/HotUpdateDlls
   externalHotUpdateAssembliyDirs: []

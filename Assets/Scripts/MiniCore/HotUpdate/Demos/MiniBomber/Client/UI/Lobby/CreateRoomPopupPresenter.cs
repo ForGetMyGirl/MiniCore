@@ -1,8 +1,6 @@
 using System;
-using System.Text;
 using MiniCore.Core;
 using MiniCore.Model;
-using MiniCore.Protocol.Generated;
 using MiniCore.Service;
 using MiniCore.Threading;
 using MiniCore.UI;
@@ -36,12 +34,9 @@ namespace MiniCore.Demo.MiniBomber
             room = Global.Get<RoomComponent>(this);
             flow = Global.Get<MiniBomberClientFlowComponent>(this);
             commandRunning = false;
-            View.PromptText.text = string.Empty;
-            SetCommandInteractable(true);
-            View.DurationDropdown.ClearOptions();
-            View.DurationDropdown.AddOptions(new System.Collections.Generic.List<string> { "2分钟", "5分钟", "10分钟" });
-            Bindings.Add(View.SubmitButton, Submit);
-            Bindings.Add(View.CancelButton, Close);
+            View.ShowPrompt(string.Empty);
+            View.SetCommandInteractable(true);
+            View.BindActions(Bindings, Submit, Close);
         }
 
         /// <summary>
@@ -78,29 +73,29 @@ namespace MiniCore.Demo.MiniBomber
         /// <returns>创建流程完成任务。</returns>
         private async MTask SubmitAsync()
         {
-            int index = Mathf.Clamp(View.DurationDropdown.value, 0, Durations.Length - 1);
-            string roomName = View.RoomNameInput.text;
+            View.GetCreateInput(out string roomName, out int durationIndex);
+            int index = Mathf.Clamp(durationIndex, 0, Durations.Length - 1);
             commandRunning = true;
-            SetCommandInteractable(false);
+            View.SetCommandInteractable(false);
             bool created = false;
             try
             {
-                View.PromptText.text = "正在创建房间...";
-                MiniBomberCreateRoomResponse response = await room.CreateAsync(roomName, Durations[index]);
+                View.ShowPrompt("正在创建房间...");
+                MiniBomberCommandResult result = await room.CreateAsync(roomName, Durations[index]);
                 if (released)
                 {
                     return;
                 }
 
-                View.PromptText.text = response.Msg;
-                if (response.Code == MiniBomberErrorCode.Success)
+                View.ShowPrompt(result.Message);
+                if (result.IsSuccess)
                 {
                     created = true;
                     MiniBomberClientFlowComponent flowComponent = flow;
                     IUIService service = Context.Service;
                     UIWindowHandle handle = Context.Handle;
-                    View.PromptText.text = "创建成功，正在进入房间...";
-                    await flowComponent.NavigateAsync(MiniBomberClientDestination.MiniBomberDestinationRoom, response.Room);
+                    View.ShowPrompt("创建成功，正在进入房间...");
+                    await flowComponent.NavigateAsync(MiniBomberClientDestinationKind.Room);
                     await service.CloseAsync(handle);
                 }
             }
@@ -109,9 +104,9 @@ namespace MiniCore.Demo.MiniBomber
                 LogSwitch.Error($"MiniBomber 创建房间失败：{exception}");
                 if (!released)
                 {
-                    View.PromptText.text = created
+                    View.ShowPrompt(created
                         ? "房间已经创建，但界面切换失败；重新登录可恢复房间状态"
-                        : "创建房间失败，请检查网络连接后重试";
+                        : "创建房间失败，请检查网络连接后重试");
                 }
             }
             finally
@@ -119,7 +114,7 @@ namespace MiniCore.Demo.MiniBomber
                 commandRunning = false;
                 if (!released)
                 {
-                    SetCommandInteractable(true);
+                    View.SetCommandInteractable(true);
                 }
             }
         }
@@ -135,16 +130,6 @@ namespace MiniCore.Demo.MiniBomber
             }
 
             Context.Service.CloseAsync(Context.Handle).Forget();
-        }
-
-        /// <summary>
-        /// 切换创建房间弹窗按钮，防止同一请求重复提交。
-        /// </summary>
-        /// <param name="interactable">是否允许点击。</param>
-        private void SetCommandInteractable(bool interactable)
-        {
-            View.SubmitButton.interactable = interactable;
-            View.CancelButton.interactable = interactable;
         }
 
         #endregion

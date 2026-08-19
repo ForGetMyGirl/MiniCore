@@ -1,25 +1,21 @@
 using System;
-using System.Text;
 using MiniCore.Core;
 using MiniCore.Model;
-using MiniCore.Protocol.Generated;
-using MiniCore.Service;
 using MiniCore.Threading;
 using MiniCore.UI;
 using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
-
     /// <summary>
-    /// 房间窗口 Presenter。
+    /// 房间窗口 Presenter，投影房间 Model 并协调房间命令。
     /// </summary>
     public sealed class RoomWindowPresenter : AUIWindowPresenter<RoomWindowView>
     {
         #region Private 私有成员
 
-        private static readonly int[] Durations = { 120, 300, 600 }; // 下拉框索引对应时长。
-        private readonly StringBuilder builder = new StringBuilder(256); // 成员列表格式化缓存。
+        private static readonly int[] Durations = { 120, 300, 600 }; // 下拉索引对应的局时长。
+        private readonly RoomWindowViewData viewData = new RoomWindowViewData(); // 复用房间窗口显示数据。
         private AccountSessionComponent account; // 账号会话组件。
         private RoomComponent room; // 房间组件。
         private MiniBomberClientFlowComponent flow; // 客户端流程组件。
@@ -31,7 +27,7 @@ namespace MiniCore.Demo.MiniBomber
         #region Protected 受保护成员
 
         /// <summary>
-        /// 重置缓存窗口状态并绑定房间命令和权威快照变化事件。
+        /// 获取业务依赖并绑定房间意图和 Model 变化事件。
         /// </summary>
         protected override void OnBind()
         {
@@ -39,21 +35,16 @@ namespace MiniCore.Demo.MiniBomber
             room = Global.Get<RoomComponent>(this);
             flow = Global.Get<MiniBomberClientFlowComponent>(this);
             commandRunning = false;
-            View.PromptText.text = string.Empty;
-            View.DurationDropdown.ClearOptions();
-            View.DurationDropdown.AddOptions(new System.Collections.Generic.List<string> { "2分钟", "5分钟", "10分钟" });
+            View.ShowPrompt(string.Empty);
+            View.BindActions(Bindings, ApplySettings, ToggleReady, StartMatch, Leave);
             room.Changed += Render;
             Bindings.Add(() => room.Changed -= Render);
-            Bindings.Add(View.ApplySettingsButton, ApplySettings);
-            Bindings.Add(View.ReadyButton, ToggleReady);
-            Bindings.Add(View.StartButton, StartMatch);
-            Bindings.Add(View.LeaveButton, Leave);
             Render();
-            SetCommandInteractable(true);
+            View.SetCommandInteractable(true, room.IsOwner);
         }
 
         /// <summary>
-        /// 清空业务引用和格式化缓存。
+        /// 清空业务引用和复用显示列表。
         /// </summary>
         protected override void OnDispose()
         {
@@ -62,7 +53,7 @@ namespace MiniCore.Demo.MiniBomber
             account = null;
             room = null;
             flow = null;
-            builder.Clear();
+            viewData.MutableMembers.Clear();
         }
 
         #endregion
@@ -70,82 +61,69 @@ namespace MiniCore.Demo.MiniBomber
         #region Private 私有成员
 
         /// <summary>
-        /// 渲染房间成员、房主权限和准备状态。
+        /// 将当前房间 Model 投影为窗口专用显示数据。
         /// </summary>
         private void Render()
         {
-            MiniBomberRoomSnapshotDto snapshot = room.Current;
-            if (snapshot == null)
+            MiniBomberRoomModel source = room.Model;
+            if (!source.HasRoom) return;
+            viewData.RoomId = source.RoomId;
+            viewData.RoomName = source.RoomName;
+            int durationIndex = Array.IndexOf(Durations, source.DurationSeconds);
+            viewData.DurationIndex = durationIndex >= 0 ? durationIndex : 0;
+            viewData.IsOwner = room.IsOwner;
+            viewData.LocalReady = false;
+            while (viewData.MutableMembers.Count < source.Members.Count)
             {
-                return;
+                viewData.MutableMembers.Add(new RoomMemberViewData());
             }
 
-            View.RoomTitleText.text = $"#{snapshot.RoomId}  {snapshot.RoomName}";
-            View.RoomNameInput.text = snapshot.RoomName;
-            int durationIndex = Array.IndexOf(Durations, snapshot.DurationSeconds);
-            View.DurationDropdown.value = durationIndex >= 0 ? durationIndex : 0;
-            View.RoomNameInput.interactable = room.IsOwner;
-            View.DurationDropdown.interactable = room.IsOwner;
-            View.ApplySettingsButton.gameObject.SetActive(room.IsOwner);
-            View.StartButton.gameObject.SetActive(room.IsOwner);
-            builder.Clear();
-            bool localReady = false;
-            for (int memberIndex = 0; memberIndex < snapshot.Members.Count; memberIndex++)
+            for (int index = 0; index < source.Members.Count; index++)
             {
-                MiniBomberRoomMemberDto member = snapshot.Members[memberIndex];
-                builder.Append(member.IsOwner ? "[房主] " : string.Empty)
-                    .Append(member.PlayerName).Append(' ')
-                    .Append(member.IsOnline ? string.Empty : "[离线] ")
-                    .Append(member.IsReady ? "已准备" : "未准备").AppendLine();
-                if (member.PlayerId == account.PlayerId)
-                {
-                    localReady = member.IsReady;
-                }
+                MiniBomberRoomMemberModel member = source.Members[index];
+                RoomMemberViewData item = viewData.MutableMembers[index];
+                item.PlayerName = member.PlayerName;
+                item.IsOwner = member.IsOwner;
+                item.IsReady = member.IsReady;
+                item.IsOnline = member.IsOnline;
+                if (member.PlayerId == account.Model.PlayerId) viewData.LocalReady = member.IsReady;
             }
 
-            View.MemberListText.text = builder.ToString();
-            View.ReadyButton.GetComponentInChildren<TMPro.TMP_Text>().text = localReady ? "取消准备" : "准备";
+            if (viewData.MutableMembers.Count > source.Members.Count)
+            {
+                viewData.MutableMembers.RemoveRange(source.Members.Count, viewData.MutableMembers.Count - source.Members.Count);
+            }
+
+            View.Refresh(viewData);
+            View.SetCommandInteractable(!commandRunning, viewData.IsOwner);
         }
 
         /// <summary>
-        /// 提交房主设置。
+        /// 从按钮回调启动修改设置任务。
         /// </summary>
         private void ApplySettings()
         {
-            if (commandRunning)
-            {
-                return;
-            }
-
-            ApplySettingsAsync().Forget();
+            if (!commandRunning) ApplySettingsAsync().Forget();
         }
 
         /// <summary>
-        /// 请求服务器修改房间设置。
+        /// 提交房主设置并应用组件返回的 Model 更新。
         /// </summary>
         /// <returns>设置同步完成任务。</returns>
         private async MTask ApplySettingsAsync()
         {
-            int index = Mathf.Clamp(View.DurationDropdown.value, 0, Durations.Length - 1);
-            string roomName = View.RoomNameInput.text;
-            commandRunning = true;
-            SetCommandInteractable(false);
+            View.GetSettingsInput(out string roomName, out int durationIndex);
+            int index = Mathf.Clamp(durationIndex, 0, Durations.Length - 1);
+            BeginCommand("正在同步房间设置...");
             try
             {
-                View.PromptText.text = "正在同步房间设置...";
-                MiniBomberUpdateRoomResponse response = await room.UpdateSettingsAsync(roomName, Durations[index]);
-                if (!released)
-                {
-                    View.PromptText.text = response.Msg;
-                }
+                MiniBomberCommandResult result = await room.UpdateSettingsAsync(roomName, Durations[index]);
+                if (!released) View.ShowPrompt(result.Message);
             }
             catch (Exception exception)
             {
                 LogSwitch.Error($"MiniBomber 修改房间设置失败：{exception}");
-                if (!released)
-                {
-                    View.PromptText.text = "修改房间设置失败，请检查网络连接后重试";
-                }
+                if (!released) View.ShowPrompt("修改房间设置失败，请检查网络连接后重试");
             }
             finally
             {
@@ -154,59 +132,36 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 切换本地成员准备状态。
+        /// 从按钮回调启动准备状态切换任务。
         /// </summary>
         private void ToggleReady()
         {
-            if (commandRunning)
-            {
-                return;
-            }
-
-            ToggleReadyAsync().Forget();
+            if (!commandRunning) ToggleReadyAsync().Forget();
         }
 
         /// <summary>
-        /// 请求服务器切换准备状态。
+        /// 请求切换当前玩家准备状态。
         /// </summary>
-        /// <returns>准备同步完成任务。</returns>
+        /// <returns>准备状态同步完成任务。</returns>
         private async MTask ToggleReadyAsync()
         {
-            bool ready = false;
-            MiniBomberRoomSnapshotDto snapshot = room.Current;
-            if (snapshot == null)
+            if (!room.Model.HasRoom)
             {
-                View.PromptText.text = "房间状态尚未同步，请稍后重试";
+                View.ShowPrompt("房间状态尚未同步，请稍后重试");
                 return;
             }
 
-            for (int index = 0; index < snapshot.Members.Count; index++)
-            {
-                if (snapshot.Members[index].PlayerId == account.PlayerId)
-                {
-                    ready = snapshot.Members[index].IsReady;
-                    break;
-                }
-            }
-
-            commandRunning = true;
-            SetCommandInteractable(false);
+            bool ready = viewData.LocalReady;
+            BeginCommand(ready ? "正在取消准备..." : "正在准备...");
             try
             {
-                View.PromptText.text = ready ? "正在取消准备..." : "正在准备...";
-                MiniBomberSetReadyResponse response = await room.SetReadyAsync(!ready);
-                if (!released)
-                {
-                    View.PromptText.text = response.Msg;
-                }
+                MiniBomberCommandResult result = await room.SetReadyAsync(!ready);
+                if (!released) View.ShowPrompt(result.Message);
             }
             catch (Exception exception)
             {
                 LogSwitch.Error($"MiniBomber 切换准备状态失败：{exception}");
-                if (!released)
-                {
-                    View.PromptText.text = "准备状态同步失败，请检查网络连接后重试";
-                }
+                if (!released) View.ShowPrompt("准备状态同步失败，请检查网络连接后重试");
             }
             finally
             {
@@ -215,42 +170,29 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 房主请求开始比赛。
+        /// 从按钮回调启动比赛任务。
         /// </summary>
         private void StartMatch()
         {
-            if (commandRunning)
-            {
-                return;
-            }
-
-            StartMatchAsync().Forget();
+            if (!commandRunning) StartMatchAsync().Forget();
         }
 
         /// <summary>
-        /// 请求服务器验证开局条件。
+        /// 请求服务器验证并开始比赛。
         /// </summary>
         /// <returns>开局请求完成任务。</returns>
         private async MTask StartMatchAsync()
         {
-            commandRunning = true;
-            SetCommandInteractable(false);
+            BeginCommand("正在请求开始比赛...");
             try
             {
-                View.PromptText.text = "正在请求开始比赛...";
-                MiniBomberStartMatchResponse response = await room.StartMatchAsync();
-                if (!released)
-                {
-                    View.PromptText.text = response.Msg;
-                }
+                MiniBomberCommandResult result = await room.StartMatchAsync();
+                if (!released) View.ShowPrompt(result.Message);
             }
             catch (Exception exception)
             {
                 LogSwitch.Error($"MiniBomber 开始比赛请求失败：{exception}");
-                if (!released)
-                {
-                    View.PromptText.text = "开始比赛失败，请检查网络连接后重试";
-                }
+                if (!released) View.ShowPrompt("开始比赛失败，请检查网络连接后重试");
             }
             finally
             {
@@ -259,41 +201,30 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 离开房间并返回大厅。
+        /// 从按钮回调启动离开房间任务。
         /// </summary>
         private void Leave()
         {
-            if (commandRunning)
-            {
-                return;
-            }
-
-            LeaveAsync().Forget();
+            if (!commandRunning) LeaveAsync().Forget();
         }
 
         /// <summary>
-        /// 请求离开房间并切换大厅流程。
+        /// 离开当前房间并返回大厅流程。
         /// </summary>
         /// <returns>离开流程完成任务。</returns>
         private async MTask LeaveAsync()
         {
-            commandRunning = true;
-            SetCommandInteractable(false);
             bool leftRoom = false;
+            BeginCommand("正在离开房间...");
             try
             {
-                View.PromptText.text = "正在离开房间...";
-                MiniBomberLeaveRoomResponse response = await room.LeaveAsync();
-                if (released)
-                {
-                    return;
-                }
-
-                View.PromptText.text = response.Msg;
-                if (response.Code == MiniBomberErrorCode.Success)
+                MiniBomberCommandResult result = await room.LeaveAsync();
+                if (released) return;
+                View.ShowPrompt(result.Message);
+                if (result.IsSuccess)
                 {
                     leftRoom = true;
-                    await flow.NavigateAsync(MiniBomberClientDestination.MiniBomberDestinationLobby);
+                    await flow.NavigateAsync(MiniBomberClientDestinationKind.Lobby);
                 }
             }
             catch (Exception exception)
@@ -301,9 +232,9 @@ namespace MiniCore.Demo.MiniBomber
                 LogSwitch.Error($"MiniBomber 离开房间失败：{exception}");
                 if (!released)
                 {
-                    View.PromptText.text = leftRoom
+                    View.ShowPrompt(leftRoom
                         ? "已经离开房间，但大厅界面切换失败，请重新登录"
-                        : "离开房间失败，请检查网络连接后重试";
+                        : "离开房间失败，请检查网络连接后重试");
                 }
             }
             finally
@@ -313,28 +244,23 @@ namespace MiniCore.Demo.MiniBomber
         }
 
         /// <summary>
-        /// 根据当前房主权限和命令状态切换房间按钮交互。
+        /// 开始一个互斥房间命令并显示提示。
         /// </summary>
-        /// <param name="interactable">是否允许执行新的房间命令。</param>
-        private void SetCommandInteractable(bool interactable)
+        /// <param name="message">命令开始提示。</param>
+        private void BeginCommand(string message)
         {
-            bool owner = room != null && room.IsOwner;
-            View.ApplySettingsButton.interactable = interactable && owner;
-            View.ReadyButton.interactable = interactable;
-            View.StartButton.interactable = interactable && owner;
-            View.LeaveButton.interactable = interactable;
+            commandRunning = true;
+            View.SetCommandInteractable(false, room.IsOwner);
+            View.ShowPrompt(message);
         }
 
         /// <summary>
-        /// 结束当前房间命令，并在窗口仍存活时恢复符合权限的交互状态。
+        /// 结束当前房间命令并恢复符合权限的交互状态。
         /// </summary>
         private void FinishCommand()
         {
             commandRunning = false;
-            if (!released)
-            {
-                SetCommandInteractable(true);
-            }
+            if (!released) View.SetCommandInteractable(true, room.IsOwner);
         }
 
         #endregion

@@ -1,12 +1,5 @@
-using System;
-using System.Text;
 using MiniCore.Core;
-using MiniCore.Model;
-using MiniCore.Protocol.Generated;
-using MiniCore.Service;
-using MiniCore.Threading;
 using MiniCore.UI;
-using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
 {
@@ -24,7 +17,8 @@ namespace MiniCore.Demo.MiniBomber
         protected override void OnBind()
         {
             MiniBomberClientFlowComponent flow = Global.Get<MiniBomberClientFlowComponent>(this);
-            View.MessageText.text = flow.Message;
+            MiniBomberClientFlowModel model = flow.Model;
+            View.ShowMessage(MiniBomberClientFlowNoticeFormatter.Format(model.Notice, model.ReconnectAttempt, model.NextRetryMilliseconds, model.Detail));
         }
 
         #endregion

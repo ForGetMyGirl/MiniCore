@@ -12,12 +12,12 @@ namespace MiniCore.Bootstrap
         /// <summary>
         /// 包含最终启动入口的程序集名称。
         /// </summary>
-        public const string StartupAssemblyName = "MiniCore.HotUpdate.Server";
+        public const string StartupAssemblyName = "MiniCore.HotUpdate.Client";
 
         /// <summary>
         /// Bootstrap 反射调用的启动类型完整名称。
         /// </summary>
-        public const string StartupTypeName = "MiniCore.HotUpdate.Server.MiniCoreServerStartup";
+        public const string StartupTypeName = "MiniCore.HotUpdate.MiniCoreStartup";
 
         /// <summary>
         /// Bootstrap 反射调用的启动静态方法名称。
@@ -42,9 +42,8 @@ namespace MiniCore.Bootstrap
         {
             "MiniCore.Protocol.Common.dll",
             "MiniCore.Protocol.Outer.dll",
-            "MiniCore.Protocol.Inner.dll",
             "MiniCore.HotUpdate.Shared.dll",
-            "MiniCore.HotUpdate.Server.dll",
+            "MiniCore.HotUpdate.Client.dll",
         };
 
         private static readonly string[] _aotMetadataAddresses =

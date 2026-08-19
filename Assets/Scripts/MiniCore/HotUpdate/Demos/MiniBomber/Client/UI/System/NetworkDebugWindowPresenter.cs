@@ -1,8 +1,5 @@
-using System;
-using System.Text;
 using MiniCore.Core;
 using MiniCore.Model;
-using MiniCore.Protocol.Generated;
 using MiniCore.Service;
 using MiniCore.Threading;
 using MiniCore.UI;
@@ -62,11 +59,10 @@ namespace MiniCore.Demo.MiniBomber
             NetworkIncomingQueueSnapshot queue = network.GetIncomingQueueSnapshot();
             int rtt = 0;
             bool hasRtt = network.TryGetLastPingMs(MiniBomberConstants.DefaultSessionId, out rtt);
-            int snapshotAge = battle.LastSnapshotReceiveTime <= 0d
+            int snapshotAge = battle.Model.LastSnapshotReceiveTime <= 0d
                 ? 0
-                : Mathf.Max(0, Mathf.RoundToInt((float)((Global.Time.UnscaledTime - battle.LastSnapshotReceiveTime) * 1000d)));
-            string rttText = hasRtt ? $"{rtt} ms" : "--";
-            View.DiagnosticsText.text = $"ServerTick: {battle.Snapshot?.ServerTick ?? 0}\nRTT: {rttText}\nSnapshotAge: {snapshotAge} ms\nQueued: {queue.PendingPacketCount}\nPeak: {queue.PeakPendingPacketCount}";
+                : Mathf.Max(0, Mathf.RoundToInt((float)((Global.Time.UnscaledTime - battle.Model.LastSnapshotReceiveTime) * 1000d)));
+            View.RefreshDiagnostics(battle.Model.ServerTick, hasRtt, rtt, snapshotAge, queue.PendingPacketCount, queue.PeakPendingPacketCount);
         }
 
         /// <summary>
