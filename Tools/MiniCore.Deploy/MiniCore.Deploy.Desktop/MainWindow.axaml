@@ -1,0 +1,1107 @@
+<Window
+    x:Class="MiniCore.Deploy.Desktop.MainWindow"
+    x:DataType="vm:MainWindowViewModel"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:Avalonia.Controls.Primitives"
+    xmlns:core="using:MiniCore.Deploy.Core.Models"
+    xmlns:vm="using:MiniCore.Deploy.Desktop.ViewModels"
+    Title="MiniCore Deploy"
+    Width="1500"
+    Height="920"
+    MinWidth="1240"
+    MinHeight="760">
+  <Grid RowDefinitions="64,*,34" ColumnDefinitions="218,*,278" Background="{DynamicResource AppBackgroundBrush}">
+    <!-- 顶部命令栏 -->
+    <Border Grid.Row="0" Grid.ColumnSpan="3" Padding="14,0" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="190,220,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="9">
+        <Border Grid.Column="0" Padding="11,0" Height="38" CornerRadius="7" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/project.png" Stretch="Uniform" />
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="当前项目" />
+              <TextBlock FontWeight="SemiBold" Text="{Binding ProjectDisplayName}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="1" Height="38" Padding="10,0,3,0" CornerRadius="7" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="当前方案" />
+            <ComboBox Grid.Column="1"
+                      Height="34"
+                      MinWidth="0"
+                      Padding="8,0"
+                      VerticalAlignment="Center"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      ItemsSource="{Binding Profiles}"
+                      SelectedItem="{Binding SelectedProfileItem, Mode=TwoWay}"
+                      PlaceholderText="选择配置方案">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:DeploymentProfileItemViewModel">
+                  <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </Grid>
+        </Border>
+        <Button Grid.Column="2" Classes="outline" Command="{Binding NewProfileCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plus.png" Stretch="Uniform" />
+            <TextBlock Text="新建方案" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Width="7" Height="7" CornerRadius="4" Background="{DynamicResource SuccessBrush}" />
+          <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding SaveStateText}" />
+        </StackPanel>
+        <Button Grid.Column="5" Classes="outline" Command="{Binding SaveCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/save.png" Stretch="Uniform" />
+            <TextBlock Text="保存当前方案" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="6" Classes="outline" Command="{Binding PreviewPlanCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/preview.png" Stretch="Uniform" />
+            <TextBlock Text="预览计划" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="0">
+          <Button Classes="primary" MinWidth="124" CornerRadius="6,0,0,6" IsEnabled="{Binding HasPreviewedPlan}" Command="{Binding ExecuteCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <Image Classes="small-icon" Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/execute-white.png" />
+              <TextBlock Text="{Binding PrimaryExecutionActionText}" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="ExecutionMenuButton" Classes="primary execution-menu" Content="⌄" Click="OnExecutionMenuClick" />
+          <primitives:Popup x:Name="ExecutionModePopup" Placement="BottomEdgeAlignedRight" IsLightDismissEnabled="True">
+            <Border Margin="0,5,0,0" Padding="6" CornerRadius="8" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" BoxShadow="0 8 24 0 #260F172A">
+              <StackPanel Spacing="3">
+                <Button Classes="menu-option" Click="OnBuildAndPublishModeClick" Content="构建并发布" />
+                <Button Classes="menu-option" Click="OnBuildOnlyModeClick" Content="仅构建，不发布" />
+                <Button Classes="menu-option" Click="OnExistingArtifactsModeClick" Content="使用已有制品发布" />
+              </StackPanel>
+            </Border>
+          </primitives:Popup>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- 左侧固定导航 -->
+    <Border Grid.Row="1" Grid.Column="0" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+      <Grid RowDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Row="0" Margin="0,10,0,0">
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="0" IsChecked="True" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="1" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/host.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="主机管理" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="1" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="2" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/project.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="项目设置" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="2" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="3" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/profile.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="配置方案" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="3" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="4" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/topology.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="服务拓扑" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="4" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="5" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/build.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="构建目标" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="5" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="6" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/release.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="发布方式" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="6" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="7" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plan.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="计划预览" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="7" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="8" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/execute.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="执行中心" />
+            </Grid>
+          </RadioButton>
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="8" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Text="9" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/history.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="发布历史" />
+            </Grid>
+          </RadioButton>
+        </StackPanel>
+        <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,10">
+          <RadioButton Classes="nav-item" GroupName="MainNavigation" Tag="9" Click="OnNavigationClick">
+            <Grid ColumnDefinitions="24,36,*">
+              <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Text="" />
+              <Image Grid.Column="1" Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/help.png" Stretch="Uniform" />
+              <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="SemiBold" Text="帮助与文档" />
+            </Grid>
+          </RadioButton>
+        </Border>
+      </Grid>
+    </Border>
+
+    <!-- 中间页面内容，Tab 页头由左侧独立导航替代 -->
+    <Carousel Grid.Row="1" Grid.Column="1" SelectedIndex="{Binding SelectedPageIndex, Mode=TwoWay}" Background="{DynamicResource AppBackgroundBrush}">
+
+      <!-- 1 主机管理 -->
+      <ContentControl>
+        <ScrollViewer>
+          <StackPanel Margin="28,24,28,30" Spacing="14">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="9">
+                  <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/host.png" Stretch="Uniform" />
+                  <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="主机管理" />
+                </StackPanel>
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="先登记目标机器，再为服务实例选择主机。Linux 使用 systemd，Windows 使用 ServiceHost。" />
+              </StackPanel>
+              <Button Grid.Column="1" Classes="primary" VerticalAlignment="Center" Command="{Binding AddHostCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <Image Classes="small-icon" Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plus-white.png" />
+                  <TextBlock Text="添加主机" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <Border Padding="12" CornerRadius="7" Background="{DynamicResource PrimarySoftBrush}" BorderBrush="#BEDAFF" BorderThickness="1">
+              <TextBlock Foreground="#175CD3" Text="SSH 私钥和密码都需要登录用户名。私钥只保存本机路径；密码仅保留在当前应用会话，关闭后不会保存。主机指纹由工具读取并让你确认。测试连接会验证远程命令和文件上传，两者共用同一 SSH 端口与凭证。" TextWrapping="Wrap" />
+            </Border>
+            <ItemsControl ItemsSource="{Binding HostEditors}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:HostEditorViewModel">
+                  <Border Margin="0,0,0,10" Padding="16" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="13">
+                      <Grid ColumnDefinitions="1.1*,2*,150,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="主机标识" />
+                          <TextBox Text="{Binding Model.HostId, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="描述（仅用于展示）" />
+                          <TextBox Text="{Binding Model.Description, Mode=TwoWay}" PlaceholderText="例如：阿里云杭州生产节点" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="操作系统" />
+                          <ComboBox ItemsSource="{Binding $parent[Window].DataContext.HostOperatingSystems}" SelectedItem="{Binding Model.OperatingSystem, Mode=TwoWay}" />
+                        </StackPanel>
+                        <Button Grid.Column="3" Classes="danger icon-button" VerticalAlignment="Bottom" ToolTip.Tip="从当前方案删除主机" Command="{Binding $parent[Window].DataContext.RemoveHostCommand}" CommandParameter="{Binding Model}">
+                          <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/delete.png" Stretch="Uniform" />
+                        </Button>
+                      </Grid>
+                      <Grid ColumnDefinitions="2*,120,1.2*,1.5*" ColumnSpacing="12">
+                        <StackPanel Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 地址" />
+                          <TextBox Text="{Binding Model.Address, Mode=TwoWay}" PlaceholderText="公网/内网 IP 或主机名" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 端口" />
+                          <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.SshPort, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 登录用户" />
+                          <TextBox Text="{Binding Model.UserName, Mode=TwoWay}" PlaceholderText="root 或 ecs-user" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="认证方式" />
+                          <ComboBox ItemsSource="{Binding AuthenticationOptions}" SelectedItem="{Binding SelectedAuthenticationOption, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate x:DataType="vm:SshAuthenticationOptionViewModel">
+                                <TextBlock Text="{Binding DisplayName}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                      </Grid>
+                      <Grid ColumnDefinitions="2*,1.4*" ColumnSpacing="12">
+                        <StackPanel IsVisible="{Binding IsPrivateKeyAuthentication}" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 私钥文件（本机路径）" />
+                          <Grid>
+                            <TextBox Classes="with-picker" Text="{Binding PrivateKeyPath, Mode=TwoWay}" PlaceholderText="选择 .pem、id_rsa 或 id_ed25519" />
+                            <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择本机私钥文件" Click="OnPickHostPrivateKeyClick" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel IsVisible="{Binding IsPasswordAuthentication}" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 密码（仅当前会话）" />
+                          <TextBox PasswordChar="●" Text="{Binding Password, Mode=TwoWay}" PlaceholderText="关闭应用后需要重新输入" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="部署根目录（服务器路径）" />
+                          <TextBox Text="{Binding Model.DeploymentRoot, Mode=TwoWay}" />
+                        </StackPanel>
+                      </Grid>
+                      <Border Padding="12" CornerRadius="7" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                          <StackPanel Spacing="5">
+                            <TextBlock FontWeight="SemiBold" Text="SSH 主机指纹" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="用于阻止服务器地址被冒充。工具会读取服务器展示的指纹，你确认一次后固定保存；以后发生变化会拒绝连接。" TextWrapping="Wrap" />
+                            <TextBox IsReadOnly="True" Text="{Binding HostKeyFingerprint}" PlaceholderText="尚未获取" />
+                          </StackPanel>
+                          <StackPanel Grid.Column="1" MinWidth="180" VerticalAlignment="Bottom" Spacing="7">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                              <Button Classes="outline" Click="OnProbeHostFingerprintClick" Content="获取并确认" />
+                              <Button Classes="primary" IsEnabled="{Binding CanTestConnection}" Click="OnTestHostConnectionClick" Content="测试连接" />
+                            </StackPanel>
+                            <TextBlock HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding ConnectionTestStatus}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border IsVisible="{Binding HasNoHosts}" Padding="24" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel HorizontalAlignment="Center" Spacing="8">
+                <Image Width="40" Height="40" HorizontalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/host.png" Stretch="Uniform" />
+                <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="尚未添加主机" />
+                <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="点击右上角“添加主机”，填写 SSH 地址、登录用户和认证方式，再获取并确认主机指纹。" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </ContentControl>
+
+      <!-- 2 项目设置 -->
+      <ContentControl>
+        <ScrollViewer>
+          <StackPanel Margin="28,24,28,30" Spacing="14">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="9">
+                <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/project.png" Stretch="Uniform" />
+                <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="项目与 Unity" />
+              </StackPanel>
+              <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="设置构建入口、项目目录、显式启动场景和不可变制品输出位置。" />
+            </StackPanel>
+            <Border Padding="18" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel Spacing="16">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="18">
+                  <StackPanel Spacing="6">
+                    <TextBlock FontWeight="SemiBold" Text="Unity 可执行程序" />
+                    <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="macOS 应指向 Unity.app/Contents/MacOS/Unity。" />
+                    <Grid>
+                      <TextBox Classes="with-picker" Text="{Binding UnityExecutablePath, Mode=TwoWay}" PlaceholderText="Unity 可执行程序绝对路径" />
+                      <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择 Unity 可执行程序" Click="OnPickUnityExecutableClick" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBlock FontWeight="SemiBold" Text="Unity 项目根目录" />
+                    <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="目录必须包含 Assets 与 ProjectSettings。" />
+                    <Grid>
+                      <TextBox Classes="with-picker" Text="{Binding ProjectPath, Mode=TwoWay}" PlaceholderText="Unity 项目绝对路径" />
+                      <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择 Unity 项目根目录" Click="OnPickProjectDirectoryClick" />
+                    </Grid>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Spacing="6">
+                  <TextBlock FontWeight="SemiBold" Text="发布制品输出目录" />
+                  <Grid>
+                    <TextBox Classes="with-picker" Text="{Binding OutputPath, Mode=TwoWay}" />
+                    <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择制品输出目录" Click="OnPickOutputDirectoryClick" />
+                  </Grid>
+                  <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="ReleaseManifest、压缩包和客户端交付文件会按版本保存在这里。" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="18">
+                  <StackPanel Spacing="6">
+                    <TextBlock FontWeight="SemiBold" Text="客户端启动场景" />
+                    <Grid>
+                      <TextBox Classes="with-picker" Text="{Binding ClientScenePath, Mode=TwoWay}" />
+                      <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择客户端 .unity 场景" Click="OnPickClientSceneClick" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="6">
+                    <TextBlock FontWeight="SemiBold" Text="Dedicated Server 启动场景" />
+                    <Grid>
+                      <TextBox Classes="with-picker" Text="{Binding ServerScenePath, Mode=TwoWay}" />
+                      <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择 Dedicated Server .unity 场景" Click="OnPickServerSceneClick" />
+                    </Grid>
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+            <Border Padding="15" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                <Image Width="28" Height="28" VerticalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/build.png" Stretch="Uniform" />
+                <StackPanel Grid.Column="1" Spacing="3">
+                  <TextBlock FontWeight="SemiBold" Text="Unity 平台模块" />
+                  <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding UnityModuleSummary}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="outline" Command="{Binding RefreshUnityModulesCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/refresh.png" Stretch="Uniform" />
+                    <TextBlock Text="重新检测" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+            </Border>
+            <Border Padding="13" CornerRadius="7" Background="{DynamicResource WarningSoftBrush}" BorderBrush="#FED7AA" BorderThickness="1">
+              <TextBlock Foreground="{DynamicResource WarningBrush}" Text="如果 Unity Editor 正在打开这个项目，构建流程会停止并提示关闭，不会强杀 Editor。" TextWrapping="Wrap" />
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </ContentControl>
+
+      <!-- 3 配置方案 -->
+      <ContentControl>
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Margin="28,24,28,14" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="9">
+              <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/profile.png" Stretch="Uniform" />
+              <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="配置方案" />
+            </StackPanel>
+            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="方案完全由开发运维人员自由创建、命名、复制和删除；不再强制套用开发、测试或生产分类。" TextWrapping="Wrap" />
+          </StackPanel>
+          <Grid Grid.Row="1" Margin="28,0,28,30" ColumnDefinitions="292,*" ColumnSpacing="14">
+            <Border Padding="12" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <Grid RowDefinitions="Auto,*,Auto">
+                <Grid Margin="2,0,2,11" ColumnDefinitions="*,Auto">
+                  <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="全部方案" />
+                  <Button Grid.Column="1" Classes="primary" Command="{Binding NewProfileCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="small-icon" Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plus-white.png" />
+                      <TextBlock Text="新建" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+                <ListBox Grid.Row="1" Classes="profile-list" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfileItem, Mode=TwoWay}" Background="Transparent">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DeploymentProfileItemViewModel">
+                      <Grid Margin="12" ColumnDefinitions="20,*" ColumnSpacing="9">
+                        <RadioButton IsHitTestVisible="False" IsChecked="{Binding $parent[ListBoxItem].IsSelected}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                          <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Purpose}" TextWrapping="Wrap" MaxLines="2" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Grid.Row="2" Margin="2,11,2,0" Orientation="Horizontal" Spacing="8">
+                  <Button Command="{Binding DuplicateProfileCommand}" Content="复制当前方案" />
+                  <Button Classes="danger" Command="{Binding DeleteProfileCommand}" Content="删除" />
+                </StackPanel>
+              </Grid>
+            </Border>
+            <ScrollViewer Grid.Column="1">
+              <StackPanel Spacing="13">
+                <Border Padding="18" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                  <StackPanel Spacing="15">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="3">
+                        <TextBlock FontSize="17" FontWeight="SemiBold" Text="{Binding CurrentProfileName}" />
+                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding ProfileSummary}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="outline" Command="{Binding SaveCommand}" Content="保存当前方案" />
+                    </Grid>
+                    <StackPanel Spacing="6">
+                      <TextBlock FontWeight="SemiBold" Text="方案名称" />
+                      <TextBox Text="{Binding ProfileName, Mode=TwoWay}" PlaceholderText="例如：国服滚动更新" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                      <TextBlock FontWeight="SemiBold" Text="用途说明" />
+                      <TextBox Classes="multiline" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding ProfilePurpose, Mode=TwoWay}" />
+                      <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="写明使用对象、地区与目的；名称和说明均不影响框架执行逻辑。" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+                <Border Padding="18" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                  <StackPanel Spacing="14">
+                    <TextBlock FontWeight="SemiBold" Text="环境标识与目标版本" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="18">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="环境标识" />
+                        <TextBox Text="{Binding EnvironmentId, Mode=TwoWay}" />
+                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="用于远程目录和状态记录，创建后应保持稳定。" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="6">
+                        <TextBlock Text="目标 ReleaseVersion" />
+                        <TextBox Text="{Binding ReleaseVersion, Mode=TwoWay}" />
+                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="发布完成后所有启用服务应收敛到该版本。" />
+                      </StackPanel>
+                    </Grid>
+                    <Border Padding="12" CornerRadius="7" Background="#F8FAFC">
+                      <StackPanel Spacing="8">
+                        <ToggleSwitch IsChecked="{Binding RequireCleanGitWorkspace, Mode=TwoWay}" OnContent="要求干净工作区" OffContent="允许记录未提交改动" />
+                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="这是源码安全策略，不是方案分类。正式环境建议开启；本地联调可关闭并记录提交号与差异指纹。" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                    <CheckBox IsChecked="{Binding DatabaseMigrationReviewed, Mode=TwoWay}" Content="当前版本的数据库迁移已经在外部完成评审" />
+                  </StackPanel>
+                </Border>
+                <Border Padding="13" CornerRadius="7" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                  <StackPanel Spacing="4">
+                    <TextBlock FontWeight="SemiBold" Text="独立配置文件" />
+                    <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="每份方案单独保存，切换和删除不会覆盖其他方案。" />
+                    <TextBlock FontFamily="Menlo,Consolas" FontSize="11" Text="{Binding ProfileFilePath}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </Grid>
+      </ContentControl>
+
+      <!-- 4 服务拓扑 -->
+      <ContentControl>
+        <ScrollViewer>
+          <StackPanel Margin="28,24,28,30" Spacing="13">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="9">
+                  <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/topology.png" Stretch="Uniform" />
+                  <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="服务拓扑" />
+                </StackPanel>
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="定义组件、业务 Role、端口和实例落在哪台主机；一个 DS 可以同时承载多个 Role。" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="outline" ToolTip.Tip="重新读取由 Unity 代码生成器产出的 ServerRoleCatalog.json" Command="{Binding RefreshRoleCatalogCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Image Classes="small-icon" Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/refresh.png" Stretch="Uniform" />
+                    <TextBlock Text="刷新 Role" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="outline" Command="{Binding ProductionPresetCommand}" Content="生产标准" />
+                <Button Classes="outline" Command="{Binding AllInOnePresetCommand}" Content="单机一体化" />
+                <Button Classes="primary" Command="{Binding AddInstanceCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Image Classes="small-icon" Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plus-white.png" />
+                    <TextBlock Text="添加实例" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+            <Border Padding="12" CornerRadius="7" Background="{DynamicResource SuccessSoftBrush}" BorderBrush="#ABEFC6" BorderThickness="1">
+              <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="{Binding RoleCatalogStatus}" TextWrapping="Wrap" />
+            </Border>
+            <ItemsControl ItemsSource="{Binding Instances}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:InstanceEditorViewModel">
+                  <Border Margin="0,0,0,10" Padding="16" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="13">
+                      <Grid ColumnDefinitions="1.2*,1.2*,1.4*,Auto,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="实例 ID" />
+                          <TextBox Text="{Binding Model.InstanceId, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="主机 ID" />
+                          <ComboBox ItemsSource="{Binding $parent[Window].DataContext.Hosts}"
+                                    SelectedValueBinding="{Binding HostId}"
+                                    SelectedValue="{Binding Model.HostId, Mode=TwoWay}"
+                                    PlaceholderText="请先添加主机">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate x:DataType="core:HostDefinition">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                  <TextBlock FontWeight="SemiBold" Text="{Binding HostId}" />
+                                  <TextBlock Grid.Column="1" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Address}" />
+                                </Grid>
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="组件类型" />
+                          <ComboBox ItemsSource="{Binding $parent[Window].DataContext.ComponentKinds}" SelectedItem="{Binding Component, Mode=TwoWay}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="3" VerticalAlignment="Bottom" Margin="0,0,4,9" IsChecked="{Binding Model.Enabled, Mode=TwoWay}" Content="启用" />
+                        <Button Grid.Column="4" Classes="danger icon-button" VerticalAlignment="Bottom" ToolTip.Tip="从当前期望拓扑删除实例" Command="{Binding $parent[Window].DataContext.RemoveInstanceCommand}" CommandParameter="{Binding}">
+                          <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/delete.png" Stretch="Uniform" />
+                        </Button>
+                      </Grid>
+                      <TextBlock Foreground="{DynamicResource PrimaryBrush}" Text="{Binding ComponentExplanation}" TextWrapping="Wrap" />
+                      <StackPanel IsVisible="{Binding ShowsRoles}" Spacing="6">
+                        <TextBlock FontWeight="SemiBold" Text="框架/业务 Role（可多选）" />
+                        <Border Padding="10,8" CornerRadius="7" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                          <ItemsControl ItemsSource="{Binding RoleOptions}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:RoleOptionViewModel">
+                                <CheckBox Margin="0,0,18,4" IsChecked="{Binding IsSelected, Mode=TwoWay}" Content="{Binding DisplayText}" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Border>
+                        <TextBlock FontSize="12" Foreground="{DynamicResource PrimaryBrush}" Text="同一实例选中的 Lobby、Room、Match、Game 等 Role 会写入同一份外部配置，并由一个 DS 进程承载。" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <Border IsVisible="{Binding ShowsDedicatedServerSettings}" Padding="14" CornerRadius="8" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="11">
+                          <TextBlock FontWeight="SemiBold" Text="Dedicated Server 网络配置" />
+                          <Grid ColumnDefinitions="1.4*,1.4*,120" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网监听地址" />
+                              <TextBox Text="{Binding Model.InnerListenHost, Mode=TwoWay}" PlaceholderText="通常为 0.0.0.0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址" />
+                              <TextBox Text="{Binding Model.InnerAdvertisedHost, Mode=TwoWay}" PlaceholderText="其他服务器可访问的 VPC IP/DNS" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.InnerPort, Mode=TwoWay}" />
+                            </StackPanel>
+                          </Grid>
+                          <Grid ColumnDefinitions="1.4*,120,1.4*" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="外网监听地址" />
+                              <TextBox Text="{Binding Model.OuterListenHost, Mode=TwoWay}" PlaceholderText="通常为 0.0.0.0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="外网端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.OuterPort, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="WebSocket 路径" />
+                              <TextBox Text="{Binding Model.OuterPath, Mode=TwoWay}" PlaceholderText="/minicore" />
+                            </StackPanel>
+                          </Grid>
+                          <Grid ColumnDefinitions="*,120,Auto,Auto" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="外网公布地址（可留空表示不向客户端公布）" />
+                              <TextBox Text="{Binding Model.OuterAdvertisedUrl, Mode=TwoWay}" PlaceholderText="ws://公网地址:端口/minicore 或 wss://域名/minicore" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="管理端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.ManagementPort, Mode=TwoWay}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="2" VerticalAlignment="Bottom" Margin="0,0,0,9" IsChecked="{Binding Model.RequiresDatabase, Mode=TwoWay}" Content="依赖 DB" />
+                            <CheckBox Grid.Column="3" VerticalAlignment="Bottom" Margin="0,0,0,9" IsChecked="{Binding Model.AutoRestart, Mode=TwoWay}" Content="异常自动重启" />
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+                      <Border IsVisible="{Binding ShowsAuthenticationSettings}" Padding="14" CornerRadius="8" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="11">
+                          <TextBlock FontWeight="SemiBold" Text="AuthenticationServer HTTP 配置" />
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="监听地址决定进程绑定位置；内网公布地址供反向代理或其他服务访问；客户端访问地址是最终公开 URL。" TextWrapping="Wrap" />
+                          <Grid ColumnDefinitions="1.2*,1.2*,120,1.8*" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="HTTP 监听地址" />
+                              <TextBox Text="{Binding Model.InnerListenHost, Mode=TwoWay}" PlaceholderText="0.0.0.0 或 127.0.0.1" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址" />
+                              <TextBox Text="{Binding Model.InnerAdvertisedHost, Mode=TwoWay}" PlaceholderText="反向代理可访问的 VPC IP/DNS" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="HTTP 端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.InnerPort, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="客户端访问地址" />
+                              <TextBox Text="{Binding Model.OuterAdvertisedUrl, Mode=TwoWay}" PlaceholderText="https://auth.example.com" />
+                            </StackPanel>
+                          </Grid>
+                          <TextBlock Margin="0,3,0,0" FontWeight="SemiBold" Text="账号数据库" />
+                          <Grid ColumnDefinitions="1.6*,120,1.4*" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库地址" />
+                              <TextBox Text="{Binding Model.Database.Host, Mode=TwoWay}" PlaceholderText="RDS 内网地址或数据库主机名" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.Database.Port, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库名称" />
+                              <TextBox Text="{Binding Model.Database.DatabaseName, Mode=TwoWay}" PlaceholderText="例如 minibomber_auth" />
+                            </StackPanel>
+                          </Grid>
+                          <Grid ColumnDefinitions="1.2*,1.4*,150,Auto" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库账号" />
+                              <TextBox Text="{Binding Model.Database.UserName, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库密码（仅当前会话）" />
+                              <TextBox PasswordChar="●" Text="{Binding Model.Database.Password, Mode=TwoWay}" PlaceholderText="关闭应用后需要重新输入" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSL 模式" />
+                              <ComboBox ItemsSource="{Binding DatabaseSslModes}" SelectedItem="{Binding Model.Database.SslMode, Mode=TwoWay}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="3" VerticalAlignment="Bottom" Margin="0,0,0,9" IsChecked="{Binding Model.AutoRestart, Mode=TwoWay}" Content="异常自动重启" />
+                          </Grid>
+                          <TextBlock FontSize="12" Foreground="{DynamicResource PrimaryBrush}" Text="工具会生成 Auth 实际读取的 appsettings.json；数据库密码不会写入本地方案或日志。" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+                      <Border IsVisible="{Binding ShowsDatabaseSettings}" Padding="14" CornerRadius="8" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="11">
+                          <TextBlock FontWeight="SemiBold" Text="DatabaseServer 内网 RPC 配置" />
+                          <Grid ColumnDefinitions="1.3*,1.3*,120,140" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网监听地址" />
+                              <TextBox Text="{Binding Model.InnerListenHost, Mode=TwoWay}" PlaceholderText="通常为 0.0.0.0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址" />
+                              <TextBox Text="{Binding Model.InnerAdvertisedHost, Mode=TwoWay}" PlaceholderText="DS 可访问的 VPC IP/DNS" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="RPC 端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.InnerPort, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="最大并发" />
+                              <NumericUpDown Minimum="1" Maximum="100000" Value="{Binding Model.MaximumConcurrency, Mode=TwoWay}" />
+                            </StackPanel>
+                          </Grid>
+                          <TextBlock Margin="0,3,0,0" FontWeight="SemiBold" Text="游戏数据库" />
+                          <Grid ColumnDefinitions="1.6*,120,1.4*" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库地址" />
+                              <TextBox Text="{Binding Model.Database.Host, Mode=TwoWay}" PlaceholderText="RDS 内网地址或数据库主机名" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库端口" />
+                              <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding Model.Database.Port, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库名称" />
+                              <TextBox Text="{Binding Model.Database.DatabaseName, Mode=TwoWay}" PlaceholderText="例如 minibomber_game" />
+                            </StackPanel>
+                          </Grid>
+                          <Grid ColumnDefinitions="1.2*,1.4*,150,Auto" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库账号" />
+                              <TextBox Text="{Binding Model.Database.UserName, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="数据库密码（仅当前会话）" />
+                              <TextBox PasswordChar="●" Text="{Binding Model.Database.Password, Mode=TwoWay}" PlaceholderText="关闭应用后需要重新输入" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSL 模式" />
+                              <ComboBox ItemsSource="{Binding DatabaseSslModes}" SelectedItem="{Binding Model.Database.SslMode, Mode=TwoWay}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="3" VerticalAlignment="Bottom" Margin="0,0,0,9" IsChecked="{Binding Model.AutoRestart, Mode=TwoWay}" Content="异常自动重启" />
+                          </Grid>
+                          <TextBlock FontSize="12" Foreground="{DynamicResource PrimaryBrush}" Text="Coordinator 内网地址会从当前拓扑自动写入 DB 配置，无需重复输入。" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+                      <Border IsVisible="{Binding ShowsStaticContentSettings}" Padding="14" CornerRadius="8" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <StackPanel Spacing="11">
+                          <TextBlock FontWeight="SemiBold" Text="StaticContent 静态目录配置" />
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="它不启动进程、不占端口，也没有 Role。工具只上传 WebGL/YooAsset 内容并原子切换目录；Web Server、CDN 和 TLS 仍由外部设施配置。" TextWrapping="Wrap" />
+                          <Grid ColumnDefinitions="1.5*,1.5*" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="远程发布路径（服务器绝对路径，必填）" />
+                              <TextBox Text="{Binding Model.StaticContentPublishPath, Mode=TwoWay}" PlaceholderText="例如 /var/www/minicore/current" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="外部访问地址（可选，仅记录和展示）" />
+                              <TextBox Text="{Binding Model.OuterAdvertisedUrl, Mode=TwoWay}" PlaceholderText="https://static.example.com" />
+                            </StackPanel>
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border IsVisible="{Binding HasNoInstances}" Padding="24" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel HorizontalAlignment="Center" Spacing="8">
+                <Image Width="40" Height="40" HorizontalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/topology.png" Stretch="Uniform" />
+                <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="尚未配置服务实例" />
+                <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="可以添加独立 Coordinator、一个多 Role DS，或直接应用拓扑预设。" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </ContentControl>
+
+      <!-- 5 构建目标 -->
+      <ContentControl>
+        <ScrollViewer>
+          <StackPanel Margin="28,24,28,30" Spacing="13">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="4">
+                <StackPanel Orientation="Horizontal" Spacing="9">
+                  <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/build.png" Stretch="Uniform" />
+                  <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="构建目标与发布范围" />
+                </StackPanel>
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="服务端、客户端和资源可以独立选择；“构建”与“发布”两列互不强制绑定。" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold" Text="{Binding BuildScopeSummary}" />
+                <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="未构建但选择发布时，会使用已有制品。" />
+              </StackPanel>
+            </Grid>
+            <Border Padding="11" CornerRadius="8" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="快速选择" />
+                <Button Grid.Column="1" Command="{Binding SelectServerOnlyCommand}" Content="仅服务端" />
+                <Button Grid.Column="2" Command="{Binding SelectClientOnlyCommand}" Content="仅客户端" />
+                <Button Grid.Column="3" Command="{Binding SelectContentOnlyCommand}" Content="仅资源更新" />
+                <Button Grid.Column="4" Command="{Binding SelectAllTargetsCommand}" Content="全部可用目标" />
+                <Button Grid.Column="5" HorizontalAlignment="Right" Command="{Binding ClearTargetsCommand}" Content="清空选择" />
+              </Grid>
+            </Border>
+            <Border CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel>
+                <Border Padding="16,11" Background="#F8FAFC">
+                  <Grid ColumnDefinitions="*,76,76,240">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/server.png" Stretch="Uniform" />
+                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="服务端" />
+                    <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="Coordinator、DS 与可选服务" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" HorizontalAlignment="Center" FontWeight="SemiBold" Text="构建" />
+                  <TextBlock Grid.Column="2" HorizontalAlignment="Center" FontWeight="SemiBold" Text="发布" />
+                  <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="Unity Hub 模块状态" />
+                  </Grid>
+                </Border>
+                <ItemsControl ItemsSource="{Binding ServerTargetSelections}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BuildTargetSelectionViewModel">
+                      <Grid Margin="16,9" ColumnDefinitions="*,76,76,240">
+                        <StackPanel Spacing="2">
+                          <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Description}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="{Binding IsBuildAvailable}" IsChecked="{Binding IsBuildSelected, Mode=TwoWay}" />
+                        <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding IsPublishSelected, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding AvailabilityText}" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+            <Border CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel>
+                <Border Padding="16,11" Background="#F8FAFC">
+                  <Grid ColumnDefinitions="*,76,76,240">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/client.png" Stretch="Uniform" />
+                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="客户端" />
+                    <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="可以独立选择一个或多个平台" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" HorizontalAlignment="Center" FontWeight="SemiBold" Text="构建" />
+                  <TextBlock Grid.Column="2" HorizontalAlignment="Center" FontWeight="SemiBold" Text="发布" />
+                  <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="Unity Hub 模块状态" />
+                  </Grid>
+                </Border>
+                <ItemsControl ItemsSource="{Binding ClientTargetSelections}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BuildTargetSelectionViewModel">
+                      <Grid Margin="16,9" ColumnDefinitions="*,76,76,240">
+                        <StackPanel Spacing="2">
+                          <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Description}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="{Binding IsBuildAvailable}" IsChecked="{Binding IsBuildSelected, Mode=TwoWay}" />
+                        <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding IsPublishSelected, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding AvailabilityText}" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Margin="16,4,16,12" Padding="10" CornerRadius="6" Background="#F8FAFC">
+                  <CheckBox IsEnabled="{Binding CanBuildClientAndroid}" IsChecked="{Binding AndroidAppBundle, Mode=TwoWay}" Content="Android 输出 AAB（关闭时输出 APK）" />
+                </Border>
+              </StackPanel>
+            </Border>
+            <Border Padding="15" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="5">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/content.png" Stretch="Uniform" />
+                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="资源与热更新" />
+                    <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="HotUpdate 程序集 + YooAsset 资源包" />
+                  </StackPanel>
+                  <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="开启后按上方勾选的平台生成内容目录，不重新构建 Unity Player；适合业务内容更新。" TextWrapping="Wrap" />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="仅内容" OffContent="随 Player" IsChecked="{Binding ContentOnly, Mode=TwoWay}" />
+              </Grid>
+            </Border>
+            <Border Padding="11" CornerRadius="8" Background="{DynamicResource PrimarySoftBrush}" BorderBrush="#BEDAFF" BorderThickness="1">
+              <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+                <TextBlock VerticalAlignment="Center" Foreground="#175CD3" FontWeight="SemiBold" Text="执行模式" />
+                <Button Grid.Column="1" Command="{Binding UseBuildAndPublishCommand}" Content="构建并发布" />
+                <Button Grid.Column="2" Command="{Binding UseBuildOnlyCommand}" Content="仅构建" />
+                <Button Grid.Column="3" HorizontalAlignment="Left" Command="{Binding UseExistingArtifactsCommand}" Content="使用已有制品发布" />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </ContentControl>
+
+      <!-- 6 发布方式 -->
+      <ContentControl>
+        <ScrollViewer>
+          <StackPanel Margin="28,24,28,30" Spacing="14" MaxWidth="920" HorizontalAlignment="Left">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="9">
+                <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/release.png" Stretch="Uniform" />
+                <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="发布方式" />
+              </StackPanel>
+              <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="选择与当前目标相匹配的确定性发布流程。所有选项均使用中文，并显示用途与影响范围。" />
+            </StackPanel>
+            <Border Padding="18" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel Spacing="13">
+                <StackPanel Spacing="6">
+                  <TextBlock FontWeight="SemiBold" Text="操作类型" />
+                  <ComboBox Width="320" HorizontalAlignment="Left" ItemsSource="{Binding DeploymentOperationOptions}" SelectedItem="{Binding SelectedDeploymentOperationOption, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:DeploymentOperationOptionViewModel">
+                        <TextBlock Text="{Binding Title}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </StackPanel>
+                <Border Padding="13" CornerRadius="7" Background="#F8FAFC">
+                  <StackPanel Spacing="6">
+                    <TextBlock FontWeight="SemiBold" Text="适用场景" />
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding SelectedOperationDescription}" TextWrapping="Wrap" />
+                    <TextBlock Margin="0,5,0,0" FontWeight="SemiBold" Text="影响范围" />
+                    <TextBlock Foreground="#175CD3" Text="{Binding SelectedOperationImpact}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+                <StackPanel Spacing="6">
+                  <TextBlock FontWeight="SemiBold" Text="目标实例（横向扩容、单实例修复和下线时使用）" />
+                  <ComboBox Width="320" HorizontalAlignment="Left" PlaceholderText="当前没有可用实例" ItemsSource="{Binding Instances}" SelectedValueBinding="{Binding Model.InstanceId}" SelectedValue="{Binding SelectedTargetInstanceId, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:InstanceEditorViewModel">
+                        <TextBlock Text="{Binding Model.InstanceId}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <Border Padding="15" CornerRadius="8" Background="{DynamicResource WarningSoftBrush}" BorderBrush="#FED7AA" BorderThickness="1">
+              <StackPanel Spacing="6">
+                <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" Text="需要人工确认的情况" />
+                <TextBlock Foreground="#9A3412" Text="更新 Coordinator、更新某 Role 最后一个实例、Drain 超时、仍有玩家或比赛，以及任何实际停服步骤。" TextWrapping="Wrap" />
+                <TextBlock Foreground="#9A3412" Text="工具不会自动执行数据库 Migration、购买云资源、修改 DNS、TLS 或安全组。" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Button Classes="primary" HorizontalAlignment="Left" Command="{Binding PreviewPlanCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <Image Classes="small-icon" Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/preview-white.png" />
+                <TextBlock Text="生成并保存计划预览" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </ScrollViewer>
+      </ContentControl>
+
+      <!-- 7 计划预览 -->
+      <ContentControl>
+        <Grid RowDefinitions="Auto,*">
+          <Grid Margin="28,24,28,14" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="9">
+                <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plan.png" Stretch="Uniform" />
+                <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="计划预览" />
+              </StackPanel>
+              <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="执行前必须查看完整步骤；任何配置变化都会使当前预览失效。" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="primary" IsEnabled="{Binding HasPreviewedPlan}" Command="{Binding ExecuteCommand}" Content="执行已预览计划" />
+          </Grid>
+          <ListBox Grid.Row="1" Margin="28,0,28,30" ItemsSource="{Binding PlanSteps}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="core:DeploymentStep">
+                <Border Margin="0,0,0,7" Padding="12" CornerRadius="7" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                  <Grid ColumnDefinitions="80,170,*,140,110">
+                    <TextBlock Foreground="{DynamicResource PrimaryBrush}" Text="{Binding StepId}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Action}" />
+                    <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="{Binding DisplayName}" />
+                    <TextBlock Grid.Column="3" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding HostId}" />
+                    <TextBlock Grid.Column="4" Foreground="{DynamicResource WarningBrush}" Text="{Binding RequiresApproval, StringFormat='人工确认：{0}'}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <Border Grid.Row="1" Margin="28,0,28,30" IsVisible="{Binding HasNoPlanSteps}" Padding="24" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+              <Image Width="40" Height="40" HorizontalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/plan.png" Stretch="Uniform" />
+              <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="尚未生成计划" />
+              <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="完成主机、拓扑和发布方式设置后，点击顶部“预览计划”。" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </ContentControl>
+
+      <!-- 8 执行中心 -->
+      <ContentControl>
+        <Grid RowDefinitions="Auto,*">
+          <Grid Margin="28,24,28,14" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="9">
+                <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/execute.png" Stretch="Uniform" />
+                <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="执行中心" />
+              </StackPanel>
+              <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="逐步骤显示状态、失败原因、日志位置和恢复建议。" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="outline" IsEnabled="{Binding HasActiveExecution}" Command="{Binding CancelCommand}" Content="取消当前执行" />
+          </Grid>
+          <ListBox Grid.Row="1" Margin="28,0,28,30" ItemsSource="{Binding ExecutionResults}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="core:StepResult">
+                <Border Margin="0,0,0,8" Padding="13" CornerRadius="7" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                  <Grid ColumnDefinitions="82,120,210,*" RowDefinitions="Auto,Auto">
+                    <TextBlock Foreground="{DynamicResource PrimaryBrush}" Text="{Binding StepId}" />
+                    <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="{Binding Status}" />
+                    <TextBlock Grid.Column="2" Text="{Binding DisplayName}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Message}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,5,0,0" Foreground="{DynamicResource DangerBrush}" Text="{Binding ErrorCode}" />
+                    <TextBlock Grid.Row="1" Grid.Column="3" Margin="0,5,0,0" Foreground="{DynamicResource WarningBrush}" Text="{Binding RecoverySuggestion}" TextWrapping="Wrap" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <Border Grid.Row="1" Margin="28,0,28,30" IsVisible="{Binding HasNoExecutionResults}" Padding="24" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+              <Image Width="40" Height="40" HorizontalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/execute.png" Stretch="Uniform" />
+              <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="当前没有执行记录" />
+              <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="执行已确认的计划后，每一步的状态和错误会显示在这里。" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </ContentControl>
+
+      <!-- 9 发布历史 -->
+      <ContentControl>
+        <StackPanel Margin="28,24,28,30" Spacing="13">
+          <StackPanel Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="9">
+              <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/history.png" Stretch="Uniform" />
+              <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="发布历史" />
+            </StackPanel>
+            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="计划、状态和日志保存在应用数据目录；不会把密钥或 Token 写入仓库。" />
+          </StackPanel>
+          <Border Padding="14" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <Grid MinHeight="160">
+              <ListBox ItemsSource="{Binding HistoryFiles}" Background="Transparent" />
+              <StackPanel IsVisible="{Binding HasNoHistory}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                <Image Width="40" Height="40" HorizontalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/history.png" Stretch="Uniform" />
+                <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="还没有发布历史" />
+                <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="首次生成并执行计划后，历史文件会列在这里。" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </StackPanel>
+      </ContentControl>
+
+      <!-- 帮助 -->
+      <ContentControl>
+        <ScrollViewer>
+          <StackPanel Margin="28,24,28,30" Spacing="14" MaxWidth="920" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="9">
+              <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/help.png" Stretch="Uniform" />
+              <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="帮助与文档" />
+            </StackPanel>
+            <Border Padding="18" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+              <StackPanel Spacing="14">
+                <StackPanel Spacing="4">
+                  <TextBlock FontWeight="SemiBold" Text="配置方案是什么？" />
+                  <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="一份方案就是一组由开发运维人员自由命名的完整配置，包含主机、拓扑、构建目标和发布策略。方案没有固定分类，删除只影响本地文件。" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock FontWeight="SemiBold" Text="为什么一个 DS 能选择多个 Role？" />
+                  <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="Role 是业务能力位。Lobby、Room、Match、Game 可以由同一个 DS 进程同时承载，也可以按容量拆到不同实例。" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock FontWeight="SemiBold" Text="构建与发布有什么区别？" />
+                  <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="构建会生成新制品；发布会部署或整理所选制品。取消构建但保留发布时，必须已经存在对应 ReleaseManifest。" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock FontWeight="SemiBold" Text="平台模块为什么不可选？" />
+                  <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="应用会同时扫描 Unity.app 内置模块和 Unity Hub 安装在编辑器版本目录旁的外置模块。修改 Unity 路径后请点击“重新检测”。" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock FontWeight="SemiBold" Text="安全边界" />
+                  <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="私钥只保存路径；管理 Token 不离开服务器；管理接口只监听 127.0.0.1；数据库迁移和云资源变更不会自动执行。" TextWrapping="Wrap" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </ContentControl>
+    </Carousel>
+
+    <!-- 右侧上下文帮助 -->
+    <Border Grid.Row="1" Grid.Column="2" Padding="18" Background="#FBFCFE" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0">
+      <ScrollViewer>
+        <StackPanel Spacing="14">
+          <StackPanel Spacing="3">
+            <TextBlock FontSize="15" FontWeight="SemiBold" Text="本页说明" />
+            <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内容会随左侧页面切换" />
+          </StackPanel>
+          <Border Padding="13" CornerRadius="8" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <StackPanel Spacing="7">
+              <TextBlock FontWeight="SemiBold" Text="{Binding CurrentHelpTitle}" />
+              <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding CurrentHelpText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Border Padding="13" CornerRadius="8" Background="{DynamicResource SuccessSoftBrush}" BorderBrush="#ABEFC6" BorderThickness="1">
+            <StackPanel Spacing="7">
+              <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}" Text="推荐设置" />
+              <TextBlock Foreground="#067647" Text="{Binding CurrentHelpTip}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Border Padding="13" CornerRadius="8" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <StackPanel Spacing="8">
+              <TextBlock FontWeight="SemiBold" Text="执行前检查" />
+              <StackPanel IsVisible="{Binding HasNoPreviewedPlan}" Spacing="8">
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="○ 尚未检查 Instance ID" />
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="○ 尚未检查主机端口" />
+                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="○ 尚未生成计划预览" />
+              </StackPanel>
+              <StackPanel IsVisible="{Binding HasPreviewedPlan}" Spacing="8">
+                <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✓ Instance ID 唯一" />
+                <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✓ 主机端口无冲突" />
+                <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✓ 计划已经预览" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <Button Classes="outline" HorizontalAlignment="Stretch" Command="{Binding SaveCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/save.png" Stretch="Uniform" />
+              <TextBlock Text="保存当前方案" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <!-- 底部状态栏 -->
+    <Border Grid.Row="2" Grid.ColumnSpan="3" Padding="14,0" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Border Width="7" Height="7" CornerRadius="4" VerticalAlignment="Center" Background="{DynamicResource PrimaryBrush}" />
+        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

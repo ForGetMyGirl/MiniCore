@@ -9,7 +9,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理 Lobby 或房间分配逻辑对一组已匹配玩家的提取请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Match)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Match)]
     public sealed class TakeMatchHandler : ARpcHandler<TakeMatchRequest, TakeMatchResponse>
     {
         #region Private 私有成员

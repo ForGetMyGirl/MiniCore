@@ -15,7 +15,7 @@ namespace MiniCore.Server
         private const long LeaseMilliseconds = 15000; // 默认服务租约长度。
         private readonly object syncRoot = new object(); // 保护目录和轮询游标。
         private readonly Dictionary<string, RegisteredInstance> instances = new Dictionary<string, RegisteredInstance>(StringComparer.Ordinal); // 实例标识到注册记录。
-        private readonly Dictionary<ServiceKind, int> roundRobinIndices = new Dictionary<ServiceKind, int>(); // 各服务种类的轮询游标。
+        private readonly Dictionary<ServiceId, int> roundRobinIndices = new Dictionary<ServiceId, int>(); // 各服务标识的轮询游标。
         private long directoryRevision; // 单调递增目录修订号。
 
         #endregion
@@ -34,8 +34,8 @@ namespace MiniCore.Server
                 return new RegisterServerResponse { Code = 400, Msg = "instanceId 不能为空" };
             }
 
-            List<ServiceKind> kinds = ResolveKinds(request);
-            if (kinds.Count == 0)
+            List<ServiceId> serviceIds = ResolveServiceIds(request);
+            if (serviceIds.Count == 0)
             {
                 return new RegisterServerResponse { Code = 400, Msg = "注册请求没有有效服务类型" };
             }
@@ -45,7 +45,7 @@ namespace MiniCore.Server
                 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 instances[request.InstanceId] = new RegisteredInstance(
                     request.InstanceId,
-                    kinds,
+                    serviceIds,
                     request.InnerHost,
                     request.InnerPort,
                     request.OuterWebSocketUrl,
@@ -117,10 +117,10 @@ namespace MiniCore.Server
         /// <summary>
         /// 使用每种服务独立的轮询游标选择一个 Ready 实例。
         /// </summary>
-        /// <param name="kind">目标服务种类。</param>
+        /// <param name="serviceId">目标稳定服务标识。</param>
         /// <param name="endpoint">成功时返回服务端点。</param>
         /// <returns>存在 Ready 实例时返回 true。</returns>
-        public bool TryResolve(ServiceKind kind, out DiscoveredServiceEndpoint endpoint)
+        public bool TryResolve(ServiceId serviceId, out DiscoveredServiceEndpoint endpoint)
         {
             lock (syncRoot)
             {
@@ -128,7 +128,7 @@ namespace MiniCore.Server
                 var candidates = new List<RegisteredInstance>();
                 foreach (RegisteredInstance instance in instances.Values)
                 {
-                    if (instance.State == ServiceLifecycleState.Ready && instance.Kinds.Contains(kind))
+                    if (instance.State == ServiceLifecycleState.Ready && instance.ServiceIds.Contains(serviceId))
                     {
                         candidates.Add(instance);
                     }
@@ -141,10 +141,10 @@ namespace MiniCore.Server
                 }
 
                 candidates.Sort((left, right) => string.CompareOrdinal(left.InstanceId, right.InstanceId));
-                roundRobinIndices.TryGetValue(kind, out int cursor);
+                roundRobinIndices.TryGetValue(serviceId, out int cursor);
                 RegisteredInstance selected = candidates[cursor % candidates.Count];
-                roundRobinIndices[kind] = (cursor + 1) % candidates.Count;
-                endpoint = selected.ToEndpoint(kind, directoryRevision);
+                roundRobinIndices[serviceId] = (cursor + 1) % candidates.Count;
+                endpoint = selected.ToEndpoint(serviceId, directoryRevision);
                 return true;
             }
         }
@@ -161,9 +161,9 @@ namespace MiniCore.Server
                 var result = new List<DiscoveredServiceEndpoint>();
                 foreach (RegisteredInstance instance in instances.Values)
                 {
-                    for (int index = 0; index < instance.Kinds.Count; index++)
+                    for (int index = 0; index < instance.ServiceIds.Count; index++)
                     {
-                        result.Add(instance.ToEndpoint(instance.Kinds[index], directoryRevision));
+                        result.Add(instance.ToEndpoint(instance.ServiceIds[index], directoryRevision));
                     }
                 }
 
@@ -176,37 +176,39 @@ namespace MiniCore.Server
         #region Private 私有成员
 
         /// <summary>
-        /// 根据专用 Database 类型或 Unity DS Role 标志展开服务种类。
+        /// 根据独立服务标识或不透明 Role Mask 展开服务标识。
         /// </summary>
         /// <param name="request">注册请求。</param>
         /// <returns>当前实例提供的服务种类。</returns>
-        private static List<ServiceKind> ResolveKinds(RegisterServerRequest request)
+        private static List<ServiceId> ResolveServiceIds(RegisterServerRequest request)
         {
-            var result = new List<ServiceKind>(4);
-            ServiceKind explicitKind = (ServiceKind)(int)request.ServiceKind;
-            if (explicitKind == ServiceKind.Database)
+            var result = new List<ServiceId>(4);
+            if (request.ServiceId != 0UL)
             {
-                result.Add(ServiceKind.Database);
+                if (request.RoleMask != 0UL)
+                {
+                    return result;
+                }
+
+                result.Add(new ServiceId(request.ServiceId));
                 return result;
             }
 
-            DedicatedServerRole roles = (DedicatedServerRole)request.Roles;
-            AddRoleKind(roles, DedicatedServerRole.Coordinator, ServiceKind.Coordinator, result);
-            AddRoleKind(roles, DedicatedServerRole.Lobby, ServiceKind.Lobby, result);
-            AddRoleKind(roles, DedicatedServerRole.Match, ServiceKind.Match, result);
-            AddRoleKind(roles, DedicatedServerRole.Game, ServiceKind.Game, result);
-            return result;
-        }
-
-        /// <summary>
-        /// 当 Role 标志存在时向结果加入对应服务种类。
-        /// </summary>
-        private static void AddRoleKind(DedicatedServerRole roles, DedicatedServerRole role, ServiceKind kind, List<ServiceKind> result)
-        {
-            if ((roles & role) != 0)
+            ulong remaining = request.RoleMask;
+            while (remaining != 0UL)
             {
-                result.Add(kind);
+                ulong serviceValue = remaining & (~remaining + 1UL);
+                if (serviceValue == FrameworkServiceIds.Database)
+                {
+                    result.Clear();
+                    return result;
+                }
+
+                result.Add(new ServiceId(serviceValue));
+                remaining &= ~serviceValue;
             }
+
+            return result;
         }
 
         /// <summary>
@@ -247,9 +249,9 @@ namespace MiniCore.Server
             var result = new List<DiscoveredServiceEndpoint>();
             foreach (RegisteredInstance instance in instances.Values)
             {
-                for (int index = 0; index < instance.Kinds.Count; index++)
+                for (int index = 0; index < instance.ServiceIds.Count; index++)
                 {
-                    result.Add(instance.ToEndpoint(instance.Kinds[index], directoryRevision));
+                    result.Add(instance.ToEndpoint(instance.ServiceIds[index], directoryRevision));
                 }
             }
 
@@ -286,10 +288,10 @@ namespace MiniCore.Server
             /// <summary>
             /// 创建服务实例注册记录。
             /// </summary>
-            public RegisteredInstance(string instanceId, List<ServiceKind> kinds, string innerHost, int innerPort, string outerWebSocketUrl, ServiceLifecycleState state, long leaseExpiresAtMilliseconds)
+            public RegisteredInstance(string instanceId, List<ServiceId> serviceIds, string innerHost, int innerPort, string outerWebSocketUrl, ServiceLifecycleState state, long leaseExpiresAtMilliseconds)
             {
                 InstanceId = instanceId;
-                Kinds = kinds;
+                ServiceIds = serviceIds;
                 InnerHost = innerHost;
                 InnerPort = innerPort;
                 OuterWebSocketUrl = outerWebSocketUrl;
@@ -298,7 +300,7 @@ namespace MiniCore.Server
             }
 
             public string InstanceId { get; }
-            public List<ServiceKind> Kinds { get; }
+            public List<ServiceId> ServiceIds { get; }
             public string InnerHost { get; }
             public int InnerPort { get; }
             public string OuterWebSocketUrl { get; }
@@ -308,9 +310,9 @@ namespace MiniCore.Server
             /// <summary>
             /// 将注册记录转换为指定服务种类的目录端点。
             /// </summary>
-            public DiscoveredServiceEndpoint ToEndpoint(ServiceKind kind, long revision)
+            public DiscoveredServiceEndpoint ToEndpoint(ServiceId serviceId, long revision)
             {
-                return new DiscoveredServiceEndpoint(InstanceId, kind, InnerHost, InnerPort, OuterWebSocketUrl, State, revision);
+                return new DiscoveredServiceEndpoint(InstanceId, serviceId, InnerHost, InnerPort, OuterWebSocketUrl, State, revision);
             }
         }
 

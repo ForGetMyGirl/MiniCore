@@ -1,0 +1,260 @@
+<Application
+    x:Class="MiniCore.Deploy.Desktop.App"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedThemeVariant="Light">
+  <Application.Resources>
+    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F5F7FA" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SidebarBrush" Color="#F8FAFC" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#182235" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#667892" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#D9E2EC" />
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#0B73EA" />
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#0865D1" />
+    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#0758B7" />
+    <SolidColorBrush x:Key="PrimarySoftBrush" Color="#EAF3FF" />
+    <SolidColorBrush x:Key="PrimarySofterBrush" Color="#F5F9FF" />
+    <SolidColorBrush x:Key="NeutralButtonBrush" Color="#EEF2F6" />
+    <SolidColorBrush x:Key="NeutralButtonHoverBrush" Color="#E2E8F0" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#079455" />
+    <SolidColorBrush x:Key="SuccessSoftBrush" Color="#ECFDF3" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#B54708" />
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="#FFF7ED" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#D92D20" />
+
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="FontFamily" Value="-apple-system,BlinkMacSystemFont,Segoe UI,Microsoft YaHei UI,PingFang SC,sans-serif" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Background" Value="{DynamicResource NeutralButtonBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource NeutralButtonHoverBrush}" />
+    </Style>
+    <Style Selector="Button StackPanel">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button Image">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="PrimaryButtonRoot"
+                  Padding="{TemplateBinding Padding}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}">
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ Border#PrimaryButtonRoot">
+      <Setter Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
+    </Style>
+    <Style Selector="Button.primary:pressed">
+      <Setter Property="Background" Value="{DynamicResource PrimaryPressedBrush}" />
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ Border#PrimaryButtonRoot">
+      <Setter Property="Background" Value="{DynamicResource PrimaryPressedBrush}" />
+    </Style>
+    <Style Selector="Button.primary:disabled">
+      <Setter Property="Background" Value="#A9CDF6" />
+      <Setter Property="Foreground" Value="#F8FBFF" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.primary:disabled /template/ Border#PrimaryButtonRoot">
+      <Setter Property="Background" Value="#A9CDF6" />
+    </Style>
+    <Style Selector="Button.outline">
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.outline:pointerover">
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#B9C6D5" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="#FFF1F0" />
+      <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+    </Style>
+    <Style Selector="Button.icon-button">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="MinWidth" Value="36" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Button.menu-option">
+      <Setter Property="MinWidth" Value="210" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="CornerRadius" Value="5" />
+    </Style>
+    <Style Selector="Button.menu-option:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PrimarySoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.execution-menu">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="MinWidth" Value="38" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="0,6,6,0" />
+    </Style>
+    <Style Selector="Button.path-picker-button">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="MinWidth" Value="38" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Margin" Value="0,1,1,1" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0,5,5,0" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Button.path-picker-button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PrimarySoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Height" Value="36" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#C8D2DF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.multiline">
+      <Setter Property="Height" Value="82" />
+      <Setter Property="MinHeight" Value="76" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="VerticalContentAlignment" Value="Top" />
+    </Style>
+    <Style Selector="TextBox.with-picker">
+      <Setter Property="Padding" Value="10,0,42,0" />
+    </Style>
+    <Style Selector="TextBox:focus">
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Height" Value="36" />
+      <Setter Property="MinWidth" Value="140" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#C8D2DF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="NumericUpDown">
+      <Setter Property="Height" Value="36" />
+      <Setter Property="MinWidth" Value="118" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#C8D2DF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Increment" Value="1" />
+      <Setter Property="FormatString" Value="0" />
+    </Style>
+
+    <Style Selector="RadioButton.nav-item">
+      <Setter Property="Height" Value="46" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Margin" Value="8,2" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="NavRoot" Padding="{TemplateBinding Padding}" CornerRadius="{TemplateBinding CornerRadius}" Background="{TemplateBinding Background}">
+            <Grid ColumnDefinitions="3,*">
+              <Border Name="NavPipe" Width="3" CornerRadius="2" Background="Transparent" />
+              <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+            </Grid>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.nav-item:pointerover /template/ Border#NavRoot">
+      <Setter Property="Background" Value="#EEF2F7" />
+    </Style>
+    <Style Selector="RadioButton.nav-item:checked">
+      <Setter Property="Background" Value="{DynamicResource PrimarySoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    <Style Selector="RadioButton.nav-item:checked:pointerover /template/ Border#NavRoot">
+      <Setter Property="Background" Value="{DynamicResource PrimarySoftBrush}" />
+    </Style>
+    <Style Selector="RadioButton.nav-item:checked /template/ Border#NavPipe">
+      <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+
+    <Style Selector="ListBox.profile-list > ListBoxItem">
+      <Setter Property="Margin" Value="0,0,0,7" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Padding="{TemplateBinding Padding}" CornerRadius="{TemplateBinding CornerRadius}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.profile-list > ListBoxItem:pointerover">
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#B9C6D5" />
+    </Style>
+    <Style Selector="ListBox.profile-list > ListBoxItem:selected">
+      <Setter Property="Background" Value="#F8FBFF" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ListBox.profile-list > ListBoxItem:selected:pointerover">
+      <Setter Property="Background" Value="#F8FBFF" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+    </Style>
+    <Style Selector="Image.small-icon">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+  </Application.Styles>
+</Application>

@@ -14,7 +14,7 @@ namespace MiniCore.EditorTools
     /// <summary>
     /// 生成框架内部与项目业务 Protobuf 代码，并维护稳定 Opcode 和无状态注册入口。
     /// </summary>
-    internal static class ProtoCodeGenerator
+    public static class ProtoCodeGenerator
     {
         #region Private 私有成员
 

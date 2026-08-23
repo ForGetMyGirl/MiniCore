@@ -8,7 +8,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理其他 Dedicated Server 对等待票据的取消请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Match)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Match)]
     public sealed class CancelMatchHandler : ARpcHandler<CancelMatchRequest, CancelMatchResponse>
     {
         #region Public 公共成员

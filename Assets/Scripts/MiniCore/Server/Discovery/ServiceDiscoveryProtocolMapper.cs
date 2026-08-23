@@ -18,7 +18,7 @@ namespace MiniCore.Server
             return new ClusterServiceEndpoint
             {
                 InstanceId = endpoint.InstanceId ?? string.Empty,
-                ServiceKind = (ClusterServiceKind)(int)endpoint.Kind,
+                ServiceId = endpoint.ServiceId.Value,
                 InnerHost = endpoint.InnerHost ?? string.Empty,
                 InnerPort = endpoint.InnerPort,
                 OuterWebSocketUrl = endpoint.OuterWebSocketUrl ?? string.Empty,
@@ -34,7 +34,7 @@ namespace MiniCore.Server
         {
             return new DiscoveredServiceEndpoint(
                 endpoint.InstanceId,
-                (ServiceKind)(int)endpoint.ServiceKind,
+                new ServiceId(endpoint.ServiceId),
                 endpoint.InnerHost,
                 endpoint.InnerPort,
                 endpoint.OuterWebSocketUrl,

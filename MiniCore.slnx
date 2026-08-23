@@ -18,8 +18,8 @@
   <Project Path="MiniCore.Protocol.Common.csproj" />
   <Project Path="MiniCore.Protocol.Control.Inner.csproj" />
   <Project Path="MiniCore.Protocol.Editor.csproj" />
-  <Project Path="MiniCore.EditorTests.csproj" />
   <Project Path="MiniCore.Editor.csproj" />
+  <Project Path="MiniCore.EditorTests.csproj" />
   <Project Path="MiniCore.Performance.Editor.csproj" />
   <Project Path="MiniCore.Protocol.Handler.Editor.csproj" />
   <Project Path="MiniCore.HotUpdateAssembly.Editor.csproj" />

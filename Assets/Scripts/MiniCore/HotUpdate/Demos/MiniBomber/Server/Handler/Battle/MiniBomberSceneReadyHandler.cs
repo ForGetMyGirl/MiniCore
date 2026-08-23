@@ -9,7 +9,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理 MiniBomber 客户端战斗场景就绪请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Game)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Game)]
     public sealed class MiniBomberSceneReadyHandler : ARpcHandler<MiniBomberSceneReadyRequest, MiniBomberSceneReadyResponse>
     {
         #region Public 公共成员

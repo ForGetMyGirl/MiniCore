@@ -112,3 +112,8 @@ InitTestScene*.unity*
 # 根目录独立 .NET 服务的项目文件属于正式源码，不使用 Unity 自动生成忽略规则。
 !/Server/**/*.csproj
 !/Server/**/*.sln
+
+# MiniCore Deploy 的本地编译缓存与跨平台自包含桌面制品。
+/Tools/MiniCore.Deploy/**/bin/
+/Tools/MiniCore.Deploy/**/obj/
+/Tools/MiniCore.Deploy/Artifacts/

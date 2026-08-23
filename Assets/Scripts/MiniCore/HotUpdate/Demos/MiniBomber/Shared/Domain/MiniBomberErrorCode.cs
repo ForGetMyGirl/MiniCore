@@ -26,6 +26,11 @@ namespace MiniCore.Demo.MiniBomber
         public const int MatchNotFound = 3001;
         public const int MatchLoadingTimeout = 3002;
 
+        /// <summary>
+        /// 服务正在摘流量或暂时拒绝新业务工作。
+        /// </summary>
+        public const int ServerUnavailable = 5001;
+
         #endregion
     }
 }

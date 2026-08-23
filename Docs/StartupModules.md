@@ -14,7 +14,7 @@ MiniCore 将客户端和 Dedicated Server 的启动入口、程序集与配置�
 Dedicated Server 启动链：
 
 1. Dedicated Server Player 固定携带 AOT Control/Control.Inner；Bootstrap 加载业务 Common、Outer、Inner、Shared、Server 热更新程序集。
-2. `MiniCoreServerStartup.StartAsync()` 把业务实现交给 AOT `DedicatedServerHost`；宿主从自身 Player 的 `StreamingAssets/MiniCoreServerRuntime.json` 读取 Role 和监听配置。
+2. `MiniCoreServerStartup.StartAsync()` 把业务实现交给 AOT `DedicatedServerHost`；宿主从 `--minicore-config <absolute-path>` 指定的外部实例配置读取 Role 和监听参数，并校验随制品发布的 Role Catalog。
 3. 宿主自动装配 `INetworkService`、固定控制面协议及 Handler 与必需的 `IServiceDiscoveryService`，随后调用业务入口注册业务协议和 Role Handler。
 4. 启动监听；Coordinator Role 创建本地目录，其余 Role 向 Coordinator 注册 `Starting`。
 5. 调用 `MiniBomberServerStartupComponent` 创建当前 Role 的业务 Component，最后自动报告 `Ready`；计划停服时先调用 `StopAsync` 报告 `Draining`。

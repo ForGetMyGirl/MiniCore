@@ -9,7 +9,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理 MiniBomber 房间设置请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Lobby)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Lobby)]
     public sealed class MiniBomberUpdateRoomHandler : ARpcHandler<MiniBomberUpdateRoomRequest, MiniBomberUpdateRoomResponse>
     {
         /// <summary>

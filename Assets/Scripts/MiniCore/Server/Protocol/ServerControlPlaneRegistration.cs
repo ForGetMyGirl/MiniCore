@@ -16,7 +16,7 @@ namespace MiniCore.Server
         /// </summary>
         /// <param name="builder">目标协议构建器。</param>
         /// <param name="activeRoles">当前进程启用的 Role。</param>
-        internal static void Register(NetworkProtocolBuilder builder, DedicatedServerRole activeRoles)
+        internal static void Register(NetworkProtocolBuilder builder, ServerRoleMask activeRoles)
         {
             if (builder == null)
             {
@@ -24,7 +24,7 @@ namespace MiniCore.Server
             }
 
             CoordinatorInnerProtocolRegistration.Register(builder);
-            if ((activeRoles & DedicatedServerRole.Coordinator) == 0)
+            if (!activeRoles.Contains(ServerRoleMask.CoordinatorValue))
             {
                 return;
             }

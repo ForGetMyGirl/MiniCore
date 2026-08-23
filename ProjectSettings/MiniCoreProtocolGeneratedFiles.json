@@ -4,7 +4,7 @@
     "BusinessOutputDirectory": "Assets/Scripts/MiniCore/Protocol/Generated",
     "ControlOutputDirectory": "Assets/Scripts/MiniCore/Protocol/Control/Generated",
     "OutputDirectory": "",
-    "SourceDigest": "836e0c11b2b1c5f649ae6445bbcc28d82558a6d014e49acb46219d4e812a5aae",
+    "SourceDigest": "be8001fb4ec66d923c49a6960855edbaccdc4b52d58962db207c23d075dd959c",
     "Files": [
         "Assets/Scripts/MiniCore/Protocol/Control/Generated/Common/ClusterCommon.cs",
         "Assets/Scripts/MiniCore/Protocol/Control/Generated/Inner/CoordinatorInner.ProtocolRegistration.g.cs",

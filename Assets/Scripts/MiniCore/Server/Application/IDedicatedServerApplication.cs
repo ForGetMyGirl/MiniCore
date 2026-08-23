@@ -9,11 +9,16 @@ namespace MiniCore.Server
     public interface IDedicatedServerApplication
     {
         /// <summary>
+        /// 获取业务安全停服参与者；无长寿命业务时可以返回 null。
+        /// </summary>
+        IDedicatedServerDrainParticipant DrainParticipant { get; }
+
+        /// <summary>
         /// 将当前游戏的协议与 Role-aware Handler 登记到框架构建器。
         /// </summary>
         /// <param name="builder">固定控制面已经开始装配的协议构建器。</param>
         /// <param name="activeRoles">当前部署副本启用的 Role。</param>
-        void RegisterProtocols(NetworkProtocolBuilder builder, DedicatedServerRole activeRoles);
+        void RegisterProtocols(NetworkProtocolBuilder builder, ServerRoleMask activeRoles);
 
         /// <summary>
         /// 在监听、Starting 注册和可选数据库发现完成后启动游戏业务。

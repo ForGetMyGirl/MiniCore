@@ -13,69 +13,69 @@ namespace MiniCore.HotUpdate.Server
         /// </summary>
         /// <param name="builder">目标协议构建器。</param>
         /// <param name="activeRoles">当前进程启用的 Role。</param>
-        public static void Register(NetworkProtocolBuilder builder, DedicatedServerRole activeRoles)
+        public static void Register(NetworkProtocolBuilder builder, ServerRoleMask activeRoles)
         {
             if (builder == null)
             {
                 throw new global::System.ArgumentNullException(nameof(builder));
             }
-            if ((activeRoles & (DedicatedServerRole)4) != 0)
+            if (activeRoles.Intersects(4UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.CancelMatchHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)4) != 0)
+            if (activeRoles.Intersects(4UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.EnqueueMatchHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)8) != 0)
+            if (activeRoles.Intersects(8UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleInputHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)8) != 0)
+            if (activeRoles.Intersects(8UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberBattleResyncHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberCreateRoomHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberJoinRoomHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberLeaveRoomHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberLobbySnapshotHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberResumeSessionHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)8) != 0)
+            if (activeRoles.Intersects(8UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberSceneReadyHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberSetReadyHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberStartMatchHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)2) != 0)
+            if (activeRoles.Intersects(2UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.MiniBomberUpdateRoomHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)4) != 0)
+            if (activeRoles.Intersects(4UL))
             {
                 builder.RegisterHandler(new global::MiniCore.Demo.MiniBomber.TakeMatchHandler());
             }
-            if ((activeRoles & (DedicatedServerRole)15) != 0)
+            if (activeRoles.Intersects(18446744073709551615UL))
             {
                 builder.RegisterHandler(new global::MiniCore.HotUpdate.DemoRpcHandler());
             }

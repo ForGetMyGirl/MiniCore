@@ -21,7 +21,7 @@ namespace MiniCore.Server
             IServiceDiscoveryService discovery = Global.GetService<IServiceDiscoveryService>(this);
             try
             {
-                if (discovery.TryResolve((ServiceKind)(int)request.ServiceKind, out DiscoveredServiceEndpoint endpoint))
+                if (discovery.TryResolve(new ServiceId(request.ServiceId), out DiscoveredServiceEndpoint endpoint))
                 {
                     response.Code = 0;
                     response.Endpoint = ServiceDiscoveryProtocolMapper.ToProtocol(endpoint);

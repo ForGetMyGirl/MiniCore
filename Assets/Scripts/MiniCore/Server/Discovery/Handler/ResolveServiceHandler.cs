@@ -18,16 +18,16 @@ namespace MiniCore.Server
         /// </summary>
         public override MTask HandleAsync(NetworkSession session, ResolveServiceRequest request, ResolveServiceResponse response)
         {
-            ServiceKind kind = (ServiceKind)(int)request.ServiceKind;
+            ServiceId serviceId = new ServiceId(request.ServiceId);
             IServiceDiscoveryService discovery = Global.GetService<IServiceDiscoveryService>(this);
             try
             {
-                if (kind == ServiceKind.Database)
+                if (serviceId.Value == FrameworkServiceIds.Database)
                 {
                     response.Code = 403;
                     response.Msg = "客户端不能发现 DatabaseServer";
                 }
-                else if (discovery.TryResolve(kind, out DiscoveredServiceEndpoint endpoint) && !string.IsNullOrWhiteSpace(endpoint.OuterWebSocketUrl))
+                else if (discovery.TryResolve(serviceId, out DiscoveredServiceEndpoint endpoint) && !string.IsNullOrWhiteSpace(endpoint.OuterWebSocketUrl))
                 {
                     response.Code = 0;
                     response.Endpoint = ServiceDiscoveryProtocolMapper.ToProtocol(endpoint);

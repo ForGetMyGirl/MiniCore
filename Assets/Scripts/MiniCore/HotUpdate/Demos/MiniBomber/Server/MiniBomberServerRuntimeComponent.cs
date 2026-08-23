@@ -49,6 +49,7 @@ namespace MiniCore.Demo.MiniBomber
         private double previousUpdateTime; // 上一次驱动固定时间步的单调时间。
         private double fixedStepAccumulator; // 尚未消费的固定时间步累计秒数。
         private bool initialized; // 运行时是否完成初始化。
+        private bool acceptingNewWork = true; // Drain 后禁止创建或加入新的房间和比赛。
 
         #endregion
 
@@ -58,6 +59,29 @@ namespace MiniCore.Demo.MiniBomber
         /// 当前运行时是否完成初始化。
         /// </summary>
         public bool IsInitialized => initialized;
+
+        /// <summary>
+        /// 获取当前在线玩家数量。
+        /// </summary>
+        public int OnlinePlayerCount => CountOnlinePlayers();
+
+        /// <summary>
+        /// 获取当前仍存在的房间数量。
+        /// </summary>
+        public int RoomCount => rooms.Count;
+
+        /// <summary>
+        /// 获取当前仍在运行或结算的比赛数量。
+        /// </summary>
+        public int MatchCount => matches.Count;
+
+        /// <summary>
+        /// 停止接受新的房间、加入和开局请求，已有会话继续运行到自然结束。
+        /// </summary>
+        public void BeginDrain()
+        {
+            acceptingNewWork = false;
+        }
 
         /// <summary>
         /// 使用项目配置初始化服务器业务运行时；框架服务发现已在此前启动内外网监听。
@@ -201,6 +225,12 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="response">待填写响应。</param>
         public void CreateRoom(NetworkSession session, MiniBomberCreateRoomRequest request, MiniBomberCreateRoomResponse response)
         {
+            if (!acceptingNewWork)
+            {
+                SetError(response, MiniBomberErrorCode.ServerUnavailable, "服务器正在摘流量，暂不接受新房间");
+                return;
+            }
+
             if (!TryAuthorize(session, request.PlayerId, response, out MiniBomberServerPlayerSession player))
             {
                 return;
@@ -239,6 +269,12 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="response">待填写响应。</param>
         public void JoinRoom(NetworkSession session, MiniBomberJoinRoomRequest request, MiniBomberJoinRoomResponse response)
         {
+            if (!acceptingNewWork)
+            {
+                SetError(response, MiniBomberErrorCode.ServerUnavailable, "服务器正在摘流量，暂不接受新玩家加入房间");
+                return;
+            }
+
             if (!TryAuthorize(session, request.PlayerId, response, out MiniBomberServerPlayerSession player))
             {
                 return;
@@ -377,6 +413,12 @@ namespace MiniCore.Demo.MiniBomber
         /// <param name="response">待填写响应。</param>
         public void StartMatch(NetworkSession session, MiniBomberStartMatchRequest request, MiniBomberStartMatchResponse response)
         {
+            if (!acceptingNewWork)
+            {
+                SetError(response, MiniBomberErrorCode.ServerUnavailable, "服务器正在摘流量，暂不允许开始新比赛");
+                return;
+            }
+
             if (!TryAuthorize(session, request.PlayerId, response) || !rooms.TryGetValue(request.RoomId, out MiniBomberServerRoom room))
             {
                 SetError(response, MiniBomberErrorCode.RoomNotFound, "房间不存在");
@@ -554,6 +596,7 @@ namespace MiniCore.Demo.MiniBomber
             battleRules = null;
             roomWorkers = null;
             initialized = false;
+            acceptingNewWork = false;
             Global.ReleaseAll(this);
             base.OnDispose();
         }

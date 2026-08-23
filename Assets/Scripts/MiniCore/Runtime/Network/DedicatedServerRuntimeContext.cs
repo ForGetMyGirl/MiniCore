@@ -18,17 +18,17 @@ namespace MiniCore.Model
         /// <summary>
         /// 获取当前 Dedicated Server 启用的 Role。
         /// </summary>
-        public static DedicatedServerRole ActiveRoles { get; private set; }
+        public static ServerRoleMask ActiveRoles { get; private set; }
 
         /// <summary>
         /// 在任何 AppService 和业务入口启动前设置 Dedicated Server Role。
         /// </summary>
         /// <param name="roles">配置文件解析出的 Role。</param>
-        public static void Configure(DedicatedServerRole roles)
+        public static void Configure(ServerRoleMask roles)
         {
-            if (roles == DedicatedServerRole.None || (roles & ~DedicatedServerRole.All) != 0)
+            if (roles.IsEmpty)
             {
-                throw new ArgumentOutOfRangeException(nameof(roles), "Dedicated Server 必须启用至少一个已定义 Role。");
+                throw new ArgumentOutOfRangeException(nameof(roles), "Dedicated Server 必须启用至少一个由 Role Catalog 定义的 Role。");
             }
 
             IsDedicatedServer = true;
@@ -41,7 +41,7 @@ namespace MiniCore.Model
         public static void Reset()
         {
             IsDedicatedServer = false;
-            ActiveRoles = DedicatedServerRole.None;
+            ActiveRoles = ServerRoleMask.None;
         }
 
         #endregion

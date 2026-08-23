@@ -61,7 +61,7 @@ Runtime / Network <- Platform.Browser
 - `INetworkService` 同时提供连接与监听能力，不按 Client/Server 拆接口；一个进程可以兼任上游客户端和下游服务端。调用前用 `NetworkCapabilities` 判断 TCP、UDP、KCP、WebSocket 的连接/监听能力。
 - `CallAsync` 的末尾 `timeoutSeconds` 是单次 RPC 等待时间，默认 `10` 秒且必须大于零；长连接 Ping 每 `2` 秒发送一次，连续 `10` 秒无 Pong 才断开，两者不是同一个参数。控制面 RPC 使用 `3` 秒，客户端查询 Coordinator 使用 `8` 秒，Database Load/Save 分别使用 `5/8` 秒，Match/场景长流程使用 `15` 秒。
 - WebSocket 与 TCP 共用 `4 字节大端长度 + 12 字节业务头 + Protobuf Body` 字节流帧；普通浏览器 WebGL 只支持 WS/WSS 客户端。网络入站主循环默认受每帧 `256` 包和 `2 ms` 双预算约束。
-- 客户端 Handler 放入 Client 程序集；服务端 Handler 放入 Server 程序集并标记 `[ServerHandler(DedicatedServerRole.X)]`。
+- 客户端 Handler 放入 Client 程序集；服务端 Handler 放入 Server 程序集并使用项目包装特性，例如 `[MiniBomberServerHandler(MiniBomberServerRole.X)]`。框架特性只保存通用 `ulong RequiredRoleMask`。
 - 带网络角色的 Proto 消息生成稳定 Opcode、Parser 和角色注册；Handler 只做第二阶段处理绑定。无 Handler 的合法出站消息仍可发送。
 - 每个 `NetworkService` 持有独立不可变 Registry；启动时由 Builder 原子合并项目协议和 Handler，提交前禁止连接、监听和收发。
 - 已删除协议的编号保留在 `Proto/Manifest/OpcodeManifest.json`，绝不可重用或重排。
@@ -116,6 +116,7 @@ Runtime / Network <- Platform.Browser
 | Opcode/Handler 生成 | `Editor/Protocol`、项目 PB 输出目录、`HotUpdate/Generated/Network` |
 | UI 窗口、Root、分辨率、安全区域和动画 | `Unity/UI`、`HotUpdate/Demos/*/Client/UI`、`HotUpdate/UI/Generated`、`Editor/UI`、[UI 框架](UIFramework.md) |
 | MiniBomber 账号、大厅、房间、战斗、三端和热更新联调 | `Demos/MiniBomber`、`Proto/Business`、[MiniBomber 全链路 Demo](Demos/MiniBomber.md)、[框架部署入门](FrameworkDeploymentGettingStarted.md)、[多 Role 服务端架构](DedicatedServerArchitecture.md) |
+| 桌面自动构建、不可变制品、SSH 发布、滚动更新与回滚 | `Tools/MiniCore.Deploy`、[MiniCore Deploy](MiniCoreDeploy.md)、[打包与热更新流程](BuildAndHotUpdateWorkflow.md) |
 | 热更启动/打包 | `Project/Bootstrap/UpdateMainWindow.cs`、`HotUpdate/Entry`、`Editor/HybridCLR` |
 | Development Runner 与性能测试 | `Assets/Scripts/MiniCore/Development`、`Assets/Tests/Editor`、[性能测试指南](PerformanceTestingGuide.md) |
 | 文档维护 | [文档维护约定](DocumentationConventions.md) |

@@ -1,7 +1,7 @@
 {
   "name": "MiniCore.Editor",
   "rootNamespace": "",
-  "references": ["MiniCore.Runtime", "MiniCore.Protocol.Control", "MiniCore.Protocol.Control.Inner", "MiniCore.Protocol.Common", "MiniCore.Protocol.Outer", "MiniCore.Protocol.Inner", "MiniCore.Network", "MiniCore.Unity", "MiniCore.Unity.YooAsset", "MiniCore.Server", "MiniCore.HotUpdate.Shared", "MiniCore.HotUpdate.Client", "MiniCore.HotUpdate.Server", "MiniCore.HotUpdateAssembly.Editor", "Unity.InputSystem", "HybridCLR.Editor", "YooAsset", "YooAsset.Editor"],
+  "references": ["MiniCore.Runtime", "MiniCore.Protocol.Control", "MiniCore.Protocol.Control.Inner", "MiniCore.Protocol.Common", "MiniCore.Protocol.Outer", "MiniCore.Protocol.Inner", "MiniCore.Network", "MiniCore.Unity", "MiniCore.Unity.YooAsset", "MiniCore.Server", "MiniCore.HotUpdate.Shared", "MiniCore.HotUpdate.Client", "MiniCore.HotUpdate.Server", "MiniCore.HotUpdateAssembly.Editor", "MiniCore.Protocol.Editor", "MiniCore.Protocol.Handler.Editor", "Unity.InputSystem", "HybridCLR.Editor", "YooAsset", "YooAsset.Editor"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

@@ -8,11 +8,11 @@ import "Control/Common/ClusterCommon.proto";
 //[IRpcRequest]
 message RegisterServerRequest {
   string instance_id = 1;
-  uint32 roles = 2;
+  uint64 role_mask = 2;
   string inner_host = 3;
   int32 inner_port = 4;
   string outer_web_socket_url = 5;
-  minicore.cluster.common.ClusterServiceKind service_kind = 6;
+  uint64 service_id = 6;
   string protocol_version = 7;
 }
 
@@ -55,7 +55,7 @@ message SetServerStateResponse {
 
 //[IRpcRequest]
 message ResolveInnerServiceRequest {
-  minicore.cluster.common.ClusterServiceKind service_kind = 1;
+  uint64 service_id = 1;
 }
 
 //[IRpcResponse]

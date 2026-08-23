@@ -228,7 +228,7 @@ public sealed class DatabaseRpcWorker : BackgroundService
                 InstanceId = options.InstanceId,
                 InnerHost = options.AdvertisedHost,
                 InnerPort = options.ListenPort,
-                ServiceKind = ClusterServiceKind.ClusterServiceDatabase,
+                ServiceId = 1UL << 63,
                 ProtocolVersion = "1"
             },
             RegisterServerResponse.Parser,

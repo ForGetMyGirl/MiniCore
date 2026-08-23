@@ -10,7 +10,7 @@ namespace MiniCore.HotUpdate
     /// <summary>
     /// 回显示例 RPC 请求内容的处理器。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.All)]
+    [ServerHandler(ulong.MaxValue)]
     public class DemoRpcHandler : ARpcHandler<DemoRpcRequest, DemoRpcResponse>
     {
         #region Public 公共成员

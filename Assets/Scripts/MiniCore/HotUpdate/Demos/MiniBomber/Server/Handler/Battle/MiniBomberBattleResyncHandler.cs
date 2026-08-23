@@ -9,7 +9,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理客户端战斗基线不匹配后的重同步请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Game)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Game)]
     public sealed class MiniBomberBattleResyncHandler : ARpcHandler<MiniBomberBattleResyncRequest, MiniBomberBattleResyncResponse>
     {
         #region Public 公共成员

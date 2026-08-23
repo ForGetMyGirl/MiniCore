@@ -13,7 +13,7 @@ namespace MiniCore.Server
         /// <summary>
         /// 获取当前部署副本启用的 Role。
         /// </summary>
-        public DedicatedServerRole ActiveRoles { get; }
+        public ServerRoleMask ActiveRoles { get; }
 
         /// <summary>
         /// 获取经过固定宿主校验的部署配置。
@@ -44,7 +44,7 @@ namespace MiniCore.Server
             RuntimeConfig = runtimeConfig ?? throw new System.ArgumentNullException(nameof(runtimeConfig));
             Network = network ?? throw new System.ArgumentNullException(nameof(network));
             ServiceDiscovery = serviceDiscovery ?? throw new System.ArgumentNullException(nameof(serviceDiscovery));
-            ActiveRoles = runtimeConfig.ParseRoles();
+            ActiveRoles = runtimeConfig.ParseRoles(DedicatedServerRuntimeBootstrap.CurrentRoleCatalog);
         }
 
         #endregion

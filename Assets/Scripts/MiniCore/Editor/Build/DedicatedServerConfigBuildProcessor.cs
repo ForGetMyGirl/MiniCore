@@ -8,13 +8,13 @@ using UnityEngine;
 namespace MiniCore.EditorTools
 {
     /// <summary>
-    /// 只向 Dedicated Server Player 注入项目根目录下的运行配置。
+    /// 只向 Dedicated Server Player 注入与实例无关的 Role Catalog，并阻止配置泄漏到客户端。
     /// </summary>
     public sealed class DedicatedServerConfigBuildProcessor : BuildPlayerProcessor, IPreprocessBuildWithReport
     {
         #region Private 私有成员
 
-        private const string SourceConfigPath = "Server/DedicatedServer/Config/MiniCoreServerRuntime.json"; // 项目内 DS 源配置。
+        private const string SourceRoleCatalogPath = "Server/DedicatedServer/Config/ServerRoleCatalog.json"; // 项目业务 Role 目录。
         private const string RuntimeConfigFileName = "MiniCoreServerRuntime.json"; // Player 中固定文件名。
         private const string HotUpdateAssetDirectory = "Assets/AssetRes/Dlls/HotUpdate"; // 当前目标热更新 DLL 资源目录。
         private const string ClientAssemblyDefinitionPath = "Assets/Scripts/MiniCore/HotUpdate/Client/MiniCore.HotUpdate.Client.asmdef"; // 客户端业务程序集定义。
@@ -34,7 +34,7 @@ namespace MiniCore.EditorTools
         public override int callbackOrder => -1000;
 
         /// <summary>
-        /// Dedicated Server 构建时向 StreamingAssets 注入外部源配置。
+        /// Dedicated Server 构建时只向 StreamingAssets 注入不可变 Role Catalog。
         /// </summary>
         /// <param name="buildPlayerContext">当前 Player 构建上下文。</param>
         public override void PrepareForBuild(BuildPlayerContext buildPlayerContext)
@@ -46,10 +46,10 @@ namespace MiniCore.EditorTools
 
             string projectRoot = Directory.GetParent(Application.dataPath)?.FullName
                 ?? throw new BuildFailedException("无法确定 Unity 项目根目录。");
-            string fullPath = Path.GetFullPath(Path.Combine(projectRoot, SourceConfigPath));
+            string fullPath = Path.GetFullPath(Path.Combine(projectRoot, SourceRoleCatalogPath));
             if (!File.Exists(fullPath))
             {
-                throw new BuildFailedException($"缺少 Dedicated Server 源配置：{SourceConfigPath}");
+                throw new BuildFailedException($"缺少 Dedicated Server Role Catalog：{SourceRoleCatalogPath}");
             }
 
             buildPlayerContext.AddAdditionalPathToStreamingAssets(fullPath);

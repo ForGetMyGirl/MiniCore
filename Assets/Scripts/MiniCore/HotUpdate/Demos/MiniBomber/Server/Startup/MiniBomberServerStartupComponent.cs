@@ -2,6 +2,7 @@ using MiniCore.Core;
 using MiniCore.Model;
 using MiniCore.Server;
 using MiniCore.Threading;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MiniCore.Demo.MiniBomber
@@ -27,13 +28,13 @@ namespace MiniCore.Demo.MiniBomber
 
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 60;
-            DedicatedServerRole roles = context.ActiveRoles;
-            if ((roles & DedicatedServerRole.Match) != 0)
+            ServerRoleMask roles = context.ActiveRoles;
+            if (roles.Intersects((ulong)MiniBomberServerRole.Match))
             {
                 matchServer = Global.GetOrAdd<MiniBomberMatchServerComponent>(this);
             }
 
-            if ((roles & (DedicatedServerRole.Lobby | DedicatedServerRole.Game)) == 0)
+            if (!roles.Intersects((ulong)(MiniBomberServerRole.Lobby | MiniBomberServerRole.Game)))
             {
                 return;
             }
@@ -45,6 +46,55 @@ namespace MiniCore.Demo.MiniBomber
                 RuleConfig,
                 MapDefinition,
                 context.RuntimeConfig.ParsePersistenceMode());
+        }
+
+        /// <summary>
+        /// 通知当前启用的 MiniBomber Role 不再接收新的业务工作。
+        /// </summary>
+        public void BeginDrain()
+        {
+            serverRuntime?.BeginDrain();
+            matchServer?.BeginDrain();
+        }
+
+        /// <summary>
+        /// 汇总当前玩家、房间、比赛和匹配队列数量。
+        /// </summary>
+        /// <returns>用于自动发布人工门禁的 Drain 快照。</returns>
+        public DedicatedServerDrainStatus CaptureDrainStatus()
+        {
+            int players = serverRuntime?.OnlinePlayerCount ?? 0;
+            int rooms = serverRuntime?.RoomCount ?? 0;
+            int matches = serverRuntime?.MatchCount ?? 0;
+            int queuedPlayers = matchServer?.WaitingCount ?? 0;
+            int activeCount = players + rooms + matches + queuedPlayers;
+            if (activeCount == 0)
+            {
+                return DedicatedServerDrainStatus.Drained();
+            }
+
+            var blockers = new List<string>(4);
+            if (players > 0)
+            {
+                blockers.Add($"在线玩家：{players}");
+            }
+
+            if (rooms > 0)
+            {
+                blockers.Add($"活动房间：{rooms}");
+            }
+
+            if (matches > 0)
+            {
+                blockers.Add($"活动比赛：{matches}");
+            }
+
+            if (queuedPlayers > 0)
+            {
+                blockers.Add($"匹配队列玩家：{queuedPlayers}");
+            }
+
+            return new DedicatedServerDrainStatus(false, activeCount, blockers.ToArray());
         }
 
         #endregion

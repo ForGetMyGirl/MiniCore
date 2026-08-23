@@ -141,7 +141,7 @@ public sealed class EnterBattleHandler
 | `Outer/BusinessClientProtocolRegistration.g.cs` | 业务 Common + Outer 统一入口，客户端和 DS 均可调用 |
 | `Inner/BusinessServerProtocolRegistration.g.cs` | 业务 Inner 统一入口，仅 DS 调用 |
 | `HotUpdate/Generated/Network/HotUpdateHandlerRegistration.Generated.cs` | 只直接 `new` 客户端 Handler |
-| `HotUpdate/Server/Generated/Network/ServerHotUpdateHandlerRegistration.Generated.cs` | 按 `DedicatedServerRole` 直接 `new` 服务端 Handler |
+| `HotUpdate/Server/Generated/Network/ServerHotUpdateHandlerRegistration.Generated.cs` | 按通用 `ServerRoleMask` 直接 `new` 服务端 Handler |
 
 普通消息从 `100001` 起，RPC 从 `200001` 起。编号稳定性来自 Manifest，而不是类型排序。
 

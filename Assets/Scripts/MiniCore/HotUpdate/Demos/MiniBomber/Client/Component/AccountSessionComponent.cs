@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using MiniCore.Core;
+using MiniCore.HotUpdate;
 using MiniCore.Model;
 using MiniCore.Protocol.Generated;
 using MiniCore.Service;
@@ -463,7 +464,7 @@ namespace MiniCore.Demo.MiniBomber
             {
                 ResolveServiceResponse response = await network.CallAsync<ResolveServiceRequest, ResolveServiceResponse>(CoordinatorSessionId, new ResolveServiceRequest
                 {
-                    ServiceKind = (ClusterServiceKind)(int)ServiceKind.Lobby
+                    ServiceId = PublicServiceIds.Lobby
                 }, timeoutSeconds: 8);
                 if (response.Code != 0 || response.Endpoint == null)
                 {

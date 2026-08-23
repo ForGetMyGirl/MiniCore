@@ -2,6 +2,8 @@
 
 本文档说明 MiniCore 当前由 **HybridCLR + YooAsset** 组成的 Android/Player 打包与后续热更新流程。它以项目中的实际菜单命令和启动代码为准，适用于 `DefaultPackage`。
 
+日常手动菜单仍可用于本地开发；正式的多目标构建、清单、压缩与远程发布应使用 [MiniCore Deploy](MiniCoreDeploy.md)。桌面工具通过 BatchMode 调用同一组生成与构建能力，不要求开发人员手动切换 Build Settings。
+
 当前项目登记的是有运行目标的程序集清单，而不是一份客户端与服务端共享的 DLL 列表：
 
 | 运行目标 | 默认热更新程序集 |
@@ -80,17 +82,19 @@ Dedicated Server 可以通过项目设置中的“DS 额外包含 Client”显�
 
 项目启动时由 `UpdateMainWindow` 初始化 `DefaultPackage`，在 Host 模式依次请求远端版本、更新清单、下载缺失资源，然后加载 AOT 元数据，并按当前运行目标登记的依赖顺序加载业务协议和业务代码热更新 DLL。Control 协议已编入 AOT Player。在线热更发布的是 **YooAsset 的完整新包版本**，不是单独上传一个 DLL。
 
-### Dedicated Server 部署配置注入
+### Dedicated Server 不可变制品与外部配置
 
-Dedicated Server 的源配置固定放在仓库根目录的 `Server/DedicatedServer/Config/MiniCoreServerRuntime.json`，不在 `Assets` 下。构建 DS Player 时，`DedicatedServerConfigBuildProcessor` 使用 `BuildPlayerContext.AddAdditionalPathToStreamingAssets` 将它单独注入为 `StreamingAssets/MiniCoreServerRuntime.json`。
+`Server/DedicatedServer/Config/MiniCoreServerRuntime.json` 只保留为本地开发结构示例。构建 DS Player 时不再注入实例配置；`DedicatedServerConfigBuildProcessor` 只将与实例无关的 `ServerRoleCatalog.json` 注入 StreamingAssets。
+
+线上 DS 必须使用 `--minicore-config <absolute-path>` 读取服务器本地实例配置。InstanceId、Role、Coordinator、端口、日志路径、管理 Token 和配置哈希都位于制品之外，因此同一个只读 DS 制品可以被多个实例共享。
 
 客户端 Player 构建预处理会同时阻止以下泄漏：
 
-- 服务端运行配置被注入或误放进 `Assets/StreamingAssets`；
+- 服务端实例运行配置被注入或误放进 `Assets/StreamingAssets`；
 - `MiniCore.Protocol.Inner` 或 `MiniCore.HotUpdate.Server` 出现在客户端目标清单；
 - Control/Control.Inner、业务 Inner、Server DLL bytes 或服务端 Handler 清单出现在客户端热更新资源目录。
 
-因此复制客户端包或反编译客户端程序集都得不到 DS Role、内网监听、Coordinator 内网地址、Inner DTO 或服务端 Handler。部署人员可以复制同一份 DS 包，再分别编辑各副本中的 JSON，无需重新编译。
+因此复制客户端包或反编译客户端程序集都得不到 DS 内网监听、Coordinator 内网地址、完整内部 Role Catalog、Inner DTO 或服务端 Handler。部署时无需复制并修改 DS 目录；多个实例通过不同外部配置引用同一个版本目录。
 
 1. 按改动范围执行第 3 节“完整生成”或第 4 节“热更编译”菜单。
 2. 在 YooAsset 构建输出中找到本次 Android / `DefaultPackage` / 时间戳版本目录；两个菜单都使用 UTC `yyyyMMddHHmmss` 作为包版本。
@@ -99,7 +103,7 @@ Dedicated Server 的源配置固定放在仓库根目录的 `Server/DedicatedSer
 5. 使用一台已安装旧首包的测试设备启动应用，确认它能获取新版本、下载资源、加载热更新 DLL 并进入游戏。
 6. 验证通过后再扩大发布范围；保留上一稳定版本的完整目录，以便服务器侧回退版本文件/资源指向。
 
-当前项目没有把构建产物自动上传 CDN/对象存储的脚本，也没有在仓库内定义发布服务器目录规范。因此第 3 步应交由现有的部署渠道执行；在接入自动发布前，发布人必须记录包版本、目标平台、Development/Release 状态、资源根地址和验证设备结果。
+MiniCore Deploy 已能通过 SSH 上传 WebGL/YooAsset 静态版本目录、校验哈希并原子切换版本指针；第一版不配置 CDN、TLS 或 Web Server。使用对象存储/CDN 的项目应在自己的 Provider 中完成上传和缓存刷新。
 
 DS、.NET 服务、systemd、反向代理、客户端资源与回滚的通用操作流程见 [MiniCore 框架部署入门](FrameworkDeploymentGettingStarted.md)。文档只提供无真实基础设施信息的模板；生产参数必须保存在仓库之外。
 
@@ -155,6 +159,14 @@ DS、.NET 服务、systemd、反向代理、客户端资源与回滚的通用操
 
 ## 10. 验证记录
 
+### 2026-08-23（MiniCore Deploy、通用 Role 与外部实例配置）
+
+- 构建：新增独立 Avalonia 桌面应用和 JSON BatchMode 桥接，可按顺序生成 Proto、Startup、UI、Handler、HybridCLR、YooAsset 与多个 Player 目标。
+- 制品：DS Player、HotUpdate、YooAsset 与 Role Catalog 组成不可变制品；实例配置不再注入 StreamingAssets。
+- Role：框架改用通用 `ServerRoleMask` / `ServiceId`，MiniBomber 的 Lobby/Match/Game 位于业务 Server 热更新程序集。
+- 发布：生成 ReleaseManifest 与 SHA-256，并支持首次发布、扩容、滚动更新、配置更新、修复、回滚和下线。
+- 验证范围：Unity 脚本、MiniCore Server 和 MiniCore Deploy 编译与 Windows/macOS 自包含发布；未运行任何测试。
+
 ### 2026-08-15（控制面 AOT、业务协议恢复 HybridCLR）
 
 - 修正：上一版把 Common/Outer/Inner 整体固定为 AOT，虽然切断了链接错误，却同时失去了业务协议热更新能力；本记录取代该过渡结论。
@@ -170,10 +182,10 @@ DS、.NET 服务、systemd、反向代理、客户端资源与回滚的通用操
 - 过渡修复：曾将 Common/Outer/Inner 整体改为 AOT；该做法已由上面的 Control/Business 分层替代，不再是当前发布规则。
 - 验证范围：仅执行 Unity C# 编译检查，不执行 Player、HybridCLR、YooAsset 构建或测试；实际完整生成由发布人员在目标 Editor 中重新执行。
 
-### 2026-08-15（客户端/服务端目标程序集与 DS 配置隔离）
+### 2026-08-15（客户端/服务端目标程序集与 DS 配置隔离，历史记录）
 
 - 改造：HotUpdate 拆分为 Shared、Client、Server，项目协议拆分为 Common、Outer、Inner；构建命令按运行目标过滤并生成独立加载清单。
-- 配置：DS JSON 源文件移至 `Server/DedicatedServer/Config`，仅 Dedicated Server Player 构建时注入 StreamingAssets。
+- 配置：当时曾将 DS JSON 源文件移至 `Server/DedicatedServer/Config` 并注入 StreamingAssets；该做法已由 2026-08-23 的外部实例配置取代。
 - 防泄漏：客户端构建前校验 Server/Inner 程序集、服务端 Handler 和 DS JSON 均不存在。
 - 本次约束：只完成 C# 编译检查；未执行 Player、YooAsset 或 HybridCLR 构建，因此实际产物仍应在后续正式构建流程中确认。
 

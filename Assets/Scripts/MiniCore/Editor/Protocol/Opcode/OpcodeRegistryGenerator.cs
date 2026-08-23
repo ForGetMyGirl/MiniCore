@@ -12,7 +12,7 @@ namespace MiniCore.EditorTools
     /// <summary>
     /// 从已登记热更新程序集发现网络 Handler，并生成无反射的直接注册入口。
     /// </summary>
-    internal static class OpcodeRegistryGenerator
+    public static class OpcodeRegistryGenerator
     {
         #region Private 私有成员
 
@@ -280,7 +280,7 @@ namespace MiniCore.EditorTools
             builder.AppendLine("        /// </summary>");
             builder.AppendLine("        /// <param name=\"builder\">目标协议构建器。</param>");
             builder.AppendLine("        /// <param name=\"activeRoles\">当前进程启用的 Role。</param>");
-            builder.AppendLine("        public static void Register(NetworkProtocolBuilder builder, DedicatedServerRole activeRoles)");
+            builder.AppendLine("        public static void Register(NetworkProtocolBuilder builder, ServerRoleMask activeRoles)");
             builder.AppendLine("        {");
             builder.AppendLine("            if (builder == null)");
             builder.AppendLine("            {");
@@ -289,7 +289,7 @@ namespace MiniCore.EditorTools
             for (int index = 0; index < bindings.Count; index++)
             {
                 HandlerBinding binding = bindings[index];
-                builder.AppendLine($"            if ((activeRoles & (DedicatedServerRole){(int)binding.ServerHandler.Roles}) != 0)");
+                builder.AppendLine($"            if (activeRoles.Intersects({binding.ServerHandler.RequiredRoleMask}UL))");
                 builder.AppendLine("            {");
                 builder.AppendLine($"                builder.RegisterHandler(new global::{binding.HandlerType.FullName}());");
                 builder.AppendLine("            }");

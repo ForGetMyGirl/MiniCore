@@ -1,7 +1,10 @@
 {
-  "instanceId": "Lobby-01",
+  "environmentId": "development",
+  "instanceId": "lobby-01",
+  "releaseVersion": "0.1.0",
+  "controlProtocolVersion": "1",
   "roles": [
-    "Lobby"
+    "minibomber.lobby"
   ],
   "coordinator": {
     "innerHost": "127.0.0.1",
@@ -19,5 +22,13 @@
     "innerPort": 7100,
     "outerWebSocketUrl": "ws://127.0.0.1:7101/minicore"
   },
-  "persistenceMode": "None"
+  "management": {
+    "host": "127.0.0.1",
+    "port": 7199,
+    "tokenFile": "/opt/minicore/instances/lobby-01/config/management.token"
+  },
+  "logPath": "/opt/minicore/instances/lobby-01/logs",
+  "persistenceMode": "None",
+  "configVersion": "0.1.0",
+  "configSha256": "8ed2c1c6a587ab5d5e892d1fe5913ee437a3a7ab1407ab45bca1099cec368e2f"
 }

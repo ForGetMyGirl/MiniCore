@@ -14,5 +14,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 WebApplication app = builder.Build();
 app.UseHttpsRedirection();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapAuthenticationEndpoints();
 app.Run();

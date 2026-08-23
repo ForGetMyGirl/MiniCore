@@ -31,8 +31,8 @@ namespace MiniCore.Server
         private static readonly int[] ReconnectDelaySeconds = { 1, 2, 4, 8, 15 }; // Coordinator 断线重连退避秒数。
         private readonly object directoryLock = new object(); // 保护本地目录快照。
         private readonly object reconnectLock = new object(); // 保证同时只有一个 Coordinator 重连任务。
-        private readonly Dictionary<ServiceKind, List<DiscoveredServiceEndpoint>> directory = new Dictionary<ServiceKind, List<DiscoveredServiceEndpoint>>(); // 服务种类到实例快照。
-        private readonly Dictionary<ServiceKind, int> resolveCursors = new Dictionary<ServiceKind, int>(); // 本地轮询游标。
+        private readonly Dictionary<ServiceId, List<DiscoveredServiceEndpoint>> directory = new Dictionary<ServiceId, List<DiscoveredServiceEndpoint>>(); // 服务标识到实例快照。
+        private readonly Dictionary<ServiceId, int> resolveCursors = new Dictionary<ServiceId, int>(); // 本地轮询游标。
         private INetworkService network; // 当前进程网络服务。
         private MiniCoreServerRuntimeConfig config; // 当前 DS 部署配置。
         private CoordinatorRegistryComponent coordinatorRegistry; // Coordinator Role 专用目录组件。
@@ -48,7 +48,17 @@ namespace MiniCore.Server
         /// <summary>
         /// 获取当前 Dedicated Server 启用的 Role。
         /// </summary>
-        public DedicatedServerRole ActiveRoles => DedicatedServerRuntimeContext.ActiveRoles;
+        public ServerRoleMask ActiveRoles => DedicatedServerRuntimeContext.ActiveRoles;
+
+        /// <summary>
+        /// 获取当前实例期望维持的生命周期状态。
+        /// </summary>
+        public ServiceLifecycleState CurrentState => desiredState;
+
+        /// <summary>
+        /// 获取监听和本地或远程注册是否已经完成。
+        /// </summary>
+        public bool IsRegistered => initialized;
 
         /// <summary>
         /// 取得网络依赖和已经在 AppService 前加载的 DS 配置。
@@ -71,7 +81,7 @@ namespace MiniCore.Server
                 Path = config.Listeners.OuterPath
             });
 
-            if ((ActiveRoles & DedicatedServerRole.Coordinator) != 0)
+            if (ActiveRoles.Contains(ServerRoleMask.CoordinatorValue))
             {
                 coordinatorRegistry = Global.GetOrAdd<CoordinatorRegistryComponent>(this);
                 RegisterLocalCoordinatorInstance();
@@ -111,27 +121,27 @@ namespace MiniCore.Server
         /// <summary>
         /// 从本地快照轮询选择一个 Ready 服务实例。
         /// </summary>
-        /// <param name="kind">目标服务种类。</param>
+        /// <param name="serviceId">目标稳定服务标识。</param>
         /// <param name="endpoint">成功时返回可直连端点。</param>
         /// <returns>存在 Ready 实例时返回 true。</returns>
-        public bool TryResolve(ServiceKind kind, out DiscoveredServiceEndpoint endpoint)
+        public bool TryResolve(ServiceId serviceId, out DiscoveredServiceEndpoint endpoint)
         {
             if (coordinatorRegistry != null)
             {
-                return coordinatorRegistry.TryResolve(kind, out endpoint);
+                return coordinatorRegistry.TryResolve(serviceId, out endpoint);
             }
 
             lock (directoryLock)
             {
-                if (!directory.TryGetValue(kind, out List<DiscoveredServiceEndpoint> candidates) || candidates.Count == 0)
+                if (!directory.TryGetValue(serviceId, out List<DiscoveredServiceEndpoint> candidates) || candidates.Count == 0)
                 {
                     endpoint = null;
                     return false;
                 }
 
-                resolveCursors.TryGetValue(kind, out int cursor);
+                resolveCursors.TryGetValue(serviceId, out int cursor);
                 endpoint = candidates[cursor % candidates.Count];
-                resolveCursors[kind] = (cursor + 1) % candidates.Count;
+                resolveCursors[serviceId] = (cursor + 1) % candidates.Count;
                 return true;
             }
         }
@@ -395,11 +405,11 @@ namespace MiniCore.Server
             return new RegisterServerRequest
             {
                 InstanceId = config.InstanceId,
-                Roles = (uint)ActiveRoles,
+                RoleMask = ActiveRoles.Value,
                 InnerHost = config.Advertised.InnerHost,
                 InnerPort = config.Advertised.InnerPort,
                 OuterWebSocketUrl = config.Advertised.OuterWebSocketUrl ?? string.Empty,
-                ServiceKind = (ClusterServiceKind)(int)ServiceKind.Unspecified,
+                ServiceId = 0UL,
                 ProtocolVersion = "1"
             };
         }
@@ -457,7 +467,7 @@ namespace MiniCore.Server
             DateTime deadline = DateTime.UtcNow + DatabaseDiscoveryTimeout;
             while (DateTime.UtcNow < deadline)
             {
-                if (TryResolve(ServiceKind.Database, out _))
+                if (TryResolve(new ServiceId(FrameworkServiceIds.Database), out _))
                 {
                     return;
                 }
@@ -469,7 +479,7 @@ namespace MiniCore.Server
                     {
                         response = await network.CallAsync<ResolveInnerServiceRequest, ResolveInnerServiceResponse>(CoordinatorSessionId, new ResolveInnerServiceRequest
                         {
-                            ServiceKind = (ClusterServiceKind)(int)ServiceKind.Database
+                            ServiceId = FrameworkServiceIds.Database
                         }, CoordinatorRpcTimeoutSeconds);
                     }
                     catch (Exception exception) when (IsRecoverableCoordinatorException(exception))
@@ -529,10 +539,10 @@ namespace MiniCore.Server
                         continue;
                     }
 
-                    if (!directory.TryGetValue(endpoint.Kind, out List<DiscoveredServiceEndpoint> list))
+                    if (!directory.TryGetValue(endpoint.ServiceId, out List<DiscoveredServiceEndpoint> list))
                     {
                         list = new List<DiscoveredServiceEndpoint>();
-                        directory.Add(endpoint.Kind, list);
+                        directory.Add(endpoint.ServiceId, list);
                     }
 
                     list.Add(endpoint);
@@ -554,15 +564,15 @@ namespace MiniCore.Server
 
             lock (directoryLock)
             {
-                if (!directory.TryGetValue(endpoint.Kind, out List<DiscoveredServiceEndpoint> list))
+                if (!directory.TryGetValue(endpoint.ServiceId, out List<DiscoveredServiceEndpoint> list))
                 {
                     list = new List<DiscoveredServiceEndpoint>();
-                    directory.Add(endpoint.Kind, list);
+                    directory.Add(endpoint.ServiceId, list);
                 }
 
                 list.RemoveAll(candidate => string.Equals(candidate.InstanceId, endpoint.InstanceId, StringComparison.Ordinal));
                 list.Add(endpoint);
-                resolveCursors[endpoint.Kind] = 0;
+                resolveCursors[endpoint.ServiceId] = 0;
             }
         }
 

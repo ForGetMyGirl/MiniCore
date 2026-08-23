@@ -16,7 +16,7 @@
 
 ## MiniCore.Editor
 - 路径：`Assets/Scripts/MiniCore/Editor/MiniCore.Editor.asmdef`
-- 引用：`MiniCore.Runtime`, `MiniCore.Protocol.Control`, `MiniCore.Protocol.Control.Inner`, `MiniCore.Protocol.Common`, `MiniCore.Protocol.Outer`, `MiniCore.Protocol.Inner`, `MiniCore.Network`, `MiniCore.Unity`, `MiniCore.Unity.YooAsset`, `MiniCore.Server`, `MiniCore.HotUpdate.Shared`, `MiniCore.HotUpdate.Client`, `MiniCore.HotUpdate.Server`, `MiniCore.HotUpdateAssembly.Editor`, `Unity.InputSystem`, `HybridCLR.Editor`, `YooAsset`, `YooAsset.Editor`
+- 引用：`MiniCore.Runtime`, `MiniCore.Protocol.Control`, `MiniCore.Protocol.Control.Inner`, `MiniCore.Protocol.Common`, `MiniCore.Protocol.Outer`, `MiniCore.Protocol.Inner`, `MiniCore.Network`, `MiniCore.Unity`, `MiniCore.Unity.YooAsset`, `MiniCore.Server`, `MiniCore.HotUpdate.Shared`, `MiniCore.HotUpdate.Client`, `MiniCore.HotUpdate.Server`, `MiniCore.HotUpdateAssembly.Editor`, `MiniCore.Protocol.Editor`, `MiniCore.Protocol.Handler.Editor`, `Unity.InputSystem`, `HybridCLR.Editor`, `YooAsset`, `YooAsset.Editor`
 - 平台：`Editor`
 - noEngineReferences：`False`；autoReferenced：`True`
 

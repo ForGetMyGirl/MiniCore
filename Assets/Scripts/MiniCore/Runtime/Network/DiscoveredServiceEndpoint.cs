@@ -15,7 +15,7 @@ namespace MiniCore.Model
         /// <summary>
         /// 获取服务种类。
         /// </summary>
-        public ServiceKind Kind { get; }
+        public ServiceId ServiceId { get; }
 
         /// <summary>
         /// 获取服务端内网主机。
@@ -46,7 +46,7 @@ namespace MiniCore.Model
         /// 创建服务端点快照。
         /// </summary>
         /// <param name="instanceId">集群内唯一实例标识。</param>
-        /// <param name="kind">实例提供的服务种类。</param>
+        /// <param name="serviceId">实例提供的稳定服务标识。</param>
         /// <param name="innerHost">服务间直连主机。</param>
         /// <param name="innerPort">服务间直连端口。</param>
         /// <param name="outerWebSocketUrl">客户端可访问地址。</param>
@@ -54,7 +54,7 @@ namespace MiniCore.Model
         /// <param name="directoryRevision">产生快照的目录修订号。</param>
         public DiscoveredServiceEndpoint(
             string instanceId,
-            ServiceKind kind,
+            ServiceId serviceId,
             string innerHost,
             int innerPort,
             string outerWebSocketUrl,
@@ -62,7 +62,7 @@ namespace MiniCore.Model
             long directoryRevision)
         {
             InstanceId = instanceId;
-            Kind = kind;
+            ServiceId = serviceId;
             InnerHost = innerHost;
             InnerPort = innerPort;
             OuterWebSocketUrl = outerWebSocketUrl;

@@ -25,41 +25,26 @@ namespace MiniCore.Protocol.Generated {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiJDb250cm9sL0NvbW1vbi9DbHVzdGVyQ29tbW9uLnByb3RvEhdtaW5pY29y",
-            "ZS5jbHVzdGVyLmNvbW1vbiKPAgoWQ2x1c3RlclNlcnZpY2VFbmRwb2ludBIT",
-            "CgtpbnN0YW5jZV9pZBgBIAEoCRJBCgxzZXJ2aWNlX2tpbmQYAiABKA4yKy5t",
-            "aW5pY29yZS5jbHVzdGVyLmNvbW1vbi5DbHVzdGVyU2VydmljZUtpbmQSEgoK",
-            "aW5uZXJfaG9zdBgDIAEoCRISCgppbm5lcl9wb3J0GAQgASgFEhwKFG91dGVy",
-            "X3dlYl9zb2NrZXRfdXJsGAUgASgJEjsKBXN0YXRlGAYgASgOMiwubWluaWNv",
-            "cmUuY2x1c3Rlci5jb21tb24uQ2x1c3RlclNlcnZpY2VTdGF0ZRIaChJkaXJl",
-            "Y3RvcnlfcmV2aXNpb24YByABKAMqxAEKEkNsdXN0ZXJTZXJ2aWNlS2luZBIf",
-            "ChtDTFVTVEVSX1NFUlZJQ0VfVU5TUEVDSUZJRUQQABIfChtDTFVTVEVSX1NF",
-            "UlZJQ0VfQ09PUkRJTkFUT1IQARIZChVDTFVTVEVSX1NFUlZJQ0VfTE9CQlkQ",
-            "AhIZChVDTFVTVEVSX1NFUlZJQ0VfTUFUQ0gQAxIYChRDTFVTVEVSX1NFUlZJ",
-            "Q0VfR0FNRRAEEhwKGENMVVNURVJfU0VSVklDRV9EQVRBQkFTRRAFKpMBChND",
-            "bHVzdGVyU2VydmljZVN0YXRlEiUKIUNMVVNURVJfU0VSVklDRV9TVEFURV9V",
-            "TlNQRUNJRklFRBAAEhwKGENMVVNURVJfU0VSVklDRV9TVEFSVElORxABEhkK",
-            "FUNMVVNURVJfU0VSVklDRV9SRUFEWRACEhwKGENMVVNURVJfU0VSVklDRV9E",
-            "UkFJTklORxADQh6qAhtNaW5pQ29yZS5Qcm90b2NvbC5HZW5lcmF0ZWRiBnBy",
-            "b3RvMw=="));
+            "ZS5jbHVzdGVyLmNvbW1vbiLgAQoWQ2x1c3RlclNlcnZpY2VFbmRwb2ludBIT",
+            "CgtpbnN0YW5jZV9pZBgBIAEoCRISCgpzZXJ2aWNlX2lkGAIgASgEEhIKCmlu",
+            "bmVyX2hvc3QYAyABKAkSEgoKaW5uZXJfcG9ydBgEIAEoBRIcChRvdXRlcl93",
+            "ZWJfc29ja2V0X3VybBgFIAEoCRI7CgVzdGF0ZRgGIAEoDjIsLm1pbmljb3Jl",
+            "LmNsdXN0ZXIuY29tbW9uLkNsdXN0ZXJTZXJ2aWNlU3RhdGUSGgoSZGlyZWN0",
+            "b3J5X3JldmlzaW9uGAcgASgDKpMBChNDbHVzdGVyU2VydmljZVN0YXRlEiUK",
+            "IUNMVVNURVJfU0VSVklDRV9TVEFURV9VTlNQRUNJRklFRBAAEhwKGENMVVNU",
+            "RVJfU0VSVklDRV9TVEFSVElORxABEhkKFUNMVVNURVJfU0VSVklDRV9SRUFE",
+            "WRACEhwKGENMVVNURVJfU0VSVklDRV9EUkFJTklORxADQh6qAhtNaW5pQ29y",
+            "ZS5Qcm90b2NvbC5HZW5lcmF0ZWRiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::MiniCore.Protocol.Generated.ClusterServiceKind), typeof(global::MiniCore.Protocol.Generated.ClusterServiceState), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::MiniCore.Protocol.Generated.ClusterServiceEndpoint), global::MiniCore.Protocol.Generated.ClusterServiceEndpoint.Parser, new[]{ "InstanceId", "ServiceKind", "InnerHost", "InnerPort", "OuterWebSocketUrl", "State", "DirectoryRevision" }, null, null, null, null)
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::MiniCore.Protocol.Generated.ClusterServiceState), }, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::MiniCore.Protocol.Generated.ClusterServiceEndpoint), global::MiniCore.Protocol.Generated.ClusterServiceEndpoint.Parser, new[]{ "InstanceId", "ServiceId", "InnerHost", "InnerPort", "OuterWebSocketUrl", "State", "DirectoryRevision" }, null, null, null, null)
           }));
     }
     #endregion
 
   }
   #region Enums
-  public enum ClusterServiceKind {
-    [pbr::OriginalName("CLUSTER_SERVICE_UNSPECIFIED")] ClusterServiceUnspecified = 0,
-    [pbr::OriginalName("CLUSTER_SERVICE_COORDINATOR")] ClusterServiceCoordinator = 1,
-    [pbr::OriginalName("CLUSTER_SERVICE_LOBBY")] ClusterServiceLobby = 2,
-    [pbr::OriginalName("CLUSTER_SERVICE_MATCH")] ClusterServiceMatch = 3,
-    [pbr::OriginalName("CLUSTER_SERVICE_GAME")] ClusterServiceGame = 4,
-    [pbr::OriginalName("CLUSTER_SERVICE_DATABASE")] ClusterServiceDatabase = 5,
-  }
-
   public enum ClusterServiceState {
     [pbr::OriginalName("CLUSTER_SERVICE_STATE_UNSPECIFIED")] Unspecified = 0,
     [pbr::OriginalName("CLUSTER_SERVICE_STARTING")] ClusterServiceStarting = 1,
@@ -106,7 +91,7 @@ namespace MiniCore.Protocol.Generated {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public ClusterServiceEndpoint(ClusterServiceEndpoint other) : this() {
       instanceId_ = other.instanceId_;
-      serviceKind_ = other.serviceKind_;
+      serviceId_ = other.serviceId_;
       innerHost_ = other.innerHost_;
       innerPort_ = other.innerPort_;
       outerWebSocketUrl_ = other.outerWebSocketUrl_;
@@ -133,15 +118,15 @@ namespace MiniCore.Protocol.Generated {
       }
     }
 
-    /// <summary>Field number for the "service_kind" field.</summary>
-    public const int ServiceKindFieldNumber = 2;
-    private global::MiniCore.Protocol.Generated.ClusterServiceKind serviceKind_ = global::MiniCore.Protocol.Generated.ClusterServiceKind.ClusterServiceUnspecified;
+    /// <summary>Field number for the "service_id" field.</summary>
+    public const int ServiceIdFieldNumber = 2;
+    private ulong serviceId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::MiniCore.Protocol.Generated.ClusterServiceKind ServiceKind {
-      get { return serviceKind_; }
+    public ulong ServiceId {
+      get { return serviceId_; }
       set {
-        serviceKind_ = value;
+        serviceId_ = value;
       }
     }
 
@@ -221,7 +206,7 @@ namespace MiniCore.Protocol.Generated {
         return true;
       }
       if (InstanceId != other.InstanceId) return false;
-      if (ServiceKind != other.ServiceKind) return false;
+      if (ServiceId != other.ServiceId) return false;
       if (InnerHost != other.InnerHost) return false;
       if (InnerPort != other.InnerPort) return false;
       if (OuterWebSocketUrl != other.OuterWebSocketUrl) return false;
@@ -235,7 +220,7 @@ namespace MiniCore.Protocol.Generated {
     public override int GetHashCode() {
       int hash = 1;
       if (InstanceId.Length != 0) hash ^= InstanceId.GetHashCode();
-      if (ServiceKind != global::MiniCore.Protocol.Generated.ClusterServiceKind.ClusterServiceUnspecified) hash ^= ServiceKind.GetHashCode();
+      if (ServiceId != 0UL) hash ^= ServiceId.GetHashCode();
       if (InnerHost.Length != 0) hash ^= InnerHost.GetHashCode();
       if (InnerPort != 0) hash ^= InnerPort.GetHashCode();
       if (OuterWebSocketUrl.Length != 0) hash ^= OuterWebSocketUrl.GetHashCode();
@@ -263,9 +248,9 @@ namespace MiniCore.Protocol.Generated {
         output.WriteRawTag(10);
         output.WriteString(InstanceId);
       }
-      if (ServiceKind != global::MiniCore.Protocol.Generated.ClusterServiceKind.ClusterServiceUnspecified) {
+      if (ServiceId != 0UL) {
         output.WriteRawTag(16);
-        output.WriteEnum((int) ServiceKind);
+        output.WriteUInt64(ServiceId);
       }
       if (InnerHost.Length != 0) {
         output.WriteRawTag(26);
@@ -301,9 +286,9 @@ namespace MiniCore.Protocol.Generated {
         output.WriteRawTag(10);
         output.WriteString(InstanceId);
       }
-      if (ServiceKind != global::MiniCore.Protocol.Generated.ClusterServiceKind.ClusterServiceUnspecified) {
+      if (ServiceId != 0UL) {
         output.WriteRawTag(16);
-        output.WriteEnum((int) ServiceKind);
+        output.WriteUInt64(ServiceId);
       }
       if (InnerHost.Length != 0) {
         output.WriteRawTag(26);
@@ -338,8 +323,8 @@ namespace MiniCore.Protocol.Generated {
       if (InstanceId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(InstanceId);
       }
-      if (ServiceKind != global::MiniCore.Protocol.Generated.ClusterServiceKind.ClusterServiceUnspecified) {
-        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) ServiceKind);
+      if (ServiceId != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(ServiceId);
       }
       if (InnerHost.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(InnerHost);
@@ -371,8 +356,8 @@ namespace MiniCore.Protocol.Generated {
       if (other.InstanceId.Length != 0) {
         InstanceId = other.InstanceId;
       }
-      if (other.ServiceKind != global::MiniCore.Protocol.Generated.ClusterServiceKind.ClusterServiceUnspecified) {
-        ServiceKind = other.ServiceKind;
+      if (other.ServiceId != 0UL) {
+        ServiceId = other.ServiceId;
       }
       if (other.InnerHost.Length != 0) {
         InnerHost = other.InnerHost;
@@ -413,7 +398,7 @@ namespace MiniCore.Protocol.Generated {
             break;
           }
           case 16: {
-            ServiceKind = (global::MiniCore.Protocol.Generated.ClusterServiceKind) input.ReadEnum();
+            ServiceId = input.ReadUInt64();
             break;
           }
           case 26: {
@@ -460,7 +445,7 @@ namespace MiniCore.Protocol.Generated {
             break;
           }
           case 16: {
-            ServiceKind = (global::MiniCore.Protocol.Generated.ClusterServiceKind) input.ReadEnum();
+            ServiceId = input.ReadUInt64();
             break;
           }
           case 26: {

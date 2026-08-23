@@ -9,7 +9,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理 MiniBomber 断线恢复请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Lobby)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Lobby)]
     public sealed class MiniBomberResumeSessionHandler : ARpcHandler<MiniBomberResumeSessionRequest, MiniBomberResumeSessionResponse>
     {
         /// <summary>

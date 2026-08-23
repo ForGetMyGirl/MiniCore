@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="MiniCore.Deploy.Core/MiniCore.Deploy.Core.csproj" />
+  <Project Path="MiniCore.Deploy.Infrastructure/MiniCore.Deploy.Infrastructure.csproj" />
+  <Project Path="MiniCore.Deploy.Desktop/MiniCore.Deploy.Desktop.csproj" />
+  <Project Path="MiniCore.Deploy.ServiceHost/MiniCore.Deploy.ServiceHost.csproj" />
+  <Project Path="MiniCore.ServerCtl/MiniCore.ServerCtl.csproj" />
+</Solution>

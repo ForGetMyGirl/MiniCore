@@ -11,7 +11,17 @@ namespace MiniCore.Service
         /// <summary>
         /// 获取当前 Dedicated Server 的活动 Role。
         /// </summary>
-        DedicatedServerRole ActiveRoles { get; }
+        ServerRoleMask ActiveRoles { get; }
+
+        /// <summary>
+        /// 获取当前实例期望维持的生命周期状态。
+        /// </summary>
+        ServiceLifecycleState CurrentState { get; }
+
+        /// <summary>
+        /// 获取实例是否已经完成本地或远程 Coordinator 注册。
+        /// </summary>
+        bool IsRegistered { get; }
 
         /// <summary>
         /// 在业务启动完成后把当前服务状态切换为 Ready。
@@ -28,9 +38,9 @@ namespace MiniCore.Service
         /// <summary>
         /// 尝试从本地目录快照取得一个 Ready 服务实例。
         /// </summary>
-        /// <param name="kind">目标服务种类。</param>
+        /// <param name="serviceId">目标稳定服务标识。</param>
         /// <param name="endpoint">成功时返回可直连端点。</param>
         /// <returns>存在 Ready 实例时返回 true。</returns>
-        bool TryResolve(ServiceKind kind, out DiscoveredServiceEndpoint endpoint);
+        bool TryResolve(ServiceId serviceId, out DiscoveredServiceEndpoint endpoint);
     }
 }

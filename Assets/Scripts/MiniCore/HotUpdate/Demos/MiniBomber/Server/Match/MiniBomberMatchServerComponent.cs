@@ -13,10 +13,24 @@ namespace MiniCore.Demo.MiniBomber
         private readonly List<MatchCandidate> waiting = new List<MatchCandidate>(128); // 保持稳定入队顺序的等待列表。
         private readonly Dictionary<long, MatchCandidate> candidateByPlayerId = new Dictionary<long, MatchCandidate>(); // 玩家到当前票据的唯一映射。
         private long nextTicketId = 1; // 当前进程单调递增的匹配票据。
+        private bool acceptingNewWork = true; // Drain 后禁止新玩家进入匹配队列。
 
         #endregion
 
         #region Public 公共成员
+
+        /// <summary>
+        /// 获取仍在等待匹配的玩家数量。
+        /// </summary>
+        public int WaitingCount => waiting.Count;
+
+        /// <summary>
+        /// 停止接受新的匹配请求，已存在票据仍可取消或被取出。
+        /// </summary>
+        public void BeginDrain()
+        {
+            acceptingNewWork = false;
+        }
 
         /// <summary>
         /// 将一个尚未排队的玩家加入当前 Match 实例。
@@ -27,7 +41,7 @@ namespace MiniCore.Demo.MiniBomber
         /// <returns>玩家成功入队时返回 true。</returns>
         public bool TryEnqueue(long playerId, int rating, out long ticketId)
         {
-            if (playerId <= 0 || candidateByPlayerId.ContainsKey(playerId))
+            if (!acceptingNewWork || playerId <= 0 || candidateByPlayerId.ContainsKey(playerId))
             {
                 ticketId = 0;
                 return false;

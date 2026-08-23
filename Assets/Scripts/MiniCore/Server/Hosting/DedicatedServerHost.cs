@@ -34,7 +34,7 @@ namespace MiniCore.Server
 
             DedicatedServerRuntimeBootstrap.Prepare();
             MiniCoreServerRuntimeConfig runtimeConfig = DedicatedServerRuntimeBootstrap.Current;
-            DedicatedServerRole activeRoles = DedicatedServerRuntimeContext.ActiveRoles;
+            ServerRoleMask activeRoles = DedicatedServerRuntimeContext.ActiveRoles;
 
             Global.RegisterAppModule<IApplicationEventBus, ApplicationEventBusModule>(string.Empty);
             NetworkService network = Global.RegisterAppService<INetworkService, NetworkService>(null);
@@ -58,6 +58,8 @@ namespace MiniCore.Server
             var context = new DedicatedServerApplicationContext(runtimeConfig, network, discovery);
             await application.StartAsync(context);
             await discovery.ReportReadyAsync();
+            DedicatedServerManagementComponent management = Global.GetOrAdd<DedicatedServerManagementComponent>(application);
+            management.Initialize(runtimeConfig, application, discovery);
         }
 
         /// <summary>

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "roles": [
+    {
+      "key": "Coordinator",
+      "value": 1,
+      "displayName": "Coordinator",
+      "frameworkReserved": true,
+      "clientDiscoverable": false,
+      "publicName": ""
+    },
+    {
+      "key": "minibomber.lobby",
+      "value": 2,
+      "displayName": "MiniBomber Lobby",
+      "frameworkReserved": false,
+      "clientDiscoverable": true,
+      "publicName": "Lobby"
+    },
+    {
+      "key": "minibomber.match",
+      "value": 4,
+      "displayName": "MiniBomber Match",
+      "frameworkReserved": false,
+      "clientDiscoverable": false,
+      "publicName": ""
+    },
+    {
+      "key": "minibomber.game",
+      "value": 8,
+      "displayName": "MiniBomber Game",
+      "frameworkReserved": false,
+      "clientDiscoverable": false,
+      "publicName": ""
+    }
+  ]
+}

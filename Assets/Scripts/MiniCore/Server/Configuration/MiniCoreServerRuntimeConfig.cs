@@ -1,5 +1,4 @@
 using System;
-using MiniCore.Model;
 
 namespace MiniCore.Server
 {
@@ -14,6 +13,21 @@ namespace MiniCore.Server
         /// 获取或设置集群内唯一的服务实例标识。
         /// </summary>
         public string InstanceId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 获取或设置环境唯一标识。
+        /// </summary>
+        public string EnvironmentId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 获取或设置环境统一发布版本。
+        /// </summary>
+        public string ReleaseVersion { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 获取或设置固定控制面兼容版本。
+        /// </summary>
+        public string ControlProtocolVersion { get; set; } = string.Empty;
 
         /// <summary>
         /// 获取或设置当前进程启用的 Role 名称。
@@ -36,6 +50,26 @@ namespace MiniCore.Server
         public ServerAdvertisedOptions Advertised { get; set; } = new ServerAdvertisedOptions();
 
         /// <summary>
+        /// 获取或设置本机管理控制面参数。
+        /// </summary>
+        public ServerManagementOptions Management { get; set; } = new ServerManagementOptions();
+
+        /// <summary>
+        /// 获取或设置实例日志目录。
+        /// </summary>
+        public string LogPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 获取或设置独立于发布版本的配置版本。
+        /// </summary>
+        public string ConfigVersion { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 获取或设置移除 configSha256 字段后原始 JSON 的 SHA-256。
+        /// </summary>
+        public string ConfigSha256 { get; set; } = string.Empty;
+
+        /// <summary>
         /// 获取或设置当前业务的持久化模式名称。
         /// </summary>
         public string PersistenceMode { get; set; } = nameof(ServerPersistenceMode.None);
@@ -44,30 +78,10 @@ namespace MiniCore.Server
         /// 将 Role 名称数组解析为框架 Role 标志。
         /// </summary>
         /// <returns>合并后的 Role 标志。</returns>
-        public DedicatedServerRole ParseRoles()
+        /// <param name="catalog">随不可变制品发布的 Role Catalog。</param>
+        public MiniCore.Model.ServerRoleMask ParseRoles(ServerRoleCatalog catalog)
         {
-            if (Roles == null || Roles.Length == 0)
-            {
-                throw new InvalidOperationException("Dedicated Server 配置必须至少包含一个 Role。");
-            }
-
-            DedicatedServerRole result = DedicatedServerRole.None;
-            for (int index = 0; index < Roles.Length; index++)
-            {
-                if (!Enum.TryParse(Roles[index], true, out DedicatedServerRole role) || role == DedicatedServerRole.None || (role & ~DedicatedServerRole.All) != 0)
-                {
-                    throw new InvalidOperationException($"未知 Dedicated Server Role：{Roles[index] ?? "<null>"}。");
-                }
-
-                result |= role;
-            }
-
-            if (result == DedicatedServerRole.None)
-            {
-                throw new InvalidOperationException("Dedicated Server 配置必须至少包含一个 Role。");
-            }
-
-            return result;
+            return (catalog ?? throw new ArgumentNullException(nameof(catalog))).ResolveMask(Roles);
         }
 
         /// <summary>

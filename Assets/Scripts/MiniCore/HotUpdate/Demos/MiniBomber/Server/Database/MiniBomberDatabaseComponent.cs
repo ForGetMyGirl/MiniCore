@@ -161,7 +161,7 @@ namespace MiniCore.Demo.MiniBomber
         private async MTask<bool> ConnectDatabaseAsync()
         {
             network.DisconnectSession(DatabaseSessionId);
-            if (!discovery.TryResolve(ServiceKind.Database, out DiscoveredServiceEndpoint endpoint))
+            if (!discovery.TryResolve(new ServiceId(FrameworkServiceIds.Database), out DiscoveredServiceEndpoint endpoint))
             {
                 return false;
             }

@@ -8,7 +8,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 处理其他 Dedicated Server 直连 Match Role 的玩家入队请求。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Match)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Match)]
     public sealed class EnqueueMatchHandler : ARpcHandler<EnqueueMatchRequest, EnqueueMatchResponse>
     {
         #region Public 公共成员

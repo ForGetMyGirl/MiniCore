@@ -175,7 +175,7 @@ sequenceDiagram
 
 客户端 Bootstrap 调用 `MiniCore.HotUpdate.MiniCoreStartup.StartAsync()`；Dedicated Server Bootstrap 调用 `MiniCore.HotUpdate.Server.MiniCoreServerStartup.StartAsync()`。两者由目标程序集登记选择，不再在同一个 `GameStartup` 中用 BatchMode 分支。
 
-DS Role、监听、公布地址与 Coordinator 内网地址来自包内 `StreamingAssets/MiniCoreServerRuntime.json`；源文件固定在项目根目录 `Server/DedicatedServer/Config`。完整规则见[多 Role 与独立 .NET 服务架构](DedicatedServerArchitecture.md)。
+DS 的实例 ID、Role、监听、公布地址与 Coordinator 内网地址来自 `--minicore-config <absolute-path>` 指定的外部实例配置；构建制品只携带与实例无关的 `ServerRoleCatalog.json`。完整规则见[多 Role 与独立 .NET 服务架构](DedicatedServerArchitecture.md)和[MiniCore Deploy](MiniCoreDeploy.md)。
 
 ### AppService、GameStartup 与生成代码
 
@@ -202,7 +202,7 @@ DS Role、监听、公布地址与 Coordinator 内网地址来自包内 `Streami
 - `IRpcResponse` 必须定义 `code = 1`、`msg = 2`。`RpcId` 不写入 Proto Body，而在 12 字节网络包头中传输，反序列化后写到生成 partial 的运行时属性。
 - `Project/MiniCore/Protocol` 只配置业务生成根目录；生成器把 Control 写入固定 AOT 目录，把 Business 写入配置根的 `Common`、`Outer`、`Inner` 子目录。`MiniCore > Protocol > Generate All` 使用仓库内置 `Proto/Tools/protoc-29.5`。
 - `Proto/Internal/ClientSettings.proto` 固定输出到 `MiniCore.Unity`；MiniBomber 等项目存档 PB 跟随项目协议输出目录，但没有网络角色时不会获得 Opcode。
-- 客户端 Handler 位于 Client 程序集；服务端 Handler 位于 Server 程序集并使用 `[ServerHandler(DedicatedServerRole.X)]`。两者都继承 `AMHandler<TMessage>` 或 `ARpcHandler<TRequest, TResponse>`。
+- 客户端 Handler 位于 Client 程序集；服务端 Handler 位于 Server 程序集并使用项目包装特性，例如 `[MiniBomberServerHandler(MiniBomberServerRole.X)]`。框架 `ServerHandlerAttribute` 只保存通用 `ulong RequiredRoleMask`。两者都继承 `AMHandler<TMessage>` 或 `ARpcHandler<TRequest, TResponse>`。
 - Proto 生成阶段根据网络角色维护 `OpcodeManifest.json`；脚本编译后的 Editor 只扫描全部已登记热更新程序集并写入 `HotUpdateHandlerRegistration.Generated.cs`。
 - 每个 `NetworkService` 启动时创建临时 Builder，先灌入消息、Opcode、角色和 Parser，再灌入 Handler；完整校验后一次性提交不可变实例 Registry。
 - 有网络角色的消息即拥有稳定 Opcode；无 Handler 的合法出站消息也可发送。普通 DTO 和存档 PB 不进入网络 Registry。

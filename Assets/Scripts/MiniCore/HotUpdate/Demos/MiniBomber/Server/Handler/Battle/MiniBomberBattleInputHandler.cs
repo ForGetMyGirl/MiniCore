@@ -9,7 +9,7 @@ namespace MiniCore.Demo.MiniBomber
     /// <summary>
     /// 接收 MiniBomber 高频战斗输入批次。
     /// </summary>
-    [ServerHandler(DedicatedServerRole.Game)]
+    [MiniBomberServerHandler(MiniBomberServerRole.Game)]
     public sealed class MiniBomberBattleInputHandler : AMHandler<MiniBomberBattleInputBatch>
     {
         #region Public 公共成员
