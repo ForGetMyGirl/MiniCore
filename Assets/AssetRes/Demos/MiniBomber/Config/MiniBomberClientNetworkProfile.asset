@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enableNetwork: 1
   enableAuthentication: 1
-  authenticationBaseUrl: https://ws.namo.wang
+  authenticationBaseUrl: https://ws.namo.wang/smoke-20260824

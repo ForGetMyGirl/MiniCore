@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MiniCore.Server.Rpc")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7857e1fa8d4e5cf6683838cdf11e27933bbdb165")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+414f7ba17cbc0973c57f8948fcfb9c7ddbb8fdcb")]
 [assembly: System.Reflection.AssemblyProductAttribute("MiniCore.Server.Rpc")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MiniCore.Server.Rpc")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

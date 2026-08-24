@@ -81,7 +81,7 @@ public sealed class ProfileStore
     public async Task SaveAsync(DeploymentProfile profile, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
-        profile.SchemaVersion = 4;
+        profile.SchemaVersion = 5;
         ValidateProfileId(profile.ProfileId);
         string targetPath = GetProfilePath(profile.ProfileId);
         string temporaryPath = targetPath + ".tmp";

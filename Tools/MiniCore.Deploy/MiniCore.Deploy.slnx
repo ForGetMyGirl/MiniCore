@@ -4,4 +4,5 @@
   <Project Path="MiniCore.Deploy.Desktop/MiniCore.Deploy.Desktop.csproj" />
   <Project Path="MiniCore.Deploy.ServiceHost/MiniCore.Deploy.ServiceHost.csproj" />
   <Project Path="MiniCore.ServerCtl/MiniCore.ServerCtl.csproj" />
+  <Project Path="MiniCore.Deploy.RegressionTests/MiniCore.Deploy.RegressionTests.csproj" />
 </Solution>

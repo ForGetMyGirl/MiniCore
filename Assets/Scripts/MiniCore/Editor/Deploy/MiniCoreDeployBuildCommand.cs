@@ -67,6 +67,12 @@ namespace MiniCore.EditorTools.Deploy
         private static string BuildSingleTarget(MiniCoreDeployBuildRequest request, string targetName)
         {
             ResolveTarget(targetName, request, out BuildTarget target, out BuildTargetGroup group, out StandaloneBuildSubtarget subtarget, out string scene, out string locationPath);
+            string targetRoot = Path.Combine(request.OutputPath, targetName);
+            if (Directory.Exists(targetRoot))
+            {
+                Directory.Delete(targetRoot, true);
+            }
+
             if (!BuildPipeline.IsBuildTargetSupported(group, target))
             {
                 throw new InvalidOperationException($"当前 Unity 安装缺少构建模块：{targetName} ({target})。");
@@ -84,7 +90,8 @@ namespace MiniCore.EditorTools.Deploy
 
             EditorUserBuildSettings.standaloneBuildSubtarget = subtarget;
             bool completeGeneration = string.Equals(request.Operation, "FirstInstall", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(request.Operation, "FullRelease", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(request.Operation, "FullRelease", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(request.Operation, "MaintenanceRelease", StringComparison.OrdinalIgnoreCase);
             if (completeGeneration)
             {
                 HybridClrYooAssetBuildCommand.GenerateAllAndBuildDefaultPackage();

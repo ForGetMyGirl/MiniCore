@@ -1,10 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "LkWFiH3ALu8=",
+  "dgSpecHash": "XtgAxTli7I8=",
   "success": true,
   "projectFilePath": "/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/MiniCore.Server.Rpc.csproj",
   "expectedPackageFiles": [
-    "/Users/ws97_mini/.nuget/packages/google.protobuf/3.29.3/google.protobuf.3.29.3.nupkg.sha512"
+    "/Users/ws97_mini/.nuget/packages/google.protobuf/3.29.3/google.protobuf.3.29.3.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.net.illink.tasks/10.0.11/microsoft.net.illink.tasks.10.0.11.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.netcore.app.runtime.linux-x64/10.0.11/microsoft.netcore.app.runtime.linux-x64.10.0.11.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.aspnetcore.app.runtime.linux-x64/10.0.11/microsoft.aspnetcore.app.runtime.linux-x64.10.0.11.nupkg.sha512"
   ],
   "logs": []
 }

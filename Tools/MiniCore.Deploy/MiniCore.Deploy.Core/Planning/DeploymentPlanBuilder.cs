@@ -1,3 +1,4 @@
+using System.Net;
 using MiniCore.Deploy.Core.Exceptions;
 using MiniCore.Deploy.Core.Models;
 
@@ -19,6 +20,7 @@ public sealed class DeploymentPlanBuilder
     {
         ArgumentNullException.ThrowIfNull(profile);
         Validate(profile);
+        bool requiresClientEndpointApproval = TryGetClientEndpointRisk(profile, out _, out _);
 
         var plan = new DeploymentPlan
         {
@@ -27,7 +29,13 @@ public sealed class DeploymentPlanBuilder
             Operation = profile.Operation
         };
 
-        AddStep(plan, DeploymentAction.Preflight, "本地与目标主机预检");
+        AddStep(
+            plan,
+            DeploymentAction.Preflight,
+            requiresClientEndpointApproval
+                ? "本地与目标主机预检（确认非公网或非加密客户端地址）"
+                : "本地与目标主机预检",
+            requiresApproval: requiresClientEndpointApproval);
         if (profile.Project.BuildTargets.Count > 0)
         {
             AddStep(plan, DeploymentAction.Build, profile.Project.ContentOnly ? "构建热更新程序集与 YooAsset 内容" : "构建所选发布制品");
@@ -114,6 +122,11 @@ public sealed class DeploymentPlanBuilder
             {
                 throw new PlanValidationException("仅资源更新不能同时构建 AuthenticationServer 或 DatabaseServer；请取消可选 .NET 服务目标。");
             }
+
+            if (profile.Project.ContentOnly && profile.Project.PublishTargets.Count > 0)
+            {
+                throw new PlanValidationException("仅内容构建不包含完整 Player，当前版本模型尚未配置完整基线版本，因此禁止直接发布或激活。请改为“仅构建”，或关闭“仅内容”后生成完整不可变 Release。");
+            }
         }
         else
         {
@@ -122,6 +135,9 @@ public sealed class DeploymentPlanBuilder
             {
                 throw new PlanValidationException($"发布已有制品需要本地存在 ReleaseManifest：{manifestPath}。");
             }
+
+
+            ValidateExistingManifest(manifestPath);
         }
 
         EnvironmentDefinition environment = profile.Environment;
@@ -137,6 +153,8 @@ public sealed class DeploymentPlanBuilder
         {
             ValidateBuildTargets(profile);
         }
+
+        ValidateOptionalComponentTargets(profile);
 
         if (!HasRemotePublishTarget(profile))
         {
@@ -178,6 +196,8 @@ public sealed class DeploymentPlanBuilder
                 throw new PlanValidationException($"主机 {host.HostId} 的部署根目录必须是无空白和换行的绝对路径。");
             }
         }
+
+        ValidateServiceNameUniqueness(environment, hostIds);
 
         var instanceIds = new HashSet<string>(StringComparer.Ordinal);
         var hostPorts = new HashSet<string>(StringComparer.Ordinal);
@@ -226,7 +246,7 @@ public sealed class DeploymentPlanBuilder
 
             if (instance.Component == ComponentKind.Coordinator)
             {
-                ValidateDedicatedServerNetwork(instance, hostPorts);
+                ValidateDedicatedServerNetwork(environment, instance, hostPorts);
                 coordinatorCount++;
                 coordinatorInstance = instance;
                 requiresDatabaseServer |= instance.RequiresDatabase;
@@ -237,7 +257,7 @@ public sealed class DeploymentPlanBuilder
             }
             else if (instance.Component == ComponentKind.DedicatedServer)
             {
-                ValidateDedicatedServerNetwork(instance, hostPorts);
+                ValidateDedicatedServerNetwork(environment, instance, hostPorts);
                 hasDedicatedServer = true;
                 requiresDatabaseServer |= instance.RequiresDatabase;
                 if (ContainsRole(instance, "Coordinator"))
@@ -249,8 +269,9 @@ public sealed class DeploymentPlanBuilder
             {
                 hasDedicatedServer = true;
                 hasAuthenticationServer = true;
+                string innerAdvertisedHost = ResolveAndValidateInnerAdvertisedHost(environment, instance);
                 if (string.IsNullOrWhiteSpace(instance.InnerListenHost)
-                    || string.IsNullOrWhiteSpace(instance.InnerAdvertisedHost)
+                    || string.IsNullOrWhiteSpace(innerAdvertisedHost)
                     || !IsValidAbsoluteUrl(instance.OuterAdvertisedUrl, "http", "https"))
                 {
                     throw new PlanValidationException($"AuthenticationServer {instance.InstanceId} 必须配置 HTTP 监听、内网公布地址和客户端 HTTP/HTTPS 绝对地址。");
@@ -262,8 +283,9 @@ public sealed class DeploymentPlanBuilder
             {
                 hasDedicatedServer = true;
                 hasDatabaseServer = true;
+                string innerAdvertisedHost = ResolveAndValidateInnerAdvertisedHost(environment, instance);
                 if (string.IsNullOrWhiteSpace(instance.InnerListenHost)
-                    || string.IsNullOrWhiteSpace(instance.InnerAdvertisedHost)
+                    || string.IsNullOrWhiteSpace(innerAdvertisedHost)
                     || instance.MaximumConcurrency <= 0)
                 {
                     throw new PlanValidationException($"DatabaseServer {instance.InstanceId} 必须配置内网监听、公布地址和正整数并发上限。");
@@ -288,6 +310,13 @@ public sealed class DeploymentPlanBuilder
                 || !IsValidAbsoluteUrl(coordinatorInstance.OuterAdvertisedUrl, "ws", "wss")))
         {
             throw new PlanValidationException("AuthenticationServer 需要 Coordinator 配置客户端可访问的 ws/wss 外网地址。");
+        }
+
+        if (environment.EnforcePublicEndpointSafety
+            && TryGetClientEndpointRisk(profile, out string unsafeInstanceId, out string endpointRisk))
+        {
+            throw new PlanValidationException(
+                $"实例 {unsafeInstanceId} 的客户端公布地址不符合生产安全策略：{endpointRisk}。生产环境必须使用客户端可访问的公网 HTTPS/WSS 绝对地址。");
         }
 
         if (requiresDatabaseServer && !hasDatabaseServer)
@@ -356,17 +385,22 @@ public sealed class DeploymentPlanBuilder
     /// <summary>
     /// 校验 Coordinator 或 Dedicated Server 的完整监听与公布配置。
     /// </summary>
+    /// <param name="environment">当前部署环境。</param>
     /// <param name="instance">目标实例。</param>
     /// <param name="hostPorts">当前主机已经占用的端口。</param>
-    private static void ValidateDedicatedServerNetwork(InstanceDefinition instance, HashSet<string> hostPorts)
+    private static void ValidateDedicatedServerNetwork(
+        EnvironmentDefinition environment,
+        InstanceDefinition instance,
+        HashSet<string> hostPorts)
     {
         if (instance.Roles.Count == 0)
         {
             throw new PlanValidationException($"实例 {instance.InstanceId} 必须至少配置一个 Role。");
         }
 
+        string innerAdvertisedHost = ResolveAndValidateInnerAdvertisedHost(environment, instance);
         if (string.IsNullOrWhiteSpace(instance.InnerListenHost)
-            || string.IsNullOrWhiteSpace(instance.InnerAdvertisedHost)
+            || string.IsNullOrWhiteSpace(innerAdvertisedHost)
             || string.IsNullOrWhiteSpace(instance.OuterListenHost)
             || string.IsNullOrWhiteSpace(instance.OuterPath)
             || instance.OuterPath[0] != '/')
@@ -381,6 +415,174 @@ public sealed class DeploymentPlanBuilder
         {
             throw new PlanValidationException($"实例 {instance.InstanceId} 的外网公布地址必须是 ws/wss 绝对地址，或为空表示不向客户端公布。");
         }
+    }
+
+    /// <summary>
+    /// 解析实例的有效内网公布地址，并阻止把监听通配或本机回环地址公布给其他服务。
+    /// </summary>
+    /// <param name="environment">当前部署环境。</param>
+    /// <param name="instance">待校验实例。</param>
+    /// <returns>实例覆盖或主机 VPC 继承得到的有效地址。</returns>
+    private static string ResolveAndValidateInnerAdvertisedHost(
+        EnvironmentDefinition environment,
+        InstanceDefinition instance)
+    {
+        string value = InstanceNetworkAddressResolver.ResolveInnerAdvertisedHost(environment.Hosts, instance);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new PlanValidationException(
+                $"实例 {instance.InstanceId} 未填写内网公布地址覆盖，所选主机 {instance.HostId} 也没有配置 VPC 地址。");
+        }
+
+        if (IsLocalOrWildcardHost(value))
+        {
+            throw new PlanValidationException(
+                $"实例 {instance.InstanceId} 的内网公布地址不能是 localhost、回环地址或监听通配地址；请填写其他主机可访问的 VPC IP/DNS。");
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// 查找客户端公布地址中的非公网、非加密或仅本机可达风险。
+    /// </summary>
+    /// <param name="profile">待检查发布配置。</param>
+    /// <param name="instanceId">输出首个风险实例标识。</param>
+    /// <param name="reason">输出用户可读风险原因。</param>
+    /// <returns>存在需要阻止或人工确认的风险时返回 true。</returns>
+    private static bool TryGetClientEndpointRisk(
+        DeploymentProfile profile,
+        out string instanceId,
+        out string reason)
+    {
+        instanceId = string.Empty;
+        reason = string.Empty;
+        if (!HasRemotePublishTarget(profile))
+        {
+            return false;
+        }
+
+        for (int index = 0; index < profile.Environment.Instances.Count; index++)
+        {
+            InstanceDefinition instance = profile.Environment.Instances[index];
+            if (!instance.Enabled || !ShouldPublishInstance(profile, instance))
+            {
+                continue;
+            }
+
+            string requiredScheme;
+            switch (instance.Component)
+            {
+                case ComponentKind.Coordinator:
+                case ComponentKind.DedicatedServer:
+                    requiredScheme = "wss";
+                    break;
+                case ComponentKind.AuthenticationServer:
+                case ComponentKind.StaticContent:
+                    requiredScheme = "https";
+                    break;
+                default:
+                    continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(instance.OuterAdvertisedUrl))
+            {
+                continue;
+            }
+
+            if (!Uri.TryCreate(instance.OuterAdvertisedUrl, UriKind.Absolute, out Uri? uri))
+            {
+                continue;
+            }
+
+            if (!string.Equals(uri.Scheme, requiredScheme, StringComparison.OrdinalIgnoreCase))
+            {
+                instanceId = instance.InstanceId;
+                reason = $"应使用 {requiredScheme}，当前为 {uri.Scheme}";
+                return true;
+            }
+
+            if (IsPrivateOrLocalClientHost(uri.Host))
+            {
+                instanceId = instance.InstanceId;
+                reason = $"地址 {uri.Host} 不是公网客户端可达主机";
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 判断服务间公布主机是否错误使用本机回环或监听通配地址。
+    /// </summary>
+    /// <param name="host">IP 或 DNS 主机名。</param>
+    /// <returns>地址只代表本机或不能作为连接目标时返回 true。</returns>
+    private static bool IsLocalOrWildcardHost(string host)
+    {
+        string normalized = host.Trim().Trim('[', ']');
+        if (string.Equals(normalized, "localhost", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!IPAddress.TryParse(normalized, out IPAddress? address))
+        {
+            return false;
+        }
+
+        return IPAddress.IsLoopback(address)
+            || address.Equals(IPAddress.Any)
+            || address.Equals(IPAddress.IPv6Any);
+    }
+
+    /// <summary>
+    /// 判断客户端公布主机是否为回环、监听通配或非公网 IP。
+    /// </summary>
+    /// <param name="host">绝对 URL 中的主机部分。</param>
+    /// <returns>主机不适合作为生产客户端公网入口时返回 true。</returns>
+    private static bool IsPrivateOrLocalClientHost(string host)
+    {
+        string normalized = host.Trim().Trim('[', ']');
+        if (string.Equals(normalized, "localhost", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(".local", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!IPAddress.TryParse(normalized, out IPAddress? address))
+        {
+            return false;
+        }
+
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (IPAddress.IsLoopback(address)
+            || address.Equals(IPAddress.Any)
+            || address.Equals(IPAddress.IPv6Any)
+            || address.IsIPv6LinkLocal
+            || address.IsIPv6SiteLocal)
+        {
+            return true;
+        }
+
+        byte[] bytes = address.GetAddressBytes();
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            return bytes[0] == 10
+                || bytes[0] == 127
+                || (bytes[0] == 169 && bytes[1] == 254)
+                || (bytes[0] == 172 && bytes[1] is >= 16 and <= 31)
+                || (bytes[0] == 192 && bytes[1] == 168)
+                || (bytes[0] == 100 && bytes[1] is >= 64 and <= 127);
+        }
+
+        return bytes.Length == 16 && (bytes[0] & 0xFE) == 0xFC;
     }
 
     /// <summary>
@@ -424,6 +626,101 @@ public sealed class DeploymentPlanBuilder
         }
 
         return value.Length > 0 && !value.Contains("..", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 校验发布已有制品使用的是可激活的完整不可变版本。
+    /// </summary>
+    /// <param name="manifestPath">本地发布清单路径。</param>
+    private static void ValidateExistingManifest(string manifestPath)
+    {
+        try
+        {
+            using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
+            if (!document.RootElement.TryGetProperty("isCompleteRelease", out System.Text.Json.JsonElement completeElement)
+                || !completeElement.GetBoolean()
+                || !document.RootElement.TryGetProperty("releaseContentSha256", out System.Text.Json.JsonElement digestElement)
+                || string.IsNullOrWhiteSpace(digestElement.GetString()))
+            {
+                throw new PlanValidationException("发布已有制品要求 ReleaseManifest 明确标记为完整 Release，并包含确定性内容摘要；仅内容或旧格式清单不得激活。");
+            }
+        }
+        catch (System.Text.Json.JsonException exception)
+        {
+            throw new PlanValidationException($"ReleaseManifest 不是有效 JSON：{exception.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 校验可选服务构建与发布目标和当前期望拓扑严格一致。
+    /// </summary>
+    /// <param name="profile">发布配置。</param>
+    private static void ValidateOptionalComponentTargets(DeploymentProfile profile)
+    {
+        ValidateOptionalComponentTarget(profile, BuildTargetKind.AuthenticationServer, ComponentKind.AuthenticationServer, "AuthenticationServer");
+        ValidateOptionalComponentTarget(profile, BuildTargetKind.DatabaseServer, ComponentKind.DatabaseServer, "DatabaseServer");
+    }
+
+    /// <summary>
+    /// 校验单个可选服务目标必须具有启用实例。
+    /// </summary>
+    /// <param name="profile">发布配置。</param>
+    /// <param name="target">构建或发布目标。</param>
+    /// <param name="component">对应拓扑组件。</param>
+    /// <param name="displayName">用户可见服务名。</param>
+    private static void ValidateOptionalComponentTarget(
+        DeploymentProfile profile,
+        BuildTargetKind target,
+        ComponentKind component,
+        string displayName)
+    {
+        if (!profile.Project.BuildTargets.Contains(target) && !profile.Project.PublishTargets.Contains(target))
+        {
+            return;
+        }
+
+        for (int index = 0; index < profile.Environment.Instances.Count; index++)
+        {
+            InstanceDefinition instance = profile.Environment.Instances[index];
+            if (instance.Enabled && instance.Component == component)
+            {
+                return;
+            }
+        }
+
+        throw new PlanValidationException($"当前拓扑未启用 {displayName} 实例，不能选择对应构建或发布目标。");
+    }
+
+    /// <summary>
+    /// 校验同一主机上规范化后的 systemd 或 Windows 服务名不会碰撞。
+    /// </summary>
+    /// <param name="environment">当前期望环境。</param>
+    /// <param name="hostIds">已经校验的主机标识。</param>
+    private static void ValidateServiceNameUniqueness(EnvironmentDefinition environment, IReadOnlySet<string> hostIds)
+    {
+        var serviceNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (int index = 0; index < environment.Instances.Count; index++)
+        {
+            InstanceDefinition instance = environment.Instances[index];
+            if (!instance.Enabled || instance.Component == ComponentKind.StaticContent)
+            {
+                continue;
+            }
+
+            if (!hostIds.Contains(instance.HostId))
+            {
+                throw new PlanValidationException($"实例 {instance.InstanceId} 引用了不存在的主机 {instance.HostId}。");
+            }
+
+            string serviceName = ServiceNameFormatter.Format(instance.InstanceId);
+            string collisionKey = instance.HostId + ":" + serviceName;
+            if (serviceNames.TryGetValue(collisionKey, out string? existingInstanceId))
+            {
+                throw new PlanValidationException($"同一主机上的实例 {existingInstanceId} 与 {instance.InstanceId} 都会转换成服务名 {serviceName}；请修改 InstanceId 后再生成计划。");
+            }
+
+            serviceNames.Add(collisionKey, instance.InstanceId);
+        }
     }
 
     /// <summary>
@@ -544,6 +841,19 @@ public sealed class DeploymentPlanBuilder
     {
         InstanceDefinition instance = FindTargetInstance(profile);
         AddStep(plan, DeploymentAction.StageArtifact, $"暂存 {instance.HostId} 的目标版本", instance.HostId);
+        if (profile.Operation == DeploymentOperation.Repair)
+        {
+            AddStep(plan, DeploymentAction.BeginDrain, $"修复前摘除 {instance.InstanceId} 流量", instance.HostId, instance.InstanceId, true);
+            AddStep(plan, DeploymentAction.WaitForDrain, $"修复前等待 {instance.InstanceId} 排空", instance.HostId, instance.InstanceId, true);
+            AddStep(plan, DeploymentAction.StopService, $"修复前停止 {instance.InstanceId}", instance.HostId, instance.InstanceId, true);
+            AddStep(plan, DeploymentAction.WriteConfiguration, $"重写 {instance.InstanceId} 配置", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.ActivateRelease, $"重新激活 {instance.InstanceId} 版本", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.InstallService, $"刷新 {instance.InstanceId} 服务定义", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.StartService, $"启动修复后的 {instance.InstanceId}", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.WaitForHealth, $"验证修复后的 {instance.InstanceId}", instance.HostId, instance.InstanceId, false, 3);
+            return;
+        }
+
         AddInstallSteps(plan, instance, false, instance.Component == ComponentKind.Coordinator);
     }
 
@@ -563,7 +873,13 @@ public sealed class DeploymentPlanBuilder
             }
 
             AddStep(plan, DeploymentAction.WriteConfiguration, $"写入 {instance.InstanceId} 配置", instance.HostId, instance.InstanceId);
-            AddRestartSteps(plan, instance, instance.Component == ComponentKind.Coordinator);
+            AddStep(plan, DeploymentAction.BeginDrain, $"摘除 {instance.InstanceId} 流量", instance.HostId, instance.InstanceId, instance.Component == ComponentKind.Coordinator);
+            AddStep(plan, DeploymentAction.WaitForDrain, $"等待 {instance.InstanceId} 排空", instance.HostId, instance.InstanceId, instance.Component == ComponentKind.Coordinator);
+            AddStep(plan, DeploymentAction.StopService, $"停止 {instance.InstanceId}", instance.HostId, instance.InstanceId, instance.Component == ComponentKind.Coordinator);
+            AddStep(plan, DeploymentAction.InstallService, $"核对并刷新 {instance.InstanceId} 服务定义", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.ActivateRelease, $"保持 {instance.InstanceId} 当前版本", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.StartService, $"启动 {instance.InstanceId}", instance.HostId, instance.InstanceId);
+            AddStep(plan, DeploymentAction.WaitForHealth, $"确认 {instance.InstanceId} 健康", instance.HostId, instance.InstanceId, instance.Component == ComponentKind.Coordinator, 3);
         }
     }
 

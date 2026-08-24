@@ -159,6 +159,22 @@ DS、.NET 服务、systemd、反向代理、客户端资源与回滚的通用操
 
 ## 10. 验证记录
 
+### 2026-08-24（MiniCore Deploy 主机地址与构建目标同步）
+
+- 地址：主机独立保存 VPC/内网公布地址，实例留空时继承、显式覆盖时保留；监听地址与公布地址继续严格分离。
+- 安全：生产策略阻止非 HTTPS/WSS、localhost、回环、通配和私网客户端入口；非生产使用这些入口时需要人工确认。
+- 目标：动态新增、删除、禁用或切换 Auth/DB 实例会立即同步构建目标；“仅服务端”包含当前已启用的 DS/Auth/DB。
+- 回归：新增依赖零第三方测试框架的自动化回归检查源码；本次仅执行解决方案编译检查，不运行测试、应用或发布流程。
+
+### 2026-08-23（MiniCore Deploy 生产发布安全链）
+
+- 构建：每个目标构建前清理独立输出；`MaintenanceRelease` 执行协议、Opcode、Handler、HybridCLR/AOT 等完整必要生成；拓扑未启用的 Auth/DB 不允许构建或发布旧产物。
+- 制品：本地提交和远端解压均使用独立临时目录与原子改名；上传前重验大小和 SHA-256；同版本异内容拒绝；`ContentOnly` 没有完整基线时禁止发布。
+- 执行：环境级远程锁覆盖预检到状态持久化；取消可终止构建与上传，版本/服务切换在完成当前原子段后停止。
+- 健康：Auth 验证账号库，DatabaseServer 验证游戏库、Coordinator 注册和 RPC；启动失败自动恢复前一版本、配置和服务定义。
+- 配置：`configVersion` 独立于 `ReleaseVersion`，DS 配置哈希使用部署器和 Unity/Newtonsoft 均可重建的固定规范字节。
+- 验证范围：只执行 C#、Avalonia XAML 和解决方案编译检查；未执行 Player、HybridCLR、YooAsset 构建或任何测试。
+
 ### 2026-08-23（MiniCore Deploy、通用 Role 与外部实例配置）
 
 - 构建：新增独立 Avalonia 桌面应用和 JSON BatchMode 桥接，可按顺序生成 Proto、Startup、UI、Handler、HybridCLR、YooAsset 与多个 Player 目标。

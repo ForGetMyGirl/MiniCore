@@ -14,6 +14,7 @@ public sealed class BuildTargetSelectionViewModel : ObservableObject
     private bool isBuildSelected; // 当前是否构建。
     private bool isPublishSelected; // 当前是否发布。
     private bool isBuildAvailable = true; // Unity 模块是否允许构建。
+    private bool isPublishAvailable = true; // 当前拓扑和发布模式是否允许发布。
     private string availabilityText = "可用"; // 模块或拓扑状态摘要。
 
     #endregion
@@ -42,6 +43,15 @@ public sealed class BuildTargetSelectionViewModel : ObservableObject
     {
         get => isBuildAvailable;
         private set => SetProperty(ref isBuildAvailable, value);
+    }
+
+    /// <summary>
+    /// 获取当前拓扑和发布模式是否允许发布该目标。
+    /// </summary>
+    public bool IsPublishAvailable
+    {
+        get => isPublishAvailable;
+        private set => SetProperty(ref isPublishAvailable, value);
     }
 
     /// <summary>
@@ -81,6 +91,11 @@ public sealed class BuildTargetSelectionViewModel : ObservableObject
         get => isPublishSelected;
         set
         {
+            if (!IsPublishAvailable && value)
+            {
+                return;
+            }
+
             if (SetProperty(ref isPublishSelected, value))
             {
                 setPublishSelection(Target, value);
@@ -116,14 +131,21 @@ public sealed class BuildTargetSelectionViewModel : ObservableObject
     /// <param name="buildSelected">是否构建。</param>
     /// <param name="publishSelected">是否发布。</param>
     /// <param name="buildAvailable">构建模块是否可用。</param>
+    /// <param name="publishAvailable">当前拓扑和模式是否允许发布。</param>
     /// <param name="statusText">状态说明。</param>
-    public void Refresh(bool buildSelected, bool publishSelected, bool buildAvailable, string statusText)
+    public void Refresh(
+        bool buildSelected,
+        bool publishSelected,
+        bool buildAvailable,
+        bool publishAvailable,
+        string statusText)
     {
         isBuildSelected = buildSelected;
         isPublishSelected = publishSelected;
         RaisePropertyChanged(nameof(IsBuildSelected));
         RaisePropertyChanged(nameof(IsPublishSelected));
         IsBuildAvailable = buildAvailable;
+        IsPublishAvailable = publishAvailable;
         AvailabilityText = statusText;
     }
 

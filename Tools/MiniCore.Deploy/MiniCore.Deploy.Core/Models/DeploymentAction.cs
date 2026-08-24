@@ -76,6 +76,16 @@ public enum DeploymentAction
     UninstallService,
 
     /// <summary>
+    /// 健康失败后恢复上一版本指针、配置和服务状态。
+    /// </summary>
+    AutomaticRollback,
+
+    /// <summary>
+    /// 在计划终态释放环境级远程互斥锁。
+    /// </summary>
+    ReleaseEnvironmentLock,
+
+    /// <summary>
     /// 保存远程与本地发布状态。
     /// </summary>
     PersistState

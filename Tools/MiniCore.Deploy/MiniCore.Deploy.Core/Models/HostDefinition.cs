@@ -25,6 +25,11 @@ public sealed class HostDefinition
     public string Address { get; set; } = string.Empty;
 
     /// <summary>
+    /// 获取或设置供环境内其他主机访问服务的 VPC IP 或内网 DNS。
+    /// </summary>
+    public string PrivateAddress { get; set; } = string.Empty;
+
+    /// <summary>
     /// 获取或设置 SSH 端口。
     /// </summary>
     public int SshPort { get; set; } = 22;
@@ -49,6 +54,12 @@ public sealed class HostDefinition
     /// </summary>
     [JsonIgnore]
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置解密 SSH 私钥的当前会话口令；不得写入配置文件或日志。
+    /// </summary>
+    [JsonIgnore]
+    public string PrivateKeyPassphrase { get; set; } = string.Empty;
 
     /// <summary>
     /// 获取或设置首次确认后固定的主机公钥指纹。

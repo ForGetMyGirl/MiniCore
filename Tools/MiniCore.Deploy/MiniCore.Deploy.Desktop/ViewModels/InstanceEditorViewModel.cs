@@ -11,6 +11,7 @@ public sealed class InstanceEditorViewModel : ObservableObject
     #region Private 私有成员
 
     private string roleText; // 界面编辑中的 Role 文本。
+    private readonly IReadOnlyList<HostDefinition> hosts; // 当前方案可选择的主机。
 
     #endregion
 
@@ -37,6 +38,78 @@ public sealed class InstanceEditorViewModel : ObservableObject
         "VerifyFull",
         "Disabled"
     };
+
+    /// <summary>
+    /// 获取或设置承载实例的主机标识；切换主机不会覆盖显式实例地址。
+    /// </summary>
+    public string HostId
+    {
+        get => Model.HostId;
+        set
+        {
+            if (string.Equals(Model.HostId, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            Model.HostId = value;
+            RaisePropertyChanged();
+            RefreshHostDerivedValues();
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置实例级内网公布地址覆盖；留空表示跟随所选主机。
+    /// </summary>
+    public string InnerAdvertisedHostOverride
+    {
+        get => Model.InnerAdvertisedHost;
+        set
+        {
+            if (string.Equals(Model.InnerAdvertisedHost, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            Model.InnerAdvertisedHost = value;
+            RaisePropertyChanged();
+            RefreshHostDerivedValues();
+        }
+    }
+
+    /// <summary>
+    /// 获取实例覆盖或主机 VPC 继承后实际写入运行配置的内网公布地址。
+    /// </summary>
+    public string EffectiveInnerAdvertisedHost =>
+        InstanceNetworkAddressResolver.ResolveInnerAdvertisedHost(hosts, Model);
+
+    /// <summary>
+    /// 获取当前内网公布地址的继承状态说明。
+    /// </summary>
+    public string InnerAdvertisedHostSourceText =>
+        InstanceNetworkAddressResolver.UsesHostPrivateAddress(Model)
+            ? string.IsNullOrWhiteSpace(EffectiveInnerAdvertisedHost)
+                ? "正在跟随所选主机；请先在主机管理填写 VPC 地址。"
+                : "跟随所选主机 VPC 地址，当前有效值：" + EffectiveInnerAdvertisedHost
+            : "使用实例级覆盖；切换主机时会保留此值。";
+
+    /// <summary>
+    /// 获取或设置实例是否参与当前期望拓扑。
+    /// </summary>
+    public bool Enabled
+    {
+        get => Model.Enabled;
+        set
+        {
+            if (Model.Enabled == value)
+            {
+                return;
+            }
+
+            Model.Enabled = value;
+            RaisePropertyChanged();
+        }
+    }
 
     /// <summary>
     /// 获取或设置当前实例的组件类型，并同步组件专属界面状态。
@@ -120,10 +193,21 @@ public sealed class InstanceEditorViewModel : ObservableObject
     /// 创建实例编辑模型。
     /// </summary>
     /// <param name="model">底层实例模型。</param>
-    public InstanceEditorViewModel(InstanceDefinition model)
+    /// <param name="hosts">当前方案可选择的主机集合。</param>
+    public InstanceEditorViewModel(InstanceDefinition model, IReadOnlyList<HostDefinition> hosts)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
+        this.hosts = hosts ?? throw new ArgumentNullException(nameof(hosts));
         roleText = string.Join(",", model.Roles);
+    }
+
+    /// <summary>
+    /// 通知界面重新显示由主机选择或 VPC 地址派生的有效地址。
+    /// </summary>
+    public void RefreshHostDerivedValues()
+    {
+        RaisePropertyChanged(nameof(EffectiveInnerAdvertisedHost));
+        RaisePropertyChanged(nameof(InnerAdvertisedHostSourceText));
     }
 
     /// <summary>

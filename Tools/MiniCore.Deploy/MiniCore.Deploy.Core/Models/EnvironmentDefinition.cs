@@ -23,6 +23,11 @@ public sealed class EnvironmentDefinition
     public bool RequireCleanGitWorkspace { get; set; }
 
     /// <summary>
+    /// 获取或设置是否按生产规则强制客户端公布地址使用公网 HTTPS/WSS 端点。
+    /// </summary>
+    public bool EnforcePublicEndpointSafety { get; set; }
+
+    /// <summary>
     /// 获取或设置本次操作结束后必须统一使用的发布版本。
     /// </summary>
     public string ReleaseVersion { get; set; } = "0.1.0";

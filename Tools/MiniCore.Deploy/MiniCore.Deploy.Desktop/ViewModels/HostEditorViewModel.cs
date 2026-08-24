@@ -12,7 +12,9 @@ public sealed class HostEditorViewModel : ObservableObject
     private SshAuthenticationOptionViewModel selectedAuthenticationOption; // 当前认证方式选项。
     private string privateKeyPath; // 本机私钥文件路径。
     private string password; // 仅驻留当前应用会话的 SSH 密码。
+    private string privateKeyPassphrase; // 仅驻留当前应用会话的私钥解密口令。
     private string hostKeyFingerprint; // 用户确认后固定的主机指纹。
+    private string privateAddress; // 环境内服务互访使用的 VPC 地址。
     private string connectionTestStatus = "尚未测试"; // 远程命令与文件上传连接测试状态。
     private bool isConnectionTestRunning; // 当前是否正在测试连接。
 
@@ -92,6 +94,21 @@ public sealed class HostEditorViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 获取或设置只在当前应用进程中保留的 SSH 私钥口令。
+    /// </summary>
+    public string PrivateKeyPassphrase
+    {
+        get => privateKeyPassphrase;
+        set
+        {
+            if (SetProperty(ref privateKeyPassphrase, value))
+            {
+                Model.PrivateKeyPassphrase = value;
+            }
+        }
+    }
+
+    /// <summary>
     /// 获取或设置已经人工确认并固定保存的 SSH 主机指纹。
     /// </summary>
     public string HostKeyFingerprint
@@ -102,6 +119,21 @@ public sealed class HostEditorViewModel : ObservableObject
             if (SetProperty(ref hostKeyFingerprint, value))
             {
                 Model.HostKeyFingerprint = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置供实例默认继承的 VPC IP 或内网 DNS。
+    /// </summary>
+    public string PrivateAddress
+    {
+        get => privateAddress;
+        set
+        {
+            if (SetProperty(ref privateAddress, value))
+            {
+                Model.PrivateAddress = value;
             }
         }
     }
@@ -137,7 +169,9 @@ public sealed class HostEditorViewModel : ObservableObject
             : AuthenticationOptions[1];
         privateKeyPath = model.PrivateKeyPath;
         password = model.Password;
+        privateKeyPassphrase = model.PrivateKeyPassphrase;
         hostKeyFingerprint = model.HostKeyFingerprint;
+        privateAddress = model.PrivateAddress;
     }
 
     /// <summary>

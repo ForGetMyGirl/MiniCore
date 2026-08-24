@@ -53,6 +53,7 @@ namespace MiniCore.Bootstrap
             "MiniCore.Runtime.dll",
             "MiniCore.Serialization.dll",
             "MiniCore.Unity.dll",
+            "Newtonsoft.Json.dll",
             "System.Core.dll",
             "Unity.InputSystem.dll",
             "UnityEngine.CoreModule.dll",

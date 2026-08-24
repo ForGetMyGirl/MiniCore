@@ -42,5 +42,10 @@ public sealed class DatabaseServerOptions
     /// </summary>
     public int MaximumConcurrency { get; set; } = 32;
 
+    /// <summary>
+    /// 获取或设置仅供本机部署器读取的深度就绪状态文件绝对路径。
+    /// </summary>
+    public string ReadinessFilePath { get; set; } = Path.Combine(AppContext.BaseDirectory, "database.ready.json");
+
     #endregion
 }

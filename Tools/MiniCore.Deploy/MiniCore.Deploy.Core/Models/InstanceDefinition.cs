@@ -33,7 +33,7 @@ public sealed class InstanceDefinition
     public string InnerListenHost { get; set; } = "0.0.0.0";
 
     /// <summary>
-    /// 获取或设置其他服务实际可访问的内网公布地址。
+    /// 获取或设置实例级内网公布地址覆盖；留空时继承所选主机的 VPC 地址。
     /// </summary>
     public string InnerAdvertisedHost { get; set; } = string.Empty;
 

@@ -62,6 +62,11 @@ namespace MiniCore.EditorTools
         public void OnPreprocessBuild(BuildReport report)
         {
             ValidateAssemblyConstraints();
+            if (HybridClrBuildValidator.IsGeneratingArtifacts)
+            {
+                return;
+            }
+
             ValidateAotControlHotUpdateAssets();
             if (IsDedicatedServerBuild())
             {

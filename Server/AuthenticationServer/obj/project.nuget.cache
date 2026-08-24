@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "IU2j+1nY0sU=",
+  "dgSpecHash": "6/sBPjhaN9k=",
   "success": true,
   "projectFilePath": "/Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/AuthenticationServer.csproj",
   "expectedPackageFiles": [
@@ -20,6 +20,7 @@
     "/Users/ws97_mini/.nuget/packages/microsoft.entityframeworkcore.design/9.0.0/microsoft.entityframeworkcore.design.9.0.0.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/microsoft.entityframeworkcore.relational/9.0.0/microsoft.entityframeworkcore.relational.9.0.0.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/microsoft.extensions.dependencymodel/9.0.0/microsoft.extensions.dependencymodel.9.0.0.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.net.illink.tasks/10.0.11/microsoft.net.illink.tasks.10.0.11.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/mono.texttemplating/3.0.0/mono.texttemplating.3.0.0.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/mysqlconnector/2.4.0/mysqlconnector.2.4.0.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/pomelo.entityframeworkcore.mysql/9.0.0/pomelo.entityframeworkcore.mysql.9.0.0.nupkg.sha512",
@@ -29,7 +30,10 @@
     "/Users/ws97_mini/.nuget/packages/system.composition.convention/7.0.0/system.composition.convention.7.0.0.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/system.composition.hosting/7.0.0/system.composition.hosting.7.0.0.nupkg.sha512",
     "/Users/ws97_mini/.nuget/packages/system.composition.runtime/7.0.0/system.composition.runtime.7.0.0.nupkg.sha512",
-    "/Users/ws97_mini/.nuget/packages/system.composition.typedparts/7.0.0/system.composition.typedparts.7.0.0.nupkg.sha512"
+    "/Users/ws97_mini/.nuget/packages/system.composition.typedparts/7.0.0/system.composition.typedparts.7.0.0.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.netcore.app.runtime.linux-x64/10.0.11/microsoft.netcore.app.runtime.linux-x64.10.0.11.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.aspnetcore.app.runtime.linux-x64/10.0.11/microsoft.aspnetcore.app.runtime.linux-x64.10.0.11.nupkg.sha512",
+    "/Users/ws97_mini/.nuget/packages/microsoft.netcore.app.host.linux-x64/10.0.11/microsoft.netcore.app.host.linux-x64.10.0.11.nupkg.sha512"
   ],
   "logs": []
 }

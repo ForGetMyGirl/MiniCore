@@ -126,6 +126,11 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
+            if (value == 4)
+            {
+                RefreshBuildTargetSelections();
+            }
+
             RaisePropertyChanged(nameof(CurrentHelpTitle));
             RaisePropertyChanged(nameof(CurrentHelpText));
             RaisePropertyChanged(nameof(CurrentHelpTip));
@@ -154,10 +159,10 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public string CurrentHelpText => SelectedPageIndex switch
     {
-        0 => "先登记允许通过 SSH 管理的目标机器。私钥和密码认证都需要 SSH 登录用户；固定指纹后可测试远程命令与文件上传是否都可用。",
+        0 => "先登记允许通过 SSH 管理的目标机器，并单独填写供服务互访的 VPC 地址。SSH 地址用于部署连接，VPC 地址由实例默认继承。",
         1 => "设置 Unity 可执行程序、项目根目录、制品目录和显式启动场景。构建时会启动独立 BatchMode。",
         2 => "每份方案都由开发运维人员自由命名，并独立保存自己的主机、拓扑、构建目标和发布策略。",
-        3 => "Coordinator/DS 使用 Role 和内外网地址；Auth 使用 HTTP 与账号库；DB 使用内网 RPC 与游戏库；StaticContent 只切换静态目录。",
+        3 => "ListenHost 只控制本机绑定；内网公布地址留空时跟随主机 VPC，也可实例覆盖；OuterAdvertisedUrl 是客户端实际访问的 HTTPS/WSS 地址。",
         4 => "构建会生成新制品，发布会使用所选制品。两列可以独立选择，服务端、客户端和资源互不强制。",
         5 => "选择首次安装、滚动更新、扩容、修复、回滚或下线等确定性流程。",
         6 => "执行前必须先看到完整计划。未预览的配置变化不会被直接执行。",
@@ -171,10 +176,10 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public string CurrentHelpTip => SelectedPageIndex switch
     {
-        0 => "阿里云 Linux 通常使用 root 或 ecs-user；优先选择 ecs-user 与 SSH 私钥。密码只保留当前会话，不会保存到方案。",
+        0 => "阿里云 Linux 通常使用 root 或 ecs-user；优先选择 ecs-user 与 SSH 私钥。VPC 地址不要填写 127.0.0.1，也不会自动替代监听地址。",
         2 => "建议按用途自由命名，例如本地联调、国服滚动更新或海外灰度，不再强制套用方案分类。",
         3 => "小型项目可让 Lobby、Room、Match、Game 共用一个 DS；Auth/DB 没有业务 Role，StaticContent 也不启动服务进程。",
-        4 => "只改服务逻辑选服务端；只发客户端选客户端；“业务内容更新”可只生成热更新和资源。",
+        4 => "“仅服务端”会选择当前拓扑已启用的 DS、Auth 和 DB；禁用或删除最后一个 Auth/DB 实例会立即清除对应失效目标。",
         5 => "Coordinator、某 Role 最后实例和可能造成停服的步骤必须保留人工确认。",
         _ => "先填写必需字段，再生成计划预览；不要直接在远程机器上临时改动运行文件。"
     };

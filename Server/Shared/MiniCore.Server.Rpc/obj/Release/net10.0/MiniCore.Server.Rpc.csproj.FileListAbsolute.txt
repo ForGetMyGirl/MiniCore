@@ -1,17 +1,13 @@
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/bin/Release/net10.0/OpcodeManifest.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/bin/Release/net10.0/MiniCore.Server.Rpc.deps.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/bin/Release/net10.0/MiniCore.Server.Rpc.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/bin/Release/net10.0/MiniCore.Server.Rpc.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/bin/Release/net10.0/MiniCore.Server.Protocol.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/bin/Release/net10.0/MiniCore.Server.Protocol.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.csproj.AssemblyReference.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.GeneratedMSBuildEditorConfig.editorconfig
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.AssemblyInfoInputs.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.AssemblyInfo.cs
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.csproj.CoreCompileInputs.cache
-/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.sourcelink.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.1B2F599E.Up2Date
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/refint/MiniCore.Server.Rpc.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/MiniCore.Server.Rpc.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/Shared/MiniCore.Server.Rpc/obj/Release/net10.0/ref/MiniCore.Server.Rpc.dll

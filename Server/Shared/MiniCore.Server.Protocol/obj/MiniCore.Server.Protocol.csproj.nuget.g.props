@@ -13,9 +13,11 @@
     <SourceRoot Include="/Users/ws97_mini/.nuget/packages/" />
   </ItemGroup>
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Import Project="$(NuGetPackageRoot)microsoft.net.illink.tasks/10.0.11/build/Microsoft.NET.ILLink.Tasks.props" Condition="Exists('$(NuGetPackageRoot)microsoft.net.illink.tasks/10.0.11/build/Microsoft.NET.ILLink.Tasks.props')" />
     <Import Project="$(NuGetPackageRoot)grpc.tools/2.69.0/build/Grpc.Tools.props" Condition="Exists('$(NuGetPackageRoot)grpc.tools/2.69.0/build/Grpc.Tools.props')" />
   </ImportGroup>
   <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <PkgMicrosoft_NET_ILLink_Tasks Condition=" '$(PkgMicrosoft_NET_ILLink_Tasks)' == '' ">/Users/ws97_mini/.nuget/packages/microsoft.net.illink.tasks/10.0.11</PkgMicrosoft_NET_ILLink_Tasks>
     <PkgGrpc_Tools Condition=" '$(PkgGrpc_Tools)' == '' ">/Users/ws97_mini/.nuget/packages/grpc.tools/2.69.0</PkgGrpc_Tools>
   </PropertyGroup>
 </Project>

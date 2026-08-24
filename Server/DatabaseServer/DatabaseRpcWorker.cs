@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Data.Common;
+using System.Text.Json;
 using DatabaseServer.Data;
 using DatabaseServer.Models;
 using Google.Protobuf;
@@ -64,6 +66,12 @@ public sealed class DatabaseRpcWorker : BackgroundService
     /// <returns>Worker 生命周期任务。</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (string.IsNullOrWhiteSpace(options.ReadinessFilePath) || !Path.IsPathRooted(options.ReadinessFilePath))
+        {
+            throw new InvalidOperationException("DatabaseServer:ReadinessFilePath 必须是服务器本机绝对路径。");
+        }
+
+        DeleteReadinessFile();
         IPAddress address = string.Equals(options.ListenHost, "0.0.0.0", StringComparison.Ordinal)
             ? IPAddress.Any
             : IPAddress.Parse(options.ListenHost);
@@ -76,6 +84,7 @@ public sealed class DatabaseRpcWorker : BackgroundService
         }
         finally
         {
+            DeleteReadinessFile();
             listener.Stop();
             try
             {
@@ -187,6 +196,7 @@ public sealed class DatabaseRpcWorker : BackgroundService
 
                     EnsureSuccess(heartbeat.Code, heartbeat.Msg, "续约 Coordinator");
                     revision = heartbeat.DirectoryRevision;
+                    await WriteReadinessFileAsync(revision, cancellationToken);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -195,6 +205,7 @@ public sealed class DatabaseRpcWorker : BackgroundService
             }
             catch (Exception exception) when (IsTransientCoordinatorException(exception))
             {
+                DeleteReadinessFile();
                 if (reachedReady)
                 {
                     retryIndex = 0;
@@ -222,6 +233,8 @@ public sealed class DatabaseRpcWorker : BackgroundService
         MiniCoreRpcClient coordinator,
         CancellationToken cancellationToken)
     {
+        await VerifyDatabaseConnectionAsync(cancellationToken);
+        await VerifyBusinessRpcAsync(cancellationToken);
         RegisterServerResponse registration = await coordinator.CallAsync(
             new RegisterServerRequest
             {
@@ -246,6 +259,7 @@ public sealed class DatabaseRpcWorker : BackgroundService
             cancellationToken,
             CoordinatorRpcTimeoutSeconds);
         EnsureSuccess(ready.Code, ready.Msg, "报告 Ready");
+        await WriteReadinessFileAsync(ready.DirectoryRevision, cancellationToken);
         return ready.DirectoryRevision;
     }
 
@@ -259,7 +273,103 @@ public sealed class DatabaseRpcWorker : BackgroundService
         return exception is IOException
             or SocketException
             or TimeoutException
+            or DbException
             or CoordinatorRegistrationLostException;
+    }
+
+    /// <summary>
+    /// 使用独立 DbContext 验证游戏数据库当前可连接。
+    /// </summary>
+    /// <param name="cancellationToken">宿主停止令牌。</param>
+    /// <returns>数据库验证完成任务。</returns>
+    private async Task VerifyDatabaseConnectionAsync(CancellationToken cancellationToken)
+    {
+        await using GameDbContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        if (!await dbContext.Database.CanConnectAsync(cancellationToken))
+        {
+            throw new TimeoutException("游戏数据库当前不可连接。");
+        }
+    }
+
+    /// <summary>
+    /// 通过回环 TCP 完成一次 Ping/Pong，验证业务监听与帧处理循环已经就绪。
+    /// </summary>
+    /// <param name="cancellationToken">宿主停止令牌。</param>
+    /// <returns>RPC 自检完成任务。</returns>
+    private async Task VerifyBusinessRpcAsync(CancellationToken cancellationToken)
+    {
+        string host = string.Equals(options.ListenHost, "0.0.0.0", StringComparison.Ordinal)
+            || string.Equals(options.ListenHost, "::", StringComparison.Ordinal)
+                ? "127.0.0.1"
+                : options.ListenHost;
+        using var client = new TcpClient();
+        await client.ConnectAsync(host, options.ListenPort, cancellationToken);
+        await using NetworkStream stream = client.GetStream();
+        const long rpcId = 1;
+        await MiniCoreRpcFrameCodec.WriteAsync(stream, 1, rpcId, ReadOnlyMemory<byte>.Empty, cancellationToken);
+        MiniCoreRpcFrame frame = await MiniCoreRpcFrameCodec.ReadAsync(stream, cancellationToken)
+            ?? throw new EndOfStreamException("DatabaseServer RPC 自检未收到 Pong。");
+        if (frame.Opcode != 2 || frame.RpcId != rpcId)
+        {
+            throw new InvalidDataException("DatabaseServer RPC 自检返回了无效 Pong。");
+        }
+    }
+
+    /// <summary>
+    /// 原子刷新仅供本机部署器读取的深度就绪文件。
+    /// </summary>
+    /// <param name="directoryRevision">Coordinator 当前目录修订号。</param>
+    /// <param name="cancellationToken">宿主停止令牌。</param>
+    /// <returns>状态写入完成任务。</returns>
+    private async Task WriteReadinessFileAsync(long directoryRevision, CancellationToken cancellationToken)
+    {
+        string path = options.ReadinessFilePath;
+        string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string temporaryPath = path + ".tmp";
+        string json = JsonSerializer.Serialize(new
+        {
+            instanceId = options.InstanceId,
+            databaseReady = true,
+            coordinatorRegistered = true,
+            rpcReady = true,
+            directoryRevision,
+            updatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await File.WriteAllTextAsync(temporaryPath, json, new System.Text.UTF8Encoding(false), cancellationToken);
+        File.Move(temporaryPath, path, true);
+    }
+
+    /// <summary>
+    /// 在启动、失联或停止时删除可能误导部署器的旧就绪文件。
+    /// </summary>
+    private void DeleteReadinessFile()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(options.ReadinessFilePath) && File.Exists(options.ReadinessFilePath))
+            {
+                File.Delete(options.ReadinessFilePath);
+            }
+
+            string temporaryPath = options.ReadinessFilePath + ".tmp";
+            if (!string.IsNullOrWhiteSpace(options.ReadinessFilePath) && File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+        catch (IOException exception)
+        {
+            logger.LogWarning(exception, "清理 DatabaseServer 就绪文件失败，部署器仍会通过时间戳拒绝陈旧状态。");
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            logger.LogWarning(exception, "清理 DatabaseServer 就绪文件权限不足，部署器仍会通过时间戳拒绝陈旧状态。");
+        }
     }
 
     /// <summary>

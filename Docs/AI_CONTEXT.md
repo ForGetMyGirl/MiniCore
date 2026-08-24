@@ -116,7 +116,7 @@ Runtime / Network <- Platform.Browser
 | Opcode/Handler 生成 | `Editor/Protocol`、项目 PB 输出目录、`HotUpdate/Generated/Network` |
 | UI 窗口、Root、分辨率、安全区域和动画 | `Unity/UI`、`HotUpdate/Demos/*/Client/UI`、`HotUpdate/UI/Generated`、`Editor/UI`、[UI 框架](UIFramework.md) |
 | MiniBomber 账号、大厅、房间、战斗、三端和热更新联调 | `Demos/MiniBomber`、`Proto/Business`、[MiniBomber 全链路 Demo](Demos/MiniBomber.md)、[框架部署入门](FrameworkDeploymentGettingStarted.md)、[多 Role 服务端架构](DedicatedServerArchitecture.md) |
-| 桌面自动构建、不可变制品、SSH 发布、滚动更新与回滚 | `Tools/MiniCore.Deploy`、[MiniCore Deploy](MiniCoreDeploy.md)、[打包与热更新流程](BuildAndHotUpdateWorkflow.md) |
+| 桌面自动构建、不可变制品、远程发布锁、SSH/SFTP、安全取消、深度健康检查、自动恢复与发布审计 | `Tools/MiniCore.Deploy`、[MiniCore Deploy](MiniCoreDeploy.md)、[打包与热更新流程](BuildAndHotUpdateWorkflow.md) |
 | 热更启动/打包 | `Project/Bootstrap/UpdateMainWindow.cs`、`HotUpdate/Entry`、`Editor/HybridCLR` |
 | Development Runner 与性能测试 | `Assets/Scripts/MiniCore/Development`、`Assets/Tests/Editor`、[性能测试指南](PerformanceTestingGuide.md) |
 | 文档维护 | [文档维护约定](DocumentationConventions.md) |

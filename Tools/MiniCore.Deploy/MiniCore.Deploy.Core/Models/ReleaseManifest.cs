@@ -13,6 +13,16 @@ public sealed class ReleaseManifest
     public string ReleaseVersion { get; set; } = string.Empty;
 
     /// <summary>
+    /// 获取或设置当前清单是否包含可直接激活的完整制品。
+    /// </summary>
+    public bool IsCompleteRelease { get; set; }
+
+    /// <summary>
+    /// 获取或设置由全部制品内容和兼容字段计算的确定性发布摘要。
+    /// </summary>
+    public string ReleaseContentSha256 { get; set; } = string.Empty;
+
+    /// <summary>
     /// 获取或设置控制面协议兼容版本。
     /// </summary>
     public string ControlProtocolVersion { get; set; } = "1";

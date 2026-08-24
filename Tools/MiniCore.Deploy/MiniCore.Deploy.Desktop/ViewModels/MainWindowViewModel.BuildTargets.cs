@@ -38,9 +38,12 @@ public sealed partial class MainWindowViewModel
             if (value)
             {
                 profile.Operation = DeploymentOperation.BusinessRelease;
+                RemoveDotNetTargets(profile.Project.BuildTargets);
+                profile.Project.PublishTargets.Clear();
                 RaisePropertyChanged(nameof(Operation));
             }
 
+            RefreshBuildTargetSelections();
             RaisePropertyChanged();
             InvalidatePreview();
         }
@@ -182,6 +185,7 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     private void SelectServerOnly()
     {
+        RefreshBuildTargetSelections();
         SelectGroup(ServerTargetSelections);
         profile.Project.ContentOnly = false;
         CompleteScopeChange();
@@ -203,18 +207,24 @@ public sealed partial class MainWindowViewModel
     private void SelectContentOnly()
     {
         RemoveDotNetTargets(profile.Project.BuildTargets);
-        RemoveDotNetTargets(profile.Project.PublishTargets);
-        if (!ContainsUnityTarget(profile.Project.BuildTargets) && !ContainsUnityTarget(profile.Project.PublishTargets))
+        if (!ContainsUnityTarget(profile.Project.BuildTargets))
         {
-            BuildTargetKind fallback = GetFirstAvailableUnityTarget();
-            SetListTarget(profile.Project.BuildTargets, fallback, true);
-            SetListTarget(profile.Project.PublishTargets, fallback, true);
-        }
-        else if (profile.Project.BuildTargets.Count == 0)
-        {
-            CopyTargets(profile.Project.PublishTargets, profile.Project.BuildTargets);
+            for (int index = 0; index < profile.Project.PublishTargets.Count; index++)
+            {
+                BuildTargetKind target = profile.Project.PublishTargets[index];
+                if (target is not (BuildTargetKind.AuthenticationServer or BuildTargetKind.DatabaseServer))
+                {
+                    SetListTarget(profile.Project.BuildTargets, target, true);
+                }
+            }
+
+            if (!ContainsUnityTarget(profile.Project.BuildTargets))
+            {
+                SetListTarget(profile.Project.BuildTargets, GetFirstAvailableUnityTarget(), true);
+            }
         }
 
+        profile.Project.PublishTargets.Clear();
         profile.Project.ContentOnly = true;
         profile.Operation = DeploymentOperation.BusinessRelease;
         CompleteScopeChange();
@@ -334,6 +344,13 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     private void RefreshBuildTargetSelections()
     {
+        buildTargetInstanceBuffer.Clear();
+        for (int index = 0; index < Instances.Count; index++)
+        {
+            buildTargetInstanceBuffer.Add(Instances[index].Model);
+        }
+
+        BuildTargetTopologyPolicy.RemoveUnavailableOptionalTargets(profile.Project, buildTargetInstanceBuffer);
         RefreshTargetGroup(ServerTargetSelections);
         RefreshTargetGroup(ClientTargetSelections);
     }
@@ -347,17 +364,32 @@ public sealed partial class MainWindowViewModel
         for (int index = 0; index < group.Count; index++)
         {
             BuildTargetSelectionViewModel item = group[index];
-            bool available = moduleAvailability.IsAvailable(item.Target);
-            string status = GetTargetAvailabilityText(item.Target, available);
-            if (item.Target == BuildTargetKind.AuthenticationServer || item.Target == BuildTargetKind.DatabaseServer)
+            bool moduleAvailable = moduleAvailability.IsAvailable(item.Target);
+            bool optionalComponent = item.Target is BuildTargetKind.AuthenticationServer or BuildTargetKind.DatabaseServer;
+            bool topologyAvailable = !optionalComponent || HasEnabledComponent(item.Target);
+            bool buildAvailable = moduleAvailable && topologyAvailable;
+            bool publishAvailable = topologyAvailable && !profile.Project.ContentOnly;
+            string status = GetTargetAvailabilityText(item.Target, moduleAvailable);
+            if (optionalComponent)
             {
-                status = HasEnabledComponent(item.Target) ? "拓扑已启用" : "可选 · 当前拓扑未启用";
+                status = topologyAvailable ? "拓扑已启用" : "不可用 · 当前拓扑未启用";
+                if (!topologyAvailable)
+                {
+                    profile.Project.BuildTargets.Remove(item.Target);
+                    profile.Project.PublishTargets.Remove(item.Target);
+                }
+            }
+
+            if (profile.Project.ContentOnly)
+            {
+                profile.Project.PublishTargets.Remove(item.Target);
             }
 
             item.Refresh(
                 profile.Project.BuildTargets.Contains(item.Target),
                 profile.Project.PublishTargets.Contains(item.Target),
-                available,
+                buildAvailable,
+                publishAvailable,
                 status);
         }
     }
@@ -390,18 +422,7 @@ public sealed partial class MainWindowViewModel
     /// <returns>拓扑中存在启用实例时返回 true。</returns>
     private bool HasEnabledComponent(BuildTargetKind target)
     {
-        ComponentKind expected = target == BuildTargetKind.AuthenticationServer
-            ? ComponentKind.AuthenticationServer
-            : ComponentKind.DatabaseServer;
-        for (int index = 0; index < Instances.Count; index++)
-        {
-            if (Instances[index].Model.Enabled && Instances[index].Model.Component == expected)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return BuildTargetTopologyPolicy.IsOptionalComponentEnabled(buildTargetInstanceBuffer, target);
     }
 
     /// <summary>

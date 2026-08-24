@@ -709,53 +709,6 @@
             "assemblyVersion": "2.1.0.0",
             "fileVersion": "10.0.1126.37416"
           }
-        },
-        "native": {
-          "createdump": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libSystem.Globalization.Native.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libSystem.IO.Compression.Native.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libSystem.Native.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libSystem.Net.Security.Native.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libSystem.Security.Cryptography.Native.OpenSsl.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libclrgc.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libclrgcexp.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libclrjit.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libcoreclr.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libcoreclrtraceptprovider.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libhostfxr.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libhostpolicy.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libmscordaccore.so": {
-            "fileVersion": "0.0.0.0"
-          },
-          "libmscordbi.so": {
-            "fileVersion": "0.0.0.0"
-          }
         }
       },
       "Google.Protobuf/3.29.3": {

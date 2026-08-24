@@ -65,7 +65,7 @@ namespace MiniCore.Server
         public string ConfigVersion { get; set; } = string.Empty;
 
         /// <summary>
-        /// 获取或设置移除 configSha256 字段后原始 JSON 的 SHA-256。
+        /// 获取或设置按框架固定字段规范计算、与 JSON 属性顺序和转义无关的 SHA-256。
         /// </summary>
         public string ConfigSha256 { get; set; } = string.Empty;
 

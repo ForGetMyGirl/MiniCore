@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows.Input;
 using MiniCore.Deploy.Core.Execution;
 using MiniCore.Deploy.Core.Exceptions;
@@ -22,6 +24,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     #region Private 私有成员
 
+    private static readonly JsonSerializerOptions HistoryJsonOptions = CreateHistoryJsonOptions(); // 兼容字符串枚举的历史 JSON 设置。
     private readonly ApplicationPaths paths; // 仓库外应用数据目录。
     private readonly ProfileStore profileStore; // 配置存储。
     private readonly DeploymentPlanStore planStore; // 已展示计划快照存储。
@@ -40,6 +43,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private CancellationTokenSource? executionCancellation; // 当前执行取消源。
     private string saveStateText = "正在加载"; // 当前方案保存状态。
     private bool isExecuting; // 当前是否正在执行已预览计划。
+    private readonly List<DeploymentHistoryEntryViewModel> allHistoryEntries = new(); // 未筛选的发布历史。
+    private readonly List<InstanceDefinition> buildTargetInstanceBuffer = new(); // 构建目标拓扑同步复用缓冲。
+    private string historyEnvironmentFilter = string.Empty; // 环境筛选文本。
+    private string historyVersionFilter = string.Empty; // 版本筛选文本。
+    private string historyInstanceFilter = string.Empty; // 实例筛选文本。
+    private string historyOperationFilter = string.Empty; // 操作筛选文本。
+    private string historyResultFilter = string.Empty; // 结果筛选文本。
 
     #endregion
 
@@ -81,9 +91,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<StepResult> ExecutionResults { get; } = new();
 
     /// <summary>
-    /// 获取仓库外发布历史文件。
+    /// 获取已经解析并应用筛选条件的发布历史。
     /// </summary>
-    public ObservableCollection<string> HistoryFiles { get; } = new();
+    public ObservableCollection<DeploymentHistoryEntryViewModel> HistoryEntries { get; } = new();
 
     /// <summary>
     /// 获取当前方案是否尚未添加主机。
@@ -108,7 +118,82 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>
     /// 获取是否尚无本地发布历史。
     /// </summary>
-    public bool HasNoHistory => HistoryFiles.Count == 0;
+    public bool HasNoHistory => HistoryEntries.Count == 0;
+
+    /// <summary>
+    /// 获取或设置历史环境筛选文本。
+    /// </summary>
+    public string HistoryEnvironmentFilter
+    {
+        get => historyEnvironmentFilter;
+        set
+        {
+            if (SetProperty(ref historyEnvironmentFilter, value))
+            {
+                ApplyHistoryFilters();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置历史版本筛选文本。
+    /// </summary>
+    public string HistoryVersionFilter
+    {
+        get => historyVersionFilter;
+        set
+        {
+            if (SetProperty(ref historyVersionFilter, value))
+            {
+                ApplyHistoryFilters();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置历史实例筛选文本。
+    /// </summary>
+    public string HistoryInstanceFilter
+    {
+        get => historyInstanceFilter;
+        set
+        {
+            if (SetProperty(ref historyInstanceFilter, value))
+            {
+                ApplyHistoryFilters();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置历史操作筛选文本。
+    /// </summary>
+    public string HistoryOperationFilter
+    {
+        get => historyOperationFilter;
+        set
+        {
+            if (SetProperty(ref historyOperationFilter, value))
+            {
+                ApplyHistoryFilters();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置历史结果筛选文本。
+    /// </summary>
+    public string HistoryResultFilter
+    {
+        get => historyResultFilter;
+        set
+        {
+            if (SetProperty(ref historyResultFilter, value))
+            {
+                ApplyHistoryFilters();
+            }
+        }
+    }
 
     /// <summary>
     /// 获取当前配置是否已经成功生成可执行计划预览。
@@ -301,6 +386,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             profile.Environment.RequireCleanGitWorkspace = value;
+            InvalidatePreview();
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置是否按生产规则强制校验客户端公网 HTTPS/WSS 地址。
+    /// </summary>
+    public bool EnforcePublicEndpointSafety
+    {
+        get => profile.Environment.EnforcePublicEndpointSafety;
+        set
+        {
+            if (profile.Environment.EnforcePublicEndpointSafety == value)
+            {
+                return;
+            }
+
+            profile.Environment.EnforcePublicEndpointSafety = value;
             InvalidatePreview();
         }
     }
@@ -548,7 +651,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             new GitSourceInspector(runner),
             new ReleasePackager(),
             new SshRemoteClient(),
-            paths);
+            paths,
+            profileStore);
         orchestrator = new DeploymentOrchestrator(executor, new JsonExecutionJournal(paths));
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         AddHostCommand = new RelayCommand(AddHost);
@@ -619,7 +723,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             DeploymentRoot = "/opt/minicore"
         };
         Hosts.Add(host);
-        HostEditors.Add(new HostEditorViewModel(host));
+        var editor = new HostEditorViewModel(host);
+        AttachHostEditor(editor);
+        HostEditors.Add(editor);
         RaiseEmptyStateProperties();
         InvalidatePreview();
     }
@@ -644,6 +750,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (ReferenceEquals(HostEditors[index].Model, host))
             {
+                DetachHostEditor(HostEditors[index]);
                 HostEditors.RemoveAt(index);
             }
         }
@@ -675,8 +782,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 break;
             }
         }
-        var editor = new InstanceEditorViewModel(instance);
+        var editor = new InstanceEditorViewModel(instance, Hosts);
         editor.SetRoleCatalog(roleCatalog);
+        AttachInstanceEditor(editor);
         Instances.Add(editor);
         RaiseEmptyStateProperties();
         if (string.IsNullOrEmpty(SelectedTargetInstanceId))
@@ -684,6 +792,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedTargetInstanceId = instance.InstanceId;
         }
 
+        RefreshBuildTargetSelections();
         InvalidatePreview();
     }
 
@@ -694,7 +803,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RemoveInstance(InstanceEditorViewModel instance)
     {
         string instanceId = instance.Model.InstanceId;
+        DetachInstanceEditor(instance);
         Instances.Remove(instance);
+        RefreshBuildTargetSelections();
         RaiseEmptyStateProperties();
         if (string.Equals(SelectedTargetInstanceId, instanceId, StringComparison.Ordinal))
         {
@@ -722,7 +833,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AddHost();
         }
 
-        Instances.Clear();
+        ClearInstanceEditors();
         AddPresetInstance("coordinator-01", ComponentKind.Coordinator, 7000, 7001, 7099, "Coordinator");
         string firstBusinessInstanceId = string.Empty;
         int businessIndex = 0;
@@ -746,6 +857,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         SelectedTargetInstanceId = firstBusinessInstanceId.Length > 0 ? firstBusinessInstanceId : "coordinator-01";
+        RefreshBuildTargetSelections();
         StatusMessage = $"已按当前 Role Catalog 生成生产拓扑，共 {businessIndex} 个业务 Role；Auth 和 DB 仍保持可选。";
         InvalidatePreview();
     }
@@ -767,7 +879,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AddHost();
         }
 
-        Instances.Clear();
+        ClearInstanceEditors();
         var roles = new StringBuilder();
         for (int roleIndex = 0; roleIndex < roleCatalog.Count; roleIndex++)
         {
@@ -781,6 +893,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         AddPresetInstance("all-in-one-01", ComponentKind.Coordinator, 7000, 7001, 7099, roles.ToString());
         SelectedTargetInstanceId = "all-in-one-01";
+        RefreshBuildTargetSelections();
         StatusMessage = $"已按当前 Role Catalog 生成单机一体化拓扑，共承载 {roleCatalog.Count} 个 Role。";
         InvalidatePreview();
     }
@@ -805,9 +918,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OuterPort = outerPort,
             ManagementPort = managementPort
         };
-        var editor = new InstanceEditorViewModel(instance) { RoleText = roles };
+        var editor = new InstanceEditorViewModel(instance, Hosts) { RoleText = roles };
         editor.CommitRoles();
         editor.SetRoleCatalog(roleCatalog);
+        AttachInstanceEditor(editor);
         Instances.Add(editor);
     }
 
@@ -900,6 +1014,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 : "发布未完成；请查看执行中心的失败原因和恢复建议。";
             RefreshHistory();
         }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "执行已取消；已完成的安全步骤仍保留在发布历史中。";
+            RefreshHistory();
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = "执行基础设施失败：" + SensitiveDataRedactor.Redact(exception.Message);
+            RefreshHistory();
+        }
         finally
         {
             isExecuting = false;
@@ -913,7 +1037,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void CancelExecution()
     {
         executionCancellation?.Cancel();
-        StatusMessage = "正在取消当前步骤；已经完成的步骤不会回退。";
+        StatusMessage = "正在取消，等待当前安全步骤完成；已经完成的步骤不会回退。";
     }
 
     /// <summary>
@@ -977,23 +1101,117 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void SynchronizeCollectionsFromProfile()
     {
         Hosts.Clear();
+        for (int editorIndex = 0; editorIndex < HostEditors.Count; editorIndex++)
+        {
+            DetachHostEditor(HostEditors[editorIndex]);
+        }
+
         HostEditors.Clear();
         for (int index = 0; index < profile.Environment.Hosts.Count; index++)
         {
             HostDefinition host = profile.Environment.Hosts[index];
             Hosts.Add(host);
-            HostEditors.Add(new HostEditorViewModel(host));
+            var hostEditor = new HostEditorViewModel(host);
+            AttachHostEditor(hostEditor);
+            HostEditors.Add(hostEditor);
         }
 
-        Instances.Clear();
+        ClearInstanceEditors();
         for (int index = 0; index < profile.Environment.Instances.Count; index++)
         {
-            var editor = new InstanceEditorViewModel(profile.Environment.Instances[index]);
+            var editor = new InstanceEditorViewModel(profile.Environment.Instances[index], Hosts);
             editor.SetRoleCatalog(roleCatalog);
+            AttachInstanceEditor(editor);
             Instances.Add(editor);
         }
 
+        RefreshBuildTargetSelections();
         RaiseEmptyStateProperties();
+    }
+
+    /// <summary>
+    /// 订阅主机编辑器的 VPC 地址变化，使继承地址立即刷新。
+    /// </summary>
+    /// <param name="editor">待订阅主机编辑器。</param>
+    private void AttachHostEditor(HostEditorViewModel editor)
+    {
+        editor.PropertyChanged += OnHostEditorPropertyChanged;
+    }
+
+    /// <summary>
+    /// 解除主机编辑器属性变化订阅。
+    /// </summary>
+    /// <param name="editor">待解除订阅主机编辑器。</param>
+    private void DetachHostEditor(HostEditorViewModel editor)
+    {
+        editor.PropertyChanged -= OnHostEditorPropertyChanged;
+    }
+
+    /// <summary>
+    /// 在主机 VPC 地址变化时刷新全部实例的有效公布地址。
+    /// </summary>
+    /// <param name="sender">变化来源。</param>
+    /// <param name="eventArgs">属性变化参数。</param>
+    private void OnHostEditorPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (!string.Equals(eventArgs.PropertyName, nameof(HostEditorViewModel.PrivateAddress), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        for (int index = 0; index < Instances.Count; index++)
+        {
+            Instances[index].RefreshHostDerivedValues();
+        }
+
+        InvalidatePreview();
+    }
+
+    /// <summary>
+    /// 订阅实例组件、启用状态和地址变化。
+    /// </summary>
+    /// <param name="editor">待订阅实例编辑器。</param>
+    private void AttachInstanceEditor(InstanceEditorViewModel editor)
+    {
+        editor.PropertyChanged += OnInstanceEditorPropertyChanged;
+    }
+
+    /// <summary>
+    /// 解除实例编辑器属性变化订阅。
+    /// </summary>
+    /// <param name="editor">待解除订阅实例编辑器。</param>
+    private void DetachInstanceEditor(InstanceEditorViewModel editor)
+    {
+        editor.PropertyChanged -= OnInstanceEditorPropertyChanged;
+    }
+
+    /// <summary>
+    /// 在拓扑可用性变化时立即刷新 Auth/DB 构建目标并清理失效选择。
+    /// </summary>
+    /// <param name="sender">变化来源。</param>
+    /// <param name="eventArgs">属性变化参数。</param>
+    private void OnInstanceEditorPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (string.Equals(eventArgs.PropertyName, nameof(InstanceEditorViewModel.Component), StringComparison.Ordinal)
+            || string.Equals(eventArgs.PropertyName, nameof(InstanceEditorViewModel.Enabled), StringComparison.Ordinal))
+        {
+            RefreshBuildTargetSelections();
+        }
+
+        InvalidatePreview();
+    }
+
+    /// <summary>
+    /// 解除现有实例订阅并清空实例编辑集合。
+    /// </summary>
+    private void ClearInstanceEditors()
+    {
+        for (int index = 0; index < Instances.Count; index++)
+        {
+            DetachInstanceEditor(Instances[index]);
+        }
+
+        Instances.Clear();
     }
 
     /// <summary>
@@ -1001,15 +1219,148 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private void RefreshHistory()
     {
-        HistoryFiles.Clear();
-        string[] files = Directory.GetFiles(paths.HistoryPath, "*", SearchOption.TopDirectoryOnly);
-        Array.Sort(files, StringComparer.Ordinal);
-        for (int index = files.Length - 1; index >= 0; index--)
+        allHistoryEntries.Clear();
+        string[] files = Directory.GetFiles(paths.HistoryPath, "*.jsonl", SearchOption.TopDirectoryOnly);
+        Array.Sort(
+            files,
+            static (left, right) => File.GetLastWriteTimeUtc(right).CompareTo(File.GetLastWriteTimeUtc(left)));
+        for (int index = 0; index < files.Length; index++)
         {
-            HistoryFiles.Add(files[index]);
+            DeploymentHistoryEntryViewModel? entry = TryLoadHistoryEntry(files[index]);
+            if (entry != null)
+            {
+                allHistoryEntries.Add(entry);
+            }
+        }
+
+        ApplyHistoryFilters();
+    }
+
+    /// <summary>
+    /// 读取一份 JSONL 执行日志并汇总为用户可读的计划历史。
+    /// </summary>
+    /// <param name="path">计划执行日志路径。</param>
+    /// <returns>有效历史摘要；文件没有有效步骤时返回 null。</returns>
+    private DeploymentHistoryEntryViewModel? TryLoadHistoryEntry(string path)
+    {
+        var results = new List<StepResult>();
+        try
+        {
+            string[] lines = File.ReadAllLines(path);
+            for (int index = 0; index < lines.Length; index++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[index]))
+                {
+                    continue;
+                }
+
+                StepResult? result = JsonSerializer.Deserialize<StepResult>(lines[index], HistoryJsonOptions);
+                if (result != null)
+                {
+                    results.Add(result);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+
+        if (results.Count == 0)
+        {
+            return null;
+        }
+
+        StepResult first = results[0];
+        StepResult last = results[^1];
+        StepResult? rollback = results.LastOrDefault(static result => result.Action == DeploymentAction.AutomaticRollback);
+        bool lockReleaseFailed = results.Any(static result => result.Action == DeploymentAction.ReleaseEnvironmentLock && result.Status == StepStatus.Failed);
+        bool completed = !lockReleaseFailed
+            && results.Any(static result => result.Action == DeploymentAction.PersistState && result.Status == StepStatus.Succeeded);
+        StepResult? failed = completed
+            ? null
+            : results.LastOrDefault(static result => result.Status == StepStatus.Failed && result.Action != DeploymentAction.AutomaticRollback);
+        string[] instances = results
+            .Select(static result => result.InstanceId)
+            .Where(static instanceId => !string.IsNullOrWhiteSpace(instanceId))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static instanceId => instanceId, StringComparer.Ordinal)
+            .ToArray();
+        int retryCount = results
+            .Where(static result => result.Attempt > 1)
+            .GroupBy(static result => result.StepId, StringComparer.Ordinal)
+            .Sum(static group => group.Max(static result => result.Attempt) - 1);
+        string previousVersion = results
+            .Select(static result => result.PreviousReleaseVersion)
+            .FirstOrDefault(static version => !string.IsNullOrWhiteSpace(version)) ?? string.Empty;
+        string releaseVersion = first.ReleaseVersion;
+        string resultText = completed
+            ? "成功"
+            : rollback?.RollbackSucceeded == true
+                ? "失败，已自动回滚"
+                : rollback != null
+                    ? "失败，自动回滚失败"
+                    : last.Status == StepStatus.Cancelled
+                        ? "已取消"
+                        : "失败";
+        return new DeploymentHistoryEntryViewModel
+        {
+            PlanId = string.IsNullOrWhiteSpace(first.PlanId) ? Path.GetFileNameWithoutExtension(path) : first.PlanId,
+            EnvironmentId = first.EnvironmentId,
+            Operation = first.Operation.ToString(),
+            Operator = first.Operator,
+            StartedAt = results.Min(static result => result.StartedAtUtc).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
+            CompletedAt = results.Max(static result => result.CompletedAtUtc ?? result.StartedAtUtc).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
+            PreviousReleaseVersion = previousVersion,
+            ReleaseVersion = releaseVersion,
+            VersionTransition = (string.IsNullOrWhiteSpace(previousVersion) ? "首次/未知" : previousVersion) + " → " + releaseVersion,
+            Instances = instances.Length == 0 ? "环境级" : string.Join("、", instances),
+            Result = resultText,
+            FailedStep = failed?.DisplayName ?? string.Empty,
+            FailureReason = failed?.Message ?? string.Empty,
+            RetryCount = retryCount,
+            RollbackResult = rollback == null
+                ? "未触发"
+                : rollback.RollbackSucceeded == true ? "成功" : "失败：" + rollback.Message,
+            LogDirectory = Path.Combine(paths.LogsPath, string.IsNullOrWhiteSpace(first.PlanId) ? Path.GetFileNameWithoutExtension(path) : first.PlanId)
+        };
+    }
+
+    /// <summary>
+    /// 使用环境、版本、实例、操作和结果条件刷新发布历史列表。
+    /// </summary>
+    private void ApplyHistoryFilters()
+    {
+        HistoryEntries.Clear();
+        for (int index = 0; index < allHistoryEntries.Count; index++)
+        {
+            DeploymentHistoryEntryViewModel entry = allHistoryEntries[index];
+            if (entry.Matches(
+                historyEnvironmentFilter,
+                historyVersionFilter,
+                historyInstanceFilter,
+                historyOperationFilter,
+                historyResultFilter))
+            {
+                HistoryEntries.Add(entry);
+            }
         }
 
         RaiseEmptyStateProperties();
+    }
+
+    /// <summary>
+    /// 创建能够读取字符串枚举的历史反序列化设置。
+    /// </summary>
+    /// <returns>只用于本地历史的 JSON 设置。</returns>
+    private static JsonSerializerOptions CreateHistoryJsonOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        return options;
     }
 
     /// <summary>
@@ -1126,6 +1477,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RaisePropertyChanged(nameof(EnvironmentId));
         RaisePropertyChanged(nameof(EnvironmentDisplayName));
         RaisePropertyChanged(nameof(RequireCleanGitWorkspace));
+        RaisePropertyChanged(nameof(EnforcePublicEndpointSafety));
         RaisePropertyChanged(nameof(ReleaseVersion));
         RaisePropertyChanged(nameof(DatabaseMigrationReviewed));
         RaisePropertyChanged(nameof(Operation));

@@ -292,8 +292,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bundlePackageMode: 3
   packageName: DefaultPackage
-  resourcesServerURL: https://bomberman.namo.wang/v2/StreamingAssets/yoo/DefaultPackage
-  fallbackServerURL: https://bomberman.namo.wang/v2/StreamingAssets/yoo/DefaultPackage
+  resourcesServerURL:
+  fallbackServerURL:
   downloadMaxNum: 10
   failedTryAgain: 3
 --- !u!114 &467674385

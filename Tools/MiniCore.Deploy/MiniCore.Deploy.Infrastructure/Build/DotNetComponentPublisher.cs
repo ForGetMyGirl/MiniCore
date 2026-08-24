@@ -33,12 +33,16 @@ public sealed class DotNetComponentPublisher
     /// 按服务器目标和可选组件发布自包含 .NET 可执行程序。
     /// </summary>
     /// <param name="profile">发布配置。</param>
+    /// <param name="releaseRoot">本轮隔离构建的版本根目录。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>生成的输出目录。</returns>
-    public async Task<IReadOnlyList<string>> PublishAsync(DeploymentProfile profile, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<string>> PublishAsync(
+        DeploymentProfile profile,
+        string releaseRoot,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
-        string releaseRoot = Path.GetFullPath(Path.Combine(profile.Project.OutputPath, profile.Environment.ReleaseVersion));
+        releaseRoot = Path.GetFullPath(releaseRoot);
         string logRoot = Path.Combine(paths.LogsPath, "dotnet-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss"));
         Directory.CreateDirectory(logRoot);
         var outputs = new List<string>();
@@ -111,7 +115,15 @@ public sealed class DotNetComponentPublisher
 
         if (needsWindows)
         {
-            await PublishProjectAsync(profile.Project.ProjectPath, projectRelativePath, "win-x64", Path.Combine(releaseRoot, "DotNet", componentName, "win-x64"), logRoot, cancellationToken).ConfigureAwait(false);
+            string componentOutput = Path.Combine(releaseRoot, "DotNet", componentName, "win-x64");
+            await PublishProjectAsync(profile.Project.ProjectPath, projectRelativePath, "win-x64", componentOutput, logRoot, cancellationToken).ConfigureAwait(false);
+            await PublishProjectAsync(
+                profile.Project.ProjectPath,
+                "Tools/MiniCore.Deploy/MiniCore.Deploy.ServiceHost/MiniCore.Deploy.ServiceHost.csproj",
+                "win-x64",
+                Path.Combine(componentOutput, "Tools", "ServiceHost"),
+                logRoot,
+                cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -134,6 +146,11 @@ public sealed class DotNetComponentPublisher
         CancellationToken cancellationToken)
     {
         string projectPath = Path.Combine(projectRoot, projectRelativePath);
+        if (Directory.Exists(outputPath))
+        {
+            Directory.Delete(outputPath, true);
+        }
+
         string logName = Path.GetFileNameWithoutExtension(projectPath) + "-" + runtimeIdentifier + ".log";
         ProcessResult result = await runner.RunAsync(
             "dotnet",

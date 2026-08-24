@@ -27,5 +27,10 @@ public sealed class ReleaseArtifact
     /// </summary>
     public long Length { get; set; }
 
+    /// <summary>
+    /// 获取或设置制品解压后的总字节数，用于远程磁盘容量预检。
+    /// </summary>
+    public long UncompressedLength { get; set; }
+
     #endregion
 }

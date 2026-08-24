@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using MiniCore.Model;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace MiniCore.Server
@@ -48,7 +47,7 @@ namespace MiniCore.Server
             string configJson = File.ReadAllText(configPath);
             MiniCoreServerRuntimeConfig config = JsonConvert.DeserializeObject<MiniCoreServerRuntimeConfig>(configJson);
             ServerRoleCatalog catalog = JsonConvert.DeserializeObject<ServerRoleCatalog>(File.ReadAllText(catalogPath));
-            Validate(config, catalog, configJson);
+            Validate(config, catalog);
             DedicatedServerRuntimeContext.Configure(config.ParseRoles(catalog));
             Current = config;
             CurrentRoleCatalog = catalog;
@@ -63,8 +62,7 @@ namespace MiniCore.Server
         /// </summary>
         /// <param name="config">待校验配置。</param>
         /// <param name="catalog">制品 Role Catalog。</param>
-        /// <param name="configJson">未修改的外部配置 JSON。</param>
-        private static void Validate(MiniCoreServerRuntimeConfig config, ServerRoleCatalog catalog, string configJson)
+        private static void Validate(MiniCoreServerRuntimeConfig config, ServerRoleCatalog catalog)
         {
             if (config == null)
             {
@@ -87,7 +85,7 @@ namespace MiniCore.Server
                 throw new InvalidDataException("Dedicated Server environmentId、instanceId、releaseVersion、controlProtocolVersion、configVersion 和 configSha256 均不能为空。");
             }
 
-            VerifyConfigHash(config.ConfigSha256, configJson);
+            VerifyConfigHash(config);
             config.ParseRoles(catalog);
             config.ParsePersistenceMode();
             ValidatePort(config.Coordinator?.InnerPort ?? 0, "coordinator.innerPort");
@@ -141,25 +139,93 @@ namespace MiniCore.Server
         }
 
         /// <summary>
-        /// 移除 configSha256 字段后按紧凑 JSON 重新计算 SHA-256。
+        /// 使用与部署器共享的固定字段、UTF-8 Base64 和十进制规范验证配置版本与 SHA-256。
         /// </summary>
-        /// <param name="expected">配置声明的哈希。</param>
-        /// <param name="configJson">原始 JSON。</param>
-        private static void VerifyConfigHash(string expected, string configJson)
+        /// <param name="config">已经反序列化的实例配置。</param>
+        private static void VerifyConfigHash(MiniCoreServerRuntimeConfig config)
         {
-            JObject document = JObject.Parse(configJson);
-            document.Remove("configSha256");
-            string canonical = document.ToString(Formatting.None);
-            byte[] bytes = Encoding.UTF8.GetBytes(canonical);
-            string actual;
-            using (SHA256 sha256 = SHA256.Create())
+            var builder = new StringBuilder(768);
+            AppendCanonicalString(builder, "schema", "1");
+            AppendCanonicalString(builder, "environmentId", config.EnvironmentId);
+            AppendCanonicalString(builder, "instanceId", config.InstanceId);
+            AppendCanonicalString(builder, "releaseVersion", config.ReleaseVersion);
+            AppendCanonicalString(builder, "controlProtocolVersion", config.ControlProtocolVersion);
+            string[] roles = config.Roles == null ? Array.Empty<string>() : (string[])config.Roles.Clone();
+            Array.Sort(roles, StringComparer.Ordinal);
+            for (int index = 0; index < roles.Length; index++)
             {
-                actual = ToLowerHex(sha256.ComputeHash(bytes));
+                AppendCanonicalString(builder, "role", roles[index]);
             }
 
-            if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
+            AppendCanonicalString(builder, "coordinator.innerHost", config.Coordinator?.InnerHost);
+            AppendCanonicalInteger(builder, "coordinator.innerPort", config.Coordinator?.InnerPort ?? 0);
+            AppendCanonicalString(builder, "listeners.innerHost", config.Listeners?.InnerHost);
+            AppendCanonicalInteger(builder, "listeners.innerPort", config.Listeners?.InnerPort ?? 0);
+            AppendCanonicalString(builder, "listeners.outerHost", config.Listeners?.OuterHost);
+            AppendCanonicalInteger(builder, "listeners.outerPort", config.Listeners?.OuterPort ?? 0);
+            AppendCanonicalString(builder, "listeners.outerPath", config.Listeners?.OuterPath);
+            AppendCanonicalString(builder, "advertised.innerHost", config.Advertised?.InnerHost);
+            AppendCanonicalInteger(builder, "advertised.innerPort", config.Advertised?.InnerPort ?? 0);
+            AppendCanonicalString(builder, "advertised.outerWebSocketUrl", config.Advertised?.OuterWebSocketUrl);
+            AppendCanonicalString(builder, "management.host", config.Management?.Host);
+            AppendCanonicalInteger(builder, "management.port", config.Management?.Port ?? 0);
+            AppendCanonicalString(builder, "management.tokenFile", config.Management?.TokenFile);
+            AppendCanonicalString(builder, "logPath", config.LogPath);
+            AppendCanonicalString(builder, "persistenceMode", config.PersistenceMode);
+            string payloadSha256 = ComputeSha256(builder);
+            string expectedConfigVersion = "cfg-" + payloadSha256.Substring(0, 16);
+            if (!string.Equals(config.ConfigVersion, expectedConfigVersion, StringComparison.Ordinal))
             {
-                throw new InvalidDataException($"Dedicated Server 配置 SHA-256 不匹配：期望 {expected}，实际 {actual}。");
+                throw new InvalidDataException($"Dedicated Server configVersion 不匹配：期望 {expectedConfigVersion}，实际 {config.ConfigVersion}。");
+            }
+
+            AppendCanonicalString(builder, "configVersion", config.ConfigVersion);
+            string actual = ComputeSha256(builder);
+            if (!string.Equals(config.ConfigSha256, actual, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"Dedicated Server 配置 SHA-256 不匹配：期望 {config.ConfigSha256}，实际 {actual}。");
+            }
+        }
+
+        /// <summary>
+        /// 以 UTF-8 Base64 追加一个不受 JSON 库转义和属性顺序影响的字符串字段。
+        /// </summary>
+        /// <param name="builder">规范文本构建器。</param>
+        /// <param name="key">固定字段键。</param>
+        /// <param name="value">字段文本。</param>
+        private static void AppendCanonicalString(StringBuilder builder, string key, string value)
+        {
+            builder.Append(key)
+                .Append('=')
+                .Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(value ?? string.Empty)))
+                .Append('\n');
+        }
+
+        /// <summary>
+        /// 以十进制不变格式追加一个规范整数。
+        /// </summary>
+        /// <param name="builder">规范文本构建器。</param>
+        /// <param name="key">固定字段键。</param>
+        /// <param name="value">整数值。</param>
+        private static void AppendCanonicalInteger(StringBuilder builder, string key, int value)
+        {
+            builder.Append(key)
+                .Append("=#")
+                .Append(value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Append('\n');
+        }
+
+        /// <summary>
+        /// 计算规范文本的 UTF-8 SHA-256。
+        /// </summary>
+        /// <param name="builder">规范文本构建器。</param>
+        /// <returns>小写十六进制摘要。</returns>
+        private static string ComputeSha256(StringBuilder builder)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(builder.ToString());
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                return ToLowerHex(sha256.ComputeHash(bytes));
             }
         }
 

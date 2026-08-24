@@ -4,7 +4,6 @@
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/DatabaseServer.deps.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/DatabaseServer.runtimeconfig.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/DatabaseServer.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/DatabaseServer.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/Google.Protobuf.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/Humanizer.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/Microsoft.Bcl.AsyncInterfaces.dll
@@ -313,17 +312,13 @@
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/libmscordbi.so
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/MiniCore.Server.Protocol.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/MiniCore.Server.Rpc.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/MiniCore.Server.Protocol.pdb
-/Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/bin/Release/net10.0/linux-x64/MiniCore.Server.Rpc.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.csproj.AssemblyReference.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.GeneratedMSBuildEditorConfig.editorconfig
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.AssemblyInfoInputs.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.AssemblyInfo.cs
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.csproj.CoreCompileInputs.cache
-/Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.sourcelink.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/Database.414114EB.Up2Date
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/refint/DatabaseServer.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/DatabaseServer.genruntimeconfig.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/DatabaseServer/obj/Release/net10.0/linux-x64/ref/DatabaseServer.dll

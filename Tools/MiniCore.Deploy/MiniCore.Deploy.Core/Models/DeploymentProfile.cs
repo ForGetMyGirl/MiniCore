@@ -10,7 +10,7 @@ public sealed class DeploymentProfile
     /// <summary>
     /// 获取或设置配置文件格式版本。
     /// </summary>
-    public int SchemaVersion { get; set; } = 4;
+    public int SchemaVersion { get; set; } = 5;
 
     /// <summary>
     /// 获取或设置配置方案的稳定标识，用于独立文件保存和切换。

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MiniCore.Server.Protocol")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+970e887ba916d0cf4047072736f8faaeba696e70")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+414f7ba17cbc0973c57f8948fcfb9c7ddbb8fdcb")]
 [assembly: System.Reflection.AssemblyProductAttribute("MiniCore.Server.Protocol")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MiniCore.Server.Protocol")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

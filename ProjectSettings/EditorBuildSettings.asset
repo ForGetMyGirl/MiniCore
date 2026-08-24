@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/Demos/MiniBomber/ServerBootstrapScene.unity
-    guid: 3a6a2fc9d1dbd4bbb90754ced44d5e6f
+    path: Assets/Scenes/HotUpdateScene.unity
+    guid: 4cca3240bc0e93548816433af6b77302
   m_configObjects: {}

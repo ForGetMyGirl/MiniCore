@@ -4,7 +4,6 @@
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/AuthenticationServer.deps.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/AuthenticationServer.runtimeconfig.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/AuthenticationServer.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/AuthenticationServer.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/Humanizer.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/Microsoft.Bcl.AsyncInterfaces.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/bin/Release/net10.0/linux-x64/Microsoft.Build.Locator.dll
@@ -428,7 +427,6 @@
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.AssemblyInfo.cs
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.csproj.CoreCompileInputs.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.MvcApplicationPartsAssemblyInfo.cache
-/Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.sourcelink.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/rjimswa.dswa.cache.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/rjsmrazor.dswa.cache.json
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/rjsmcshtml.dswa.cache.json
@@ -441,6 +439,5 @@
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/Authenti.ABDD6FFB.Up2Date
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.dll
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/refint/AuthenticationServer.dll
-/Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.pdb
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/AuthenticationServer.genruntimeconfig.cache
 /Users/ws97_mini/Unity/Project/MiniCore/Server/AuthenticationServer/obj/Release/net10.0/linux-x64/ref/AuthenticationServer.dll

@@ -13,6 +13,16 @@ public sealed class StepResult
     public string StepId { get; set; } = string.Empty;
 
     /// <summary>
+    /// 获取或设置所属计划标识。
+    /// </summary>
+    public string PlanId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置目标环境标识。
+    /// </summary>
+    public string EnvironmentId { get; set; } = string.Empty;
+
+    /// <summary>
     /// 获取或设置显示名称。
     /// </summary>
     public string DisplayName { get; set; } = string.Empty;
@@ -21,6 +31,36 @@ public sealed class StepResult
     /// 获取或设置目标主机。
     /// </summary>
     public string HostId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置目标实例标识；环境级步骤为空。
+    /// </summary>
+    public string InstanceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置本轮发布操作。
+    /// </summary>
+    public DeploymentOperation Operation { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前原子动作。
+    /// </summary>
+    public DeploymentAction Action { get; set; }
+
+    /// <summary>
+    /// 获取或设置执行操作人员标识。
+    /// </summary>
+    public string Operator { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置目标程序版本。
+    /// </summary>
+    public string ReleaseVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置执行前已知程序版本。
+    /// </summary>
+    public string PreviousReleaseVersion { get; set; } = string.Empty;
 
     /// <summary>
     /// 获取或设置当前状态。
@@ -61,6 +101,26 @@ public sealed class StepResult
     /// 获取或设置操作人员可执行的恢复建议。
     /// </summary>
     public string RecoverySuggestion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置供结构化日志展示的标准输出摘要。
+    /// </summary>
+    public string StandardOutputSummary { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置供结构化日志展示的标准错误摘要。
+    /// </summary>
+    public string StandardErrorSummary { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置自动回滚是否成功；非补偿步骤为空。
+    /// </summary>
+    public bool? RollbackSucceeded { get; set; }
+
+    /// <summary>
+    /// 获取或设置步骤耗时毫秒数。
+    /// </summary>
+    public long DurationMilliseconds { get; set; }
 
     #endregion
 }

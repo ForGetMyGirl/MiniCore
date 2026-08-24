@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -7,6 +8,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using MiniCore.Deploy.Desktop.ViewModels;
+using MiniCore.Deploy.Core.Models;
 using MiniCore.Deploy.Infrastructure.Remote;
 
 namespace MiniCore.Deploy.Desktop;
@@ -288,6 +290,61 @@ public sealed partial class MainWindow : Window
         catch (Exception exception)
         {
             hostEditor.CompleteConnectionTest(false, exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// 使用操作系统默认程序打开执行中心选中步骤的结构化日志。
+    /// </summary>
+    /// <param name="sender">步骤日志按钮。</param>
+    /// <param name="eventArgs">点击事件参数。</param>
+    private async void OnOpenStepLogClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Control { DataContext: StepResult result })
+        {
+            await OpenLocalPathAsync(result.LogPath, false).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>
+    /// 使用系统文件管理器打开历史计划的日志目录。
+    /// </summary>
+    /// <param name="sender">历史日志按钮。</param>
+    /// <param name="eventArgs">点击事件参数。</param>
+    private async void OnOpenHistoryLogClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Control { DataContext: DeploymentHistoryEntryViewModel entry })
+        {
+            await OpenLocalPathAsync(entry.LogDirectory, true).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>
+    /// 校验本地日志文件或目录后交给操作系统打开。
+    /// </summary>
+    /// <param name="path">待打开路径。</param>
+    /// <param name="isDirectory">目标是否为目录。</param>
+    /// <returns>打开或错误提示完成任务。</returns>
+    private async Task OpenLocalPathAsync(string path, bool isDirectory)
+    {
+        bool exists = isDirectory ? Directory.Exists(path) : File.Exists(path);
+        if (string.IsNullOrWhiteSpace(path) || !exists)
+        {
+            await ShowErrorAsync("日志尚不可用", "该步骤尚未生成日志，或日志已经被移动。\n" + path).ConfigureAwait(true);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync("无法打开日志", exception.Message).ConfigureAwait(true);
         }
     }
 

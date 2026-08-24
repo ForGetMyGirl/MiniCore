@@ -319,18 +319,15 @@ public sealed class UpdateMainWindow : AMTaskBehaviour
     }
 
     /// <summary>
-    /// 使用 Web 模式初始化资源包。
+    /// 使用当前 WebGL 页面随包发布的 StreamingAssets 初始化资源包。
     /// </summary>
     /// <returns>资源包初始化完成任务。</returns>
     private async MTask InitPackageAsync_WebPlayMode()
     {
-        IRemoteServices remoteServices = new RemoteServices(resourcesServerURL, fallbackServerURL);
         var webServerFileSystemParameters = FileSystemParameters.CreateDefaultWebServerFileSystemParameters();
-        var webRemoteFileSystemParameters = FileSystemParameters.CreateDefaultWebRemoteFileSystemParameters(remoteServices);
 
         var createParameters = new WebPlayModeParameters();
         createParameters.WebServerFileSystemParameters = webServerFileSystemParameters;
-        createParameters.WebRemoteFileSystemParameters = webRemoteFileSystemParameters;
 
         var initOperation = package.InitializeAsync(createParameters);
         await initOperation.ToMTask();

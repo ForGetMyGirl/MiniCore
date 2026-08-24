@@ -191,7 +191,7 @@
               </Button>
             </Grid>
             <Border Padding="12" CornerRadius="7" Background="{DynamicResource PrimarySoftBrush}" BorderBrush="#BEDAFF" BorderThickness="1">
-              <TextBlock Foreground="#175CD3" Text="SSH 私钥和密码都需要登录用户名。私钥只保存本机路径；密码仅保留在当前应用会话，关闭后不会保存。主机指纹由工具读取并让你确认。测试连接会验证远程命令和文件上传，两者共用同一 SSH 端口与凭证。" TextWrapping="Wrap" />
+              <TextBlock Foreground="#175CD3" Text="SSH 地址只用于部署连接；VPC 地址供服务器之间互访并由实例默认继承。VPC 地址不会自动成为监听地址，进程监听仍在服务拓扑中独立设置。私钥和密码都需要登录用户名；测试连接会同时验证远程命令与文件上传。" TextWrapping="Wrap" />
             </Border>
             <ItemsControl ItemsSource="{Binding HostEditors}">
               <ItemsControl.ItemTemplate>
@@ -239,19 +239,26 @@
                           </ComboBox>
                         </StackPanel>
                       </Grid>
-                      <Grid ColumnDefinitions="2*,1.4*" ColumnSpacing="12">
+                      <Grid ColumnDefinitions="2*,1.25*,1.25*" ColumnSpacing="12">
                         <StackPanel IsVisible="{Binding IsPrivateKeyAuthentication}" Spacing="5">
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 私钥文件（本机路径）" />
                           <Grid>
                             <TextBox Classes="with-picker" Text="{Binding PrivateKeyPath, Mode=TwoWay}" PlaceholderText="选择 .pem、id_rsa 或 id_ed25519" />
                             <Button Classes="path-picker-button" Content="···" ToolTip.Tip="选择本机私钥文件" Click="OnPickHostPrivateKeyClick" />
                           </Grid>
+                          <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="私钥口令（可选，仅当前会话）" />
+                          <TextBox PasswordChar="●" Text="{Binding PrivateKeyPassphrase, Mode=TwoWay}" PlaceholderText="仅加密私钥需要填写" />
                         </StackPanel>
                         <StackPanel IsVisible="{Binding IsPasswordAuthentication}" Spacing="5">
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="SSH 密码（仅当前会话）" />
                           <TextBox PasswordChar="●" Text="{Binding Password, Mode=TwoWay}" PlaceholderText="关闭应用后需要重新输入" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="5">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="VPC 地址 / 内网 DNS" />
+                          <TextBox Text="{Binding PrivateAddress, Mode=TwoWay}" PlaceholderText="供实例继承，例如 10.x.x.x" />
+                          <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="只用于公布，不会替代 ListenHost。" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="5">
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="部署根目录（服务器路径）" />
                           <TextBox Text="{Binding Model.DeploymentRoot, Mode=TwoWay}" />
                         </StackPanel>
@@ -449,6 +456,8 @@
                       <StackPanel Spacing="8">
                         <ToggleSwitch IsChecked="{Binding RequireCleanGitWorkspace, Mode=TwoWay}" OnContent="要求干净工作区" OffContent="允许记录未提交改动" />
                         <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="这是源码安全策略，不是方案分类。正式环境建议开启；本地联调可关闭并记录提交号与差异指纹。" TextWrapping="Wrap" />
+                        <ToggleSwitch IsChecked="{Binding EnforcePublicEndpointSafety, Mode=TwoWay}" OnContent="启用生产公网地址安全校验" OffContent="允许非公网地址但执行前必须确认" />
+                        <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="开启后，客户端公布地址必须是公网 HTTPS/WSS；localhost、127.0.0.0/8、0.0.0.0 和私网 IP 会阻止生成计划。关闭时这些地址只适合本地联调，计划预检会要求人工确认。" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <CheckBox IsChecked="{Binding DatabaseMigrationReviewed, Mode=TwoWay}" Content="当前版本的数据库迁移已经在外部完成评审" />
@@ -513,7 +522,7 @@
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="主机 ID" />
                           <ComboBox ItemsSource="{Binding $parent[Window].DataContext.Hosts}"
                                     SelectedValueBinding="{Binding HostId}"
-                                    SelectedValue="{Binding Model.HostId, Mode=TwoWay}"
+                                    SelectedValue="{Binding HostId, Mode=TwoWay}"
                                     PlaceholderText="请先添加主机">
                             <ComboBox.ItemTemplate>
                               <DataTemplate x:DataType="core:HostDefinition">
@@ -529,7 +538,7 @@
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="组件类型" />
                           <ComboBox ItemsSource="{Binding $parent[Window].DataContext.ComponentKinds}" SelectedItem="{Binding Component, Mode=TwoWay}" />
                         </StackPanel>
-                        <CheckBox Grid.Column="3" VerticalAlignment="Bottom" Margin="0,0,4,9" IsChecked="{Binding Model.Enabled, Mode=TwoWay}" Content="启用" />
+                        <CheckBox Grid.Column="3" VerticalAlignment="Bottom" Margin="0,0,4,9" IsChecked="{Binding Enabled, Mode=TwoWay}" Content="启用" />
                         <Button Grid.Column="4" Classes="danger icon-button" VerticalAlignment="Bottom" ToolTip.Tip="从当前期望拓扑删除实例" Command="{Binding $parent[Window].DataContext.RemoveInstanceCommand}" CommandParameter="{Binding}">
                           <Image Classes="small-icon"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/delete.png" Stretch="Uniform" />
                         </Button>
@@ -560,8 +569,9 @@
                               <TextBox Text="{Binding Model.InnerListenHost, Mode=TwoWay}" PlaceholderText="通常为 0.0.0.0" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="5">
-                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址" />
-                              <TextBox Text="{Binding Model.InnerAdvertisedHost, Mode=TwoWay}" PlaceholderText="其他服务器可访问的 VPC IP/DNS" />
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址覆盖（可选）" />
+                              <TextBox Text="{Binding InnerAdvertisedHostOverride, Mode=TwoWay}" PlaceholderText="留空时跟随所选主机 VPC 地址" />
+                              <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding InnerAdvertisedHostSourceText}" TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="5">
                               <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网端口" />
@@ -606,8 +616,9 @@
                               <TextBox Text="{Binding Model.InnerListenHost, Mode=TwoWay}" PlaceholderText="0.0.0.0 或 127.0.0.1" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="5">
-                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址" />
-                              <TextBox Text="{Binding Model.InnerAdvertisedHost, Mode=TwoWay}" PlaceholderText="反向代理可访问的 VPC IP/DNS" />
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址覆盖（可选）" />
+                              <TextBox Text="{Binding InnerAdvertisedHostOverride, Mode=TwoWay}" PlaceholderText="留空时跟随所选主机 VPC 地址" />
+                              <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding InnerAdvertisedHostSourceText}" TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="5">
                               <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="HTTP 端口" />
@@ -660,8 +671,9 @@
                               <TextBox Text="{Binding Model.InnerListenHost, Mode=TwoWay}" PlaceholderText="通常为 0.0.0.0" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="5">
-                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址" />
-                              <TextBox Text="{Binding Model.InnerAdvertisedHost, Mode=TwoWay}" PlaceholderText="DS 可访问的 VPC IP/DNS" />
+                              <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="内网公布地址覆盖（可选）" />
+                              <TextBox Text="{Binding InnerAdvertisedHostOverride, Mode=TwoWay}" PlaceholderText="留空时跟随所选主机 VPC 地址" />
+                              <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding InnerAdvertisedHostSourceText}" TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="5">
                               <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="RPC 端口" />
@@ -787,7 +799,7 @@
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Description}" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="{Binding IsBuildAvailable}" IsChecked="{Binding IsBuildSelected, Mode=TwoWay}" />
-                        <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding IsPublishSelected, Mode=TwoWay}" />
+                        <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="{Binding IsPublishAvailable}" IsChecked="{Binding IsPublishSelected, Mode=TwoWay}" />
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding AvailabilityText}" TextWrapping="Wrap" />
                       </Grid>
                     </DataTemplate>
@@ -818,7 +830,7 @@
                           <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Description}" />
                         </StackPanel>
                         <CheckBox Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="{Binding IsBuildAvailable}" IsChecked="{Binding IsBuildSelected, Mode=TwoWay}" />
-                        <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" IsChecked="{Binding IsPublishSelected, Mode=TwoWay}" />
+                        <CheckBox Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="{Binding IsPublishAvailable}" IsChecked="{Binding IsPublishSelected, Mode=TwoWay}" />
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding AvailabilityText}" TextWrapping="Wrap" />
                       </Grid>
                     </DataTemplate>
@@ -969,13 +981,14 @@
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="core:StepResult">
                 <Border Margin="0,0,0,8" Padding="13" CornerRadius="7" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                  <Grid ColumnDefinitions="82,120,210,*" RowDefinitions="Auto,Auto">
+                  <Grid ColumnDefinitions="82,120,210,*,100" RowDefinitions="Auto,Auto">
                     <TextBlock Foreground="{DynamicResource PrimaryBrush}" Text="{Binding StepId}" />
                     <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="{Binding Status}" />
                     <TextBlock Grid.Column="2" Text="{Binding DisplayName}" />
                     <TextBlock Grid.Column="3" Text="{Binding Message}" TextWrapping="Wrap" />
                     <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,5,0,0" Foreground="{DynamicResource DangerBrush}" Text="{Binding ErrorCode}" />
                     <TextBlock Grid.Row="1" Grid.Column="3" Margin="0,5,0,0" Foreground="{DynamicResource WarningBrush}" Text="{Binding RecoverySuggestion}" TextWrapping="Wrap" />
+                    <Button Grid.Column="4" Grid.RowSpan="2" Classes="outline" HorizontalAlignment="Right" VerticalAlignment="Center" Click="OnOpenStepLogClick" Content="打开日志" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -993,7 +1006,7 @@
 
       <!-- 9 发布历史 -->
       <ContentControl>
-        <StackPanel Margin="28,24,28,30" Spacing="13">
+        <Grid Margin="28,24,28,30" RowDefinitions="Auto,Auto,*" RowSpacing="13">
           <StackPanel Spacing="4">
             <StackPanel Orientation="Horizontal" Spacing="9">
               <Image Width="30" Height="30"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/history.png" Stretch="Uniform" />
@@ -1001,9 +1014,66 @@
             </StackPanel>
             <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="计划、状态和日志保存在应用数据目录；不会把密钥或 Token 写入仓库。" />
           </StackPanel>
-          <Border Padding="14" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-            <Grid MinHeight="160">
-              <ListBox ItemsSource="{Binding HistoryFiles}" Background="Transparent" />
+          <Border Grid.Row="1" Padding="12" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <Grid ColumnDefinitions="1.2*,1.2*,1.5*,1.2*,1.2*" ColumnSpacing="10">
+              <StackPanel Spacing="4">
+                <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="环境" />
+                <TextBox Text="{Binding HistoryEnvironmentFilter, Mode=TwoWay}" PlaceholderText="全部环境" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="版本" />
+                <TextBox Text="{Binding HistoryVersionFilter, Mode=TwoWay}" PlaceholderText="源版本或目标版本" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4">
+                <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="实例" />
+                <TextBox Text="{Binding HistoryInstanceFilter, Mode=TwoWay}" PlaceholderText="Instance ID" />
+              </StackPanel>
+              <StackPanel Grid.Column="3" Spacing="4">
+                <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="操作" />
+                <TextBox Text="{Binding HistoryOperationFilter, Mode=TwoWay}" PlaceholderText="例如 FullRelease" />
+              </StackPanel>
+              <StackPanel Grid.Column="4" Spacing="4">
+                <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="结果" />
+                <TextBox Text="{Binding HistoryResultFilter, Mode=TwoWay}" PlaceholderText="成功、失败、回滚" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Grid.Row="2" Padding="10" CornerRadius="9" Background="White" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <Grid MinHeight="200">
+              <ListBox ItemsSource="{Binding HistoryEntries}" Background="Transparent">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:DeploymentHistoryEntryViewModel">
+                    <Border Margin="0,0,0,8" Padding="13" CornerRadius="7" Background="#F8FAFC" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                      <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="1.2*,1.1*,1.1*,1.2*,Auto" ColumnSpacing="12" RowSpacing="7">
+                        <StackPanel>
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="环境 / 操作" />
+                          <TextBlock FontWeight="SemiBold" Text="{Binding EnvironmentId, StringFormat='{}{0}'}" />
+                          <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Operation}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="版本" />
+                          <TextBlock FontWeight="SemiBold" Text="{Binding VersionTransition}" />
+                          <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Result}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="操作人 / 时间" />
+                          <TextBlock Text="{Binding Operator}" />
+                          <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding CompletedAt}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                          <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Text="实例 / 重试" />
+                          <TextBlock Text="{Binding Instances}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding RetryCount, StringFormat='额外重试：{0} 次'}" />
+                        </StackPanel>
+                        <Button Grid.Column="4" Classes="outline" VerticalAlignment="Center" Click="OnOpenHistoryLogClick" Content="打开日志" />
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="5" Foreground="{DynamicResource DangerBrush}" Text="{Binding FailedStep, StringFormat='失败步骤：{0}'}" IsVisible="{Binding HasFailure}" />
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding FailureReason}" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.Column="4" HorizontalAlignment="Right" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding RollbackResult, StringFormat='回滚：{0}'}" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
               <StackPanel IsVisible="{Binding HasNoHistory}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                 <Image Width="40" Height="40" HorizontalAlignment="Center"  Source="avares://MiniCore.Deploy.Desktop/Assets/Icons/history.png" Stretch="Uniform" />
                 <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="还没有发布历史" />
@@ -1011,7 +1081,7 @@
               </StackPanel>
             </Grid>
           </Border>
-        </StackPanel>
+        </Grid>
       </ContentControl>
 
       <!-- 帮助 -->
